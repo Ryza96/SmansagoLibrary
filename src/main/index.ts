@@ -9,12 +9,41 @@ import { PublisherService } from './services/publisher.service'
 import { PublisherRepository } from './repositories/publisher.repository'
 import { CategoryService } from './services/category.service'
 import { CategoryRepository } from './repositories/category.repository'
+import { BorrowingService } from './services/borrowing.service'
+import { BorrowingRepository } from './repositories/borrowing.repository'
+import { BorrowingItemRepository } from './repositories/borrowing-item.repository'
+import { ReturnRepository } from './repositories/return.repository'
+import { MemberService } from './services/member.service'
+import { MemberRepository } from './repositories/member.repository'
+import { BookCopyRepository } from './repositories/book-copy.repository'
+import { ReturnService } from './services/return.service'
+import { PrintService } from './services/print.service'
 
 const bookRepository = new BookRepository()
 const bookService = new BookService(bookRepository)
 const authorService = new AuthorService(new AuthorRepository(), bookRepository)
 const publisherService = new PublisherService(new PublisherRepository(), bookRepository)
 const categoryService = new CategoryService(new CategoryRepository(), bookRepository)
+const bookCopyRepository = new BookCopyRepository()
+const memberRepository = new MemberRepository()
+const memberService = new MemberService(memberRepository)
+const borrowingRepository = new BorrowingRepository()
+const borrowingItemRepository = new BorrowingItemRepository()
+const returnRepository = new ReturnRepository()
+const borrowingService = new BorrowingService(
+  borrowingRepository,
+  borrowingItemRepository,
+  returnRepository,
+  memberRepository,
+  bookCopyRepository
+)
+const returnService = new ReturnService(
+  bookCopyRepository,
+  borrowingItemRepository,
+  borrowingRepository,
+  returnRepository
+)
+const printService = new PrintService(borrowingRepository)
 
 let mainWindow: BrowserWindow | null = null
 
@@ -159,6 +188,44 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle('categories:delete', async (_event, id: string) => {
     return categoryService.delete(id)
+  })
+
+  ipcMain.handle('bookCopies:findByBarcode', async (_event, barcode: string) => {
+    return borrowingService.findBookCopyByBarcode(barcode)
+  })
+
+  ipcMain.handle('members:search', async (_event, query: string) => {
+    return memberService.search(query)
+  })
+
+  ipcMain.handle('members:findById', async (_event, id: string) => {
+    return memberService.getById(id)
+  })
+
+  ipcMain.handle('borrowings:getMemberBorrowingStats', async (_event, memberId: string) => {
+    const activeBookCount = await borrowingItemRepository.countActiveByMemberId(memberId)
+    const nearestDueDate = await borrowingItemRepository.getNearestDueDateByMemberId(memberId)
+    return { activeBookCount, nearestDueDate: nearestDueDate?.toISOString() ?? null }
+  })
+
+  ipcMain.handle('borrowings:create', async (_event, input: any) => {
+    return borrowingService.create(input)
+  })
+
+  ipcMain.handle('returns:findByBarcode', async (_event, barcode: string) => {
+    return returnService.findBorrowingByBarcode(barcode)
+  })
+
+  ipcMain.handle('returns:returnBook', async (_event, input: any) => {
+    return returnService.returnBook(input)
+  })
+
+  ipcMain.handle('printing:borrowReceipt', async (_event, borrowingId: string) => {
+    return printService.printBorrowReceipt(borrowingId)
+  })
+
+  ipcMain.handle('printing:returnReceipt', async (_event, borrowingId: string) => {
+    return printService.printReturnReceipt(borrowingId)
   })
 }
 

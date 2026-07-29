@@ -6,7 +6,7 @@ import BookTable from '../components/books/BookTable'
 import { LABELS } from '../constants/labels'
 import { ROUTES } from '../config/navigation'
 
-const api = (window as any).electronAPI
+const api = window.electronAPI
 
 export default function BooksPage() {
   const navigate = useNavigate()

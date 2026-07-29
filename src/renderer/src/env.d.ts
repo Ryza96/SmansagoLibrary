@@ -46,6 +46,31 @@ interface ElectronAPI {
     update: (id: string, input: import('./types/dtos/master').UpdateCategoryDTO) => Promise<import('./types/dtos/master').CategoryDTO>
     delete: (id: string) => Promise<void>
   }
+  bookCopies: {
+    findByBarcode: (barcode: string) => Promise<{
+      id: string
+      barcode: string | null
+      inventoryNumber: string
+      status: string
+      book: { title: string } | null
+    } | null>
+  }
+  members: {
+    search: (query: string) => Promise<import('./types/dtos/member').MemberDTO[]>
+    findById: (id: string) => Promise<import('./types/dtos/member').MemberDTO>
+  }
+  borrowings: {
+    create: (input: import('./types/dtos/borrowing').CreateBorrowingInput) => Promise<import('./types/dtos/borrowing').BorrowingDTO>
+    getMemberBorrowingStats: (memberId: string) => Promise<{ activeBookCount: number; nearestDueDate: string | null }>
+  }
+  returns: {
+    findByBarcode: (barcode: string) => Promise<import('./types/dtos/borrowing').BorrowingByBarcodeResult>
+    returnBook: (input: import('./types/dtos/borrowing').ReturnBookInput) => Promise<import('./types/dtos/borrowing').BorrowingDTO>
+  }
+  print: {
+    borrowReceipt: (borrowingId: string) => Promise<void>
+    returnReceipt: (borrowingId: string) => Promise<void>
+  }
   platform: string
 }
 

@@ -6,7 +6,7 @@ import MasterTable, { type Column } from '../../components/master/MasterTable'
 import { LABELS } from '../../constants/labels'
 import { ROUTES, authorEditPath } from '../../config/navigation'
 
-const api = (window as any).electronAPI
+const api = window.electronAPI
 
 export default function AuthorListPage() {
   const navigate = useNavigate()

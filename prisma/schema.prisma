@@ -91,7 +91,90 @@ model BookCopy {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
-  book Book @relation(fields: [bookId], references: [id])
+  book           Book            @relation(fields: [bookId], references: [id])
+  borrowingItems BorrowingItem[]
 
   @@index([status])
+}
+
+model Member {
+  id         String   @id @default(uuid())
+  number     String   @unique
+  fullName   String
+  gender     String?
+  birthplace String?
+  birthDate  DateTime?
+  phone      String?
+  email      String?
+  memberType String?
+  joinDate   DateTime?
+  validUntil DateTime?
+  status     String   @default("inactive")
+  address    String?
+  district   String?
+  village    String?
+  city       String?
+  postalCode String?
+  notes      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  borrowings Borrowing[]
+
+  @@index([fullName])
+  @@index([status])
+}
+
+model Borrowing {
+  id              String   @id @default(uuid())
+  borrowingNumber String   @unique
+  memberId        String
+  borrowDate      DateTime
+  dueDate         DateTime
+  status          String   @default("ACTIVE")
+  notes           String?
+  totalItems      Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  member  Member          @relation(fields: [memberId], references: [id])
+  items   BorrowingItem[]
+  returns Return[]
+
+  @@index([memberId])
+  @@index([status])
+  @@index([borrowingNumber])
+}
+
+model BorrowingItem {
+  id          String    @id @default(uuid())
+  borrowingId String
+  bookCopyId  String
+  status      String    @default("BORROWED")
+  returnedAt  DateTime?
+  condition   String?
+  fine        Float?
+  notes       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  borrowing Borrowing @relation(fields: [borrowingId], references: [id])
+  bookCopy  BookCopy  @relation(fields: [bookCopyId], references: [id])
+
+  @@index([borrowingId])
+  @@index([bookCopyId])
+  @@index([status])
+}
+
+model Return {
+  id          String   @id @default(uuid())
+  borrowingId String
+  returnDate  DateTime
+  processedBy String?
+  notes       String?
+  createdAt   DateTime @default(now())
+
+  borrowing Borrowing @relation(fields: [borrowingId], references: [id])
+
+  @@index([borrowingId])
 }

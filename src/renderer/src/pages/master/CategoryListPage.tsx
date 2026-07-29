@@ -6,7 +6,7 @@ import MasterTable, { type Column } from '../../components/master/MasterTable'
 import { LABELS } from '../../constants/labels'
 import { ROUTES, categoryEditPath } from '../../config/navigation'
 
-const api = (window as any).electronAPI
+const api = window.electronAPI
 
 export default function CategoryListPage() {
   const navigate = useNavigate()

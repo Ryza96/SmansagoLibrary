@@ -5,7 +5,7 @@ import type { AuthorDTO } from '../../types/dtos/master'
 import AuthorForm from '../../components/master/AuthorForm'
 import { LABELS } from '../../constants/labels'
 
-const api = (window as any).electronAPI
+const api = window.electronAPI
 
 export default function AuthorFormPage() {
   const { id } = useParams()

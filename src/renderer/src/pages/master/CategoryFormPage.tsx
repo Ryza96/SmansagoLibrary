@@ -5,7 +5,7 @@ import type { CategoryDTO } from '../../types/dtos/master'
 import CategoryForm from '../../components/master/CategoryForm'
 import { LABELS } from '../../constants/labels'
 
-const api = (window as any).electronAPI
+const api = window.electronAPI
 
 export default function CategoryFormPage() {
   const { id } = useParams()

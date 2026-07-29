@@ -5,7 +5,7 @@ import type { PublisherDTO } from '../../types/dtos/master'
 import PublisherForm from '../../components/master/PublisherForm'
 import { LABELS } from '../../constants/labels'
 
-const api = (window as any).electronAPI
+const api = window.electronAPI
 
 export default function PublisherFormPage() {
   const { id } = useParams()

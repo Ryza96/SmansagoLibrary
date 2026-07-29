@@ -14,11 +14,8 @@ export default function StatusBar() {
   const [info, setInfo] = useState<AppInfo | null>(null)
 
   useEffect(() => {
-    const api = (window as any).electronAPI
-    if (!api) return
-
-    api.db.ping().then((res: any) => setDbOk(res.ok))
-    api.app.info().then(setInfo)
+    window.electronAPI.db.ping().then((res) => setDbOk(res.ok))
+    window.electronAPI.app.info().then(setInfo)
   }, [])
 
   return (

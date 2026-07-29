@@ -5,6 +5,9 @@ import BooksPage from '../pages/BooksPage'
 import BookDetailPage from '../pages/BookDetailPage'
 import BookFormPage from '../pages/BookFormPage'
 import MembersPage from '../pages/MembersPage'
+import MemberCreatePage from '../pages/MemberCreatePage'
+import MemberEditPage from '../pages/MemberEditPage'
+import MemberDetailPage from '../pages/MemberDetailPage'
 import BorrowingsPage from '../pages/BorrowingsPage'
 import ReturnsPage from '../pages/ReturnsPage'
 import InventoryPage from '../pages/InventoryPage'
@@ -29,6 +32,9 @@ export const router = createHashRouter([
       { path: 'books/:id', element: <BookDetailPage /> },
       { path: 'books/:id/edit', element: <BookFormPage /> },
       { path: 'members', element: <MembersPage /> },
+      { path: 'members/new', element: <MemberCreatePage /> },
+      { path: 'members/:id', element: <MemberDetailPage /> },
+      { path: 'members/:id/edit', element: <MemberEditPage /> },
       { path: 'borrowings', element: <BorrowingsPage /> },
       { path: 'returns', element: <ReturnsPage /> },
       { path: 'inventory', element: <InventoryPage /> },

@@ -1,0 +1,27 @@
+export interface ReceiptItemData {
+  barcode: string
+  inventoryNumber: string
+  bookTitle: string
+  condition?: string
+}
+
+export interface BorrowReceiptData {
+  libraryName: string
+  borrowingNumber: string
+  memberName: string
+  memberNumber: string
+  borrowDate: string
+  dueDate: string
+  items: ReceiptItemData[]
+  totalItems: number
+}
+
+export interface ReturnReceiptData {
+  libraryName: string
+  borrowingNumber: string
+  memberName: string
+  memberNumber: string
+  returnDate: string
+  items: ReceiptItemData[]
+  totalItems: number
+}

@@ -1,4 +1,5 @@
 import { BookRepository } from '../repositories/book.repository'
+import { AppError } from '../errorHandler'
 import type { BookListItemDTO, BookDetailDTO, CreateBookDTO, UpdateBookDTO } from '../../shared/dto/book'
 
 export class BookService {
@@ -44,7 +45,7 @@ export class BookService {
     if (input.isbn) {
       const exists = await this.repository.existsByIsbn(input.isbn)
       if (exists) {
-        throw new Error(`ISBN ${input.isbn} sudah digunakan oleh buku lain.`)
+        throw new AppError(409, 'Duplicate', `ISBN ${input.isbn} sudah digunakan oleh buku lain.`)
       }
     }
 
@@ -71,7 +72,7 @@ export class BookService {
     if (input.isbn) {
       const duplicate = await this.repository.existsByIsbn(input.isbn, id)
       if (duplicate) {
-        throw new Error(`ISBN ${input.isbn} sudah digunakan oleh buku lain.`)
+        throw new AppError(409, 'Duplicate', `ISBN ${input.isbn} sudah digunakan oleh buku lain.`)
       }
     }
 

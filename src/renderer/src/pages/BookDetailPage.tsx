@@ -6,7 +6,7 @@ import BookDetail from '../components/books/BookDetail'
 import { LABELS } from '../constants/labels'
 import { bookEditPath } from '../config/navigation'
 
-const api = (window as any).electronAPI
+const api = window.electronAPI
 
 export default function BookDetailPage() {
   const { id } = useParams()
@@ -16,7 +16,7 @@ export default function BookDetailPage() {
 
   useEffect(() => {
     if (!id) return
-    api.books.findById(id).then((data: any) => {
+    api.books.findById(id).then((data: BookDetailDTO | null) => {
       setBook(data)
       setLoading(false)
     })

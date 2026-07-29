@@ -40,6 +40,25 @@ const electronAPI = {
     update: (id: string, input: any) => ipcRenderer.invoke('categories:update', id, input),
     delete: (id: string) => ipcRenderer.invoke('categories:delete', id)
   },
+  bookCopies: {
+    findByBarcode: (barcode: string) => ipcRenderer.invoke('bookCopies:findByBarcode', barcode)
+  },
+  members: {
+    search: (query: string) => ipcRenderer.invoke('members:search', query),
+    findById: (id: string) => ipcRenderer.invoke('members:findById', id)
+  },
+  borrowings: {
+    create: (input: any) => ipcRenderer.invoke('borrowings:create', input),
+    getMemberBorrowingStats: (memberId: string) => ipcRenderer.invoke('borrowings:getMemberBorrowingStats', memberId)
+  },
+  returns: {
+    findByBarcode: (barcode: string) => ipcRenderer.invoke('returns:findByBarcode', barcode),
+    returnBook: (input: any) => ipcRenderer.invoke('returns:returnBook', input)
+  },
+  print: {
+    borrowReceipt: (borrowingId: string) => ipcRenderer.invoke('printing:borrowReceipt', borrowingId),
+    returnReceipt: (borrowingId: string) => ipcRenderer.invoke('printing:returnReceipt', borrowingId)
+  },
   platform: process.platform
 }
 

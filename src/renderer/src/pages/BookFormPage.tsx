@@ -5,7 +5,7 @@ import { BookDetailDTO, SelectOption, CreateBookDTO, UpdateBookDTO } from '../ty
 import BookForm from '../components/books/BookForm'
 import { LABELS } from '../constants/labels'
 
-const api = (window as any).electronAPI
+const api = window.electronAPI
 
 export default function BookFormPage() {
   const { id } = useParams()
@@ -18,16 +18,20 @@ export default function BookFormPage() {
   const [categories, setCategories] = useState<SelectOption[]>([])
   const [loading, setLoading] = useState(true)
 
+  async function loadOptions() {
+    const [authorList, publisherList, categoryList] = await Promise.all([
+      api.authors.findMany(),
+      api.publishers.findMany(),
+      api.categories.findMany()
+    ])
+    setAuthors(authorList)
+    setPublishers(publisherList)
+    setCategories(categoryList)
+  }
+
   useEffect(() => {
     async function load() {
-      const [authorList, publisherList, categoryList] = await Promise.all([
-        api.authors.findMany(),
-        api.publishers.findMany(),
-        api.categories.findMany()
-      ])
-      setAuthors(authorList)
-      setPublishers(publisherList)
-      setCategories(categoryList)
+      await loadOptions()
 
       if (isEdit && id) {
         const book = await api.books.findById(id)
@@ -43,9 +47,25 @@ export default function BookFormPage() {
     if (isEdit && id) {
       await api.books.update(id, data)
     } else {
-      await api.books.create(data)
+      await api.books.create(data as CreateBookDTO)
     }
     navigate(-1)
+  }
+
+  async function handleAddAuthor(name: string) {
+    await api.authors.create({ name })
+    await loadOptions()
+  }
+
+  async function handleAddPublisher(name: string) {
+    await api.publishers.create({ name })
+    await loadOptions()
+  }
+
+  async function handleAddCategory(name: string) {
+    const code = name.slice(0, 10).toUpperCase().replace(/\s+/g, '_')
+    await api.categories.create({ code, name })
+    await loadOptions()
   }
 
   if (loading) {
@@ -66,17 +86,18 @@ export default function BookFormPage() {
         </h1>
       </div>
 
-      <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
-        <BookForm
-          initialData={initialData}
-          authors={authors}
-          publishers={publishers}
-          categories={categories}
-          onSubmit={handleSubmit}
-          onCancel={() => navigate(-1)}
-          isEdit={isEdit}
-        />
-      </div>
+      <BookForm
+        initialData={initialData}
+        authors={authors}
+        publishers={publishers}
+        categories={categories}
+        onSubmit={handleSubmit}
+        onCancel={() => navigate(-1)}
+        isEdit={isEdit}
+        onAddAuthor={handleAddAuthor}
+        onAddPublisher={handleAddPublisher}
+        onAddCategory={handleAddCategory}
+      />
     </div>
   )
 }

@@ -5,6 +5,9 @@ export const ROUTES = {
   BOOK_DETAIL: '/books/:id',
   BOOK_EDIT: '/books/:id/edit',
   MEMBERS: '/members',
+  MEMBERS_NEW: '/members/new',
+  MEMBER_DETAIL: '/members/:id',
+  MEMBERS_EDIT: '/members/:id/edit',
   BORROWINGS: '/borrowings',
   RETURNS: '/returns',
   INVENTORY: '/inventory',
@@ -27,6 +30,14 @@ export function bookDetailPath(id: string) {
 
 export function bookEditPath(id: string) {
   return `/books/${id}/edit`
+}
+
+export function memberDetailPath(id: string) {
+  return `/members/${id}`
+}
+
+export function memberEditPath(id: string) {
+  return `/members/${id}/edit`
 }
 
 export function authorEditPath(id: string) {

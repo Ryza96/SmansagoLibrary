@@ -15,10 +15,6 @@ interface CreateBookRepoInput {
 }
 
 export class BookRepository {
-  findMany() {
-    return prisma.book.findMany()
-  }
-
   findManyWithCount() {
     return prisma.book.findMany({
       include: {
@@ -95,15 +91,6 @@ export class BookRepository {
       }
     })
     return count > 0
-  }
-
-  findByIsbn(isbn: string, excludeId?: string) {
-    return prisma.book.findFirst({
-      where: {
-        isbn,
-        ...(excludeId ? { id: { not: excludeId } } : {})
-      }
-    })
   }
 
   async existsByAuthorId(authorId: string): Promise<boolean> {

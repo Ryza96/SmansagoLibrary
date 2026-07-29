@@ -1,17 +1,15 @@
 import { User, Settings, Minus, Square, X } from 'lucide-react'
 
-const api = (window as any).electronAPI
-
 function minimize() {
-  api?.window?.minimize?.()
+  window.electronAPI.window.minimize()
 }
 
 function maximize() {
-  api?.window?.maximize?.()
+  window.electronAPI.window.maximize()
 }
 
 function close() {
-  api?.window?.close?.()
+  window.electronAPI.window.close()
 }
 
 export default function TopBar() {
