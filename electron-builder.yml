@@ -1,0 +1,35 @@
+appId: com.kontenyou.aplibrary
+productName: APLibrary
+directories:
+  buildResources: resources
+  output: dist
+
+files:
+  - out/**/*
+  - node_modules/**/*
+  - "!node_modules/.prisma/client/*.node"
+  - "node_modules/.prisma/client/*.node"
+
+extraResources:
+  - from: node_modules/.prisma/client/
+    to: prisma/client/
+    filter:
+      - "*.node"
+      - "schema.prisma"
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: APLibrary
+
+asarUnpack:
+  - "**/*.node"
+  - "node_modules/.prisma/client/**"

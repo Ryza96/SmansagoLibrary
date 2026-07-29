@@ -1,0 +1,97 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Book {
+  id              String   @id @default(uuid())
+  title           String
+  isbn            String?
+  publisherId     String?
+  categoryId      String?
+  publicationYear Int?
+  edition         String?
+  language        String?
+  pageCount       Int?
+  description     String?
+  coverImage      String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  publisher  Publisher?   @relation(fields: [publisherId], references: [id])
+  category   Category?    @relation(fields: [categoryId], references: [id])
+  authors    BookAuthor[]
+  bookCopies BookCopy[]
+
+  @@index([title])
+  @@index([isbn])
+  @@index([publicationYear])
+}
+
+model Author {
+  id        String   @id @default(uuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  books BookAuthor[]
+
+  @@index([name])
+}
+
+model BookAuthor {
+  bookId   String
+  authorId String
+
+  book   Book   @relation(fields: [bookId], references: [id])
+  author Author @relation(fields: [authorId], references: [id])
+
+  @@id([bookId, authorId])
+}
+
+model Publisher {
+  id        String   @id @default(uuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  books Book[]
+
+  @@index([name])
+}
+
+model Category {
+  id          String   @id @default(uuid())
+  code        String   @unique
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  books Book[]
+
+  @@index([name])
+}
+
+// Format nomor inventaris: BK-000001, BK-000002, BK-000003 (6 digit, prefix BK-)
+// Nomor bersifat: permanent, unique, never reused
+model BookCopy {
+  id               String    @id @default(uuid())
+  bookId           String
+  inventoryNumber  String    @unique
+  barcode          String?   @unique
+  status           String    @default("AVAILABLE")
+  acquisitionDate  DateTime?
+  acquisitionPrice Float?
+  notes            String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  book Book @relation(fields: [bookId], references: [id])
+
+  @@index([status])
+}
