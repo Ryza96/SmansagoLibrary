@@ -7,55 +7,68 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Book {
+// Allowed values:
+// MemberType: SISWA | GURU | UMUM
+// Gender: LAKI_LAKI | PEREMPUAN
+// MemberStatus: ACTIVE | INACTIVE
+// BookCopyStatus: AVAILABLE | BORROWED | LOST | REMOVED
+// EducationLevel: X | XI | XII
+
+model AcademicYear {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  startDate DateTime
+  endDate   DateTime
+  isActive  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  classes Class[]
+}
+
+model Curriculum {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  classes Class[]
+}
+
+model Class {
   id              String   @id @default(uuid())
-  title           String
-  isbn            String?
-  publisherId     String?
-  categoryId      String?
-  publicationYear Int?
-  edition         String?
-  language        String?
-  pageCount       Int?
-  description     String?
-  coverImage      String?
+  academicYearId  String
+  curriculumId    String
+  educationLevel  String
+  parallel        String
+  homeroomTeacher String?
+  isActive        Boolean  @default(true)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  publisher  Publisher?   @relation(fields: [publisherId], references: [id])
-  category   Category?    @relation(fields: [categoryId], references: [id])
-  authors    BookAuthor[]
-  bookCopies BookCopy[]
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id])
+  curriculum   Curriculum   @relation(fields: [curriculumId], references: [id])
+  members      Member[]
 
-  @@index([title])
-  @@index([isbn])
-  @@index([publicationYear])
+  @@unique([academicYearId, curriculumId, educationLevel, parallel])
+  @@index([academicYearId])
+  @@index([curriculumId])
 }
 
 model Author {
   id        String   @id @default(uuid())
-  name      String
+  name      String   @unique
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  books BookAuthor[]
+  books Book[]
 
   @@index([name])
 }
 
-model BookAuthor {
-  bookId   String
-  authorId String
-
-  book   Book   @relation(fields: [bookId], references: [id])
-  author Author @relation(fields: [authorId], references: [id])
-
-  @@id([bookId, authorId])
-}
-
 model Publisher {
   id        String   @id @default(uuid())
-  name      String
+  name      String   @unique
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -77,104 +90,171 @@ model Category {
   @@index([name])
 }
 
-// Format nomor inventaris: BK-000001, BK-000002, BK-000003 (6 digit, prefix BK-)
-// Nomor bersifat: permanent, unique, never reused
-model BookCopy {
-  id               String    @id @default(uuid())
-  bookId           String
-  inventoryNumber  String    @unique
-  barcode          String?   @unique
-  status           String    @default("AVAILABLE")
-  acquisitionDate  DateTime?
-  acquisitionPrice Float?
-  notes            String?
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
-
-  book           Book            @relation(fields: [bookId], references: [id])
-  borrowingItems BorrowingItem[]
-
-  @@index([status])
-}
-
 model Member {
-  id         String   @id @default(uuid())
-  number     String   @unique
-  fullName   String
-  gender     String?
-  birthplace String?
-  birthDate  DateTime?
-  phone      String?
-  email      String?
-  memberType String?
-  joinDate   DateTime?
-  validUntil DateTime?
-  status     String   @default("inactive")
-  address    String?
-  district   String?
-  village    String?
-  city       String?
-  postalCode String?
-  notes      String?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id           String    @id @default(uuid())
+  memberNumber String    @unique @map("number")
+  memberType   String?
+  fullName     String
+  gender       String?
+  nisn         String?   @unique
+  nip          String?   @unique
+  nuptk        String?   @unique
+  nik          String?   @unique
+  birthPlace   String?   @map("birthplace")
+  birthDate    DateTime?
+  address      String?
+  phone        String?
+  email        String?
+  classId      String?
+  status       String    @default("INACTIVE")
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
-  borrowings Borrowing[]
+  class   Class?   @relation(fields: [classId], references: [id])
+  borrows Borrow[]
 
   @@index([fullName])
   @@index([status])
+  @@index([classId])
 }
 
-model Borrowing {
+model Book {
   id              String   @id @default(uuid())
-  borrowingNumber String   @unique
-  memberId        String
-  borrowDate      DateTime
-  dueDate         DateTime
-  status          String   @default("ACTIVE")
-  notes           String?
-  totalItems      Int      @default(0)
+  isbn            String?  @unique
+  title           String
+  authorId        String?
+  publisherId     String?
+  categoryId      String?
+  publicationYear Int?
+  description     String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  member  Member          @relation(fields: [memberId], references: [id])
-  items   BorrowingItem[]
-  returns Return[]
+  author     Author?    @relation(fields: [authorId], references: [id])
+  publisher  Publisher? @relation(fields: [publisherId], references: [id])
+  category   Category?  @relation(fields: [categoryId], references: [id])
+  bookCopies BookCopy[]
+
+  @@index([title])
+  @@index([isbn])
+}
+
+model BookCopy {
+  id              String    @id @default(uuid())
+  bookId          String
+  inventoryNumber String    @unique
+  barcode         String    @unique
+  condition       String    @default("GOOD")
+  status          String    @default("AVAILABLE")
+  shelfLocation   String
+  acquisitionDate DateTime?
+  notes           String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  book          Book           @relation(fields: [bookId], references: [id])
+  borrowDetails BorrowDetail[]
+  assetEvents   AssetEvent[]
+
+  @@index([status])
+  @@index([shelfLocation])
+}
+
+model AssetEvent {
+  id          String   @id @default(uuid())
+  bookCopyId  String
+  eventType   String
+  actorType   String
+  actorId     String?
+  metadata    String?
+  notes       String?
+  occurredAt  DateTime @default(now())
+
+  bookCopy BookCopy @relation(fields: [bookCopyId], references: [id])
+
+  @@index([bookCopyId])
+  @@index([eventType])
+}
+
+model Borrow {
+  id           String    @id @default(uuid())
+  borrowNumber String    @unique
+  memberId     String
+  borrowDate   DateTime
+  dueDate      DateTime
+  returnDate   DateTime?
+  notes        String?
+  memberName   String
+  memberNumber String
+  className    String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  member  Member         @relation(fields: [memberId], references: [id])
+  details BorrowDetail[]
 
   @@index([memberId])
-  @@index([status])
-  @@index([borrowingNumber])
+  @@index([borrowNumber])
 }
 
-model BorrowingItem {
-  id          String    @id @default(uuid())
-  borrowingId String
-  bookCopyId  String
-  status      String    @default("BORROWED")
-  returnedAt  DateTime?
-  condition   String?
-  fine        Float?
-  notes       String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+model BorrowDetail {
+  id            String    @id @default(uuid())
+  borrowId      String
+  bookCopyId    String
+  returnedAt    DateTime?
+  conditionBack String?
+  note          String?
+  bookTitle     String
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
-  borrowing Borrowing @relation(fields: [borrowingId], references: [id])
-  bookCopy  BookCopy  @relation(fields: [bookCopyId], references: [id])
+  borrow   Borrow   @relation(fields: [borrowId], references: [id])
+  bookCopy BookCopy @relation(fields: [bookCopyId], references: [id])
 
-  @@index([borrowingId])
+  @@index([borrowId])
   @@index([bookCopyId])
-  @@index([status])
 }
 
-model Return {
-  id          String   @id @default(uuid())
-  borrowingId String
-  returnDate  DateTime
-  processedBy String?
-  notes       String?
-  createdAt   DateTime @default(now())
+// Infrastructure — Inventory Number Allocator
+// BUKAN domain model. Infrastructure component untuk mengalokasikan nomor inventaris.
+model InventorySequence {
+  id         String   @id
+  prefix     String   @default("INV")
+  lastNumber Int      @default(0)
+  updatedAt  DateTime @updatedAt
+}
 
-  borrowing Borrowing @relation(fields: [borrowingId], references: [id])
-
-  @@index([borrowingId])
+// Settings — Singleton configuration untuk seluruh aplikasi.
+// Hanya ada SATU row. Repository bertanggung jawab memastikan row tersedia.
+model Setting {
+  id              String   @id @default(uuid())
+  // Identity
+  libraryName     String   @default("APLibrary")
+  schoolName      String   @default("")
+  address         String   @default("")
+  phone           String   @default("")
+  email           String   @default("")
+  website         String   @default("")
+  logoPath        String   @default("")
+  // Responsible Person
+  principalName   String   @default("")
+  principalNip    String   @default("")
+  librarianName   String   @default("")
+  librarianNip    String   @default("")
+  // Borrowing
+  defaultBorrowDays Int    @default(7)
+  maxBorrowBooks    Int    @default(5)
+  lateFee           Int    @default(1000)
+  allowRenewal      Boolean @default(true)
+  // Inventory
+  inventoryPrefix        String @default("INV")
+  defaultShelfLocation   String @default("")
+  barcodeFormat          String @default("BC-XXXXXXXXXX")
+  // Report
+  reportPaperSize  String   @default("A4")
+  reportDateFormat String   @default("DD/MM/YYYY")
+  reportSigner     String   @default("")
+  // System
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

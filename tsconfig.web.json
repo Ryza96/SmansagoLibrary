@@ -14,7 +14,12 @@
     "composite": true
   },
   "include": [
-    "src/renderer/src/**/*",
+    "src/renderer/**/*",
+    "src/components/**/*",
+    "src/pages/**/*",
+    "src/types/**/*",
+    "src/utils/**/*",
+    "src/routes/**/*",
     "src/shared/**/*"
   ]
 }

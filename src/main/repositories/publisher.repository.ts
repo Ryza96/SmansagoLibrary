@@ -1,36 +1,54 @@
-import { prisma } from '../database'
-import { Prisma } from '@prisma/client'
-import type { FindPublishersQueryDTO } from '../../shared/dto/master'
+import { BaseRepository } from './base/base.repository'
+import { getPaginationParams, toPaginatedResult } from './base/pagination'
+import type { FindOptions } from './base/repository.types'
+import type { Publisher } from '@prisma/client'
 
-export class PublisherRepository {
-  findMany(query?: FindPublishersQueryDTO) {
-    const where: Prisma.PublisherWhereInput = {}
-    if (query?.search) {
-      where.name = { contains: query.search }
-    }
-    return prisma.publisher.findMany({ where, orderBy: { name: 'asc' } })
+type CreatePublisherData = Pick<Publisher, 'name'>
+type UpdatePublisherData = Partial<Pick<Publisher, 'name'>>
+
+export class PublisherRepository extends BaseRepository {
+  async create(data: CreatePublisherData): Promise<Publisher> {
+    return this.prisma.publisher.create({ data })
   }
 
-  findById(id: string) {
-    return prisma.publisher.findUnique({ where: { id } })
+  async update(id: string, data: UpdatePublisherData): Promise<Publisher> {
+    return this.prisma.publisher.update({ where: { id }, data })
   }
 
-  async existsByName(name: string, excludeId?: string): Promise<boolean> {
-    const rows = await prisma.$queryRaw<Array<{ id: string }>>(
-      Prisma.sql`SELECT id FROM Publisher WHERE LOWER(name) = LOWER(${name}) ${excludeId ? Prisma.sql`AND id != ${excludeId}` : Prisma.empty} LIMIT 1`
-    )
-    return rows.length > 0
+  async delete(id: string): Promise<void> {
+    await this.prisma.publisher.delete({ where: { id } })
   }
 
-  create(data: Prisma.PublisherCreateInput) {
-    return prisma.publisher.create({ data })
+  async findById(id: string): Promise<Publisher | null> {
+    return this.prisma.publisher.findUnique({ where: { id } })
   }
 
-  update(id: string, data: Prisma.PublisherUpdateInput) {
-    return prisma.publisher.update({ where: { id }, data })
+  async findMany(options?: FindOptions) {
+    const { skip, take } = getPaginationParams(options?.pagination)
+
+    const where = options?.search
+      ? { name: { contains: options.search } }
+      : {}
+
+    const [data, total] = await Promise.all([
+      this.prisma.publisher.findMany({
+        where,
+        skip,
+        take,
+        orderBy: { name: 'asc' }
+      }),
+      this.prisma.publisher.count({ where })
+    ])
+
+    return toPaginatedResult(data, total, options?.pagination)
   }
 
-  delete(id: string) {
-    return prisma.publisher.delete({ where: { id } })
+  async existsByName(name: string): Promise<boolean> {
+    const count = await this.prisma.publisher.count({ where: { name } })
+    return count > 0
+  }
+
+  async count(): Promise<number> {
+    return this.prisma.publisher.count()
   }
 }

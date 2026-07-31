@@ -8,6 +8,16 @@ export interface BookListItemDTO {
   copyCount: number
 }
 
+export interface BookCopyDTO {
+  id: string
+  inventoryNumber: string
+  barcode: string | null
+  shelfLocation: string | null
+  condition: string
+  status: string
+  hasBorrowingHistory: boolean
+}
+
 export interface BookDetailDTO {
   id: string
   title: string
@@ -21,7 +31,7 @@ export interface BookDetailDTO {
   description: string | null
   coverImage: string | null
   authors: { id: string; name: string }[]
-  copies: { id: string; inventoryNumber: string; status: string }[]
+  copies: BookCopyDTO[]
   createdAt: string
   updatedAt: string
 }
@@ -50,6 +60,12 @@ export interface UpdateBookDTO {
   pageCount?: number | null
   description?: string
   authorIds?: string[]
+}
+
+export interface CreateBookCopiesDTO {
+  quantity: number
+  shelfLocation: string
+  condition?: string
 }
 
 export interface SelectOption {

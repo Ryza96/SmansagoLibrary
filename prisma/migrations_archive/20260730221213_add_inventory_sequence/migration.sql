@@ -1,0 +1,15 @@
+-- REPAIR WO-PV-01 (BLOCKER-01)
+-- Migration ini sengaja dibuat NO-OP.
+--
+-- Sebelumnya migration ini berisi CREATE TABLE "InventorySequence".
+-- Tabel tersebut SUDAH dibuat lebih dulu oleh migration
+-- `20260730014011_inventory_redesign_final` (CreateTable "InventorySequence").
+-- Akibatnya, replay dari database kosong gagal dengan P3006
+-- ("table InventorySequence already exists").
+--
+-- Untuk memastikan history migration replayable dari awal sampai akhir,
+-- statement CREATE TABLE yang duplikat dihapus. Schema final tetap identik:
+-- tabel InventorySequence dibuat tepat satu kali oleh migration
+-- `20260730014011_inventory_redesign_final`.
+
+-- (no-op)

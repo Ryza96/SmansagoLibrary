@@ -14,9 +14,11 @@
     "composite": true
   },
   "include": [
-    "src/main/**/*",
-    "src/preload/**/*",
+    "electron/main/**/*",
+    "electron/preload/**/*",
+    "electron/ipc/**/*",
     "src/shared/**/*",
+    "src/main/**/*",
     "electron.vite.config.ts"
   ]
 }

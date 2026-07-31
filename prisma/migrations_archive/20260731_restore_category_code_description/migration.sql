@@ -1,0 +1,22 @@
+-- REPAIR WO-PV-01 (BLOCKER-01)
+-- Migration ini sengaja dibuat NO-OP.
+--
+-- Sebelumnya migration ini (ADR-001 / WO-CR-02A) melakukan:
+--   ALTER TABLE "Category" ADD COLUMN "code"
+--   ALTER TABLE "Category" ADD COLUMN "description"
+--   backfill code 4 kategori + redefinisi tabel + index unique.
+--
+-- Seluruh operasi tersebut SUDAH dihasilkan oleh migration
+-- `20260729040204_add_category_code_and_indexes` (redefine Category dengan
+-- kolom "code" + "description" dan index unik Category_code_key).
+-- Akibatnya, replay dari database kosong gagal dengan
+-- "duplicate column name: code" (P3006).
+--
+-- Untuk memastikan history migration replayable dari awal sampai akhir,
+-- statement duplikat dihapus. Schema final tetap identik:
+-- Category(id, code UNIQUE NOT NULL, name, description, createdAt, updatedAt)
+-- dihasilkan tepat satu kali oleh `20260729040204_add_category_code_and_indexes`.
+-- Backfill data hanya berlaku untuk database audit lama dan tidak relevan
+-- untuk fresh install (tabel kosong).
+
+-- (no-op)

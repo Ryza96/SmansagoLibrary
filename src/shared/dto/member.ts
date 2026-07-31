@@ -1,22 +1,60 @@
 export interface MemberDTO {
   id: string
-  number: string
+  memberNumber: string
   fullName: string
+  memberType: string | null
   gender: string | null
-  birthplace: string | null
+  nisn: string | null
+  nip: string | null
+  nuptk: string | null
+  nik: string | null
+  birthPlace: string | null
   birthDate: string | null
+  address: string | null
   phone: string | null
   email: string | null
-  memberType: string | null
-  joinDate: string | null
-  validUntil: string | null
+  classId: string | null
+  classInfo: {
+    id: string
+    educationLevel: string
+    parallel: string
+    academicYear: { id: string; name: string; isActive: boolean } | null
+    curriculum: { id: string; name: string } | null
+  } | null
   status: string
-  address: string | null
-  district: string | null
-  village: string | null
-  city: string | null
-  postalCode: string | null
-  notes: string | null
   createdAt: string
   updatedAt: string
+}
+
+export interface CreateMemberDTO {
+  fullName: string
+  memberType?: string
+  gender?: string
+  nisn?: string
+  nip?: string
+  nuptk?: string
+  nik?: string
+  birthPlace?: string
+  birthDate?: string
+  address?: string
+  phone?: string
+  email?: string
+  classId?: string
+}
+
+export interface UpdateMemberDTO {
+  fullName?: string
+  memberType?: string
+  gender?: string
+  nisn?: string
+  nip?: string
+  nuptk?: string
+  nik?: string
+  birthPlace?: string
+  birthDate?: string
+  address?: string
+  phone?: string
+  email?: string
+  classId?: string
+  status?: string
 }

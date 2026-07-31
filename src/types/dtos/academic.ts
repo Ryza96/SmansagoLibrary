@@ -1,0 +1,1 @@
+export type { AcademicYearDTO, CreateAcademicYearDTO, UpdateAcademicYearDTO, CurriculumDTO, CreateCurriculumDTO, UpdateCurriculumDTO, ClassDTO, CreateClassDTO, UpdateClassDTO } from '../../shared/dto/academic'

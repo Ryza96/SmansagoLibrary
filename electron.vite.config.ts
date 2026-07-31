@@ -1,3 +1,4 @@
+import { resolve } from 'path'
 import { defineConfig } from 'electron-vite'
 import react from '@vitejs/plugin-react'
 
@@ -6,13 +7,17 @@ export default defineConfig({
     build: {
       outDir: 'out/main',
       rollupOptions: {
+        input: resolve(__dirname, 'electron/main/index.ts'),
         external: ['@prisma/client']
       }
     }
   },
   preload: {
     build: {
-      outDir: 'out/preload'
+      outDir: 'out/preload',
+      rollupOptions: {
+        input: resolve(__dirname, 'electron/preload/index.ts')
+      }
     }
   },
   renderer: {

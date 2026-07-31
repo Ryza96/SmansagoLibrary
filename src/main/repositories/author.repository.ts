@@ -1,36 +1,54 @@
-import { prisma } from '../database'
-import { Prisma } from '@prisma/client'
-import type { FindAuthorsQueryDTO } from '../../shared/dto/master'
+import { BaseRepository } from './base/base.repository'
+import { getPaginationParams, toPaginatedResult } from './base/pagination'
+import type { FindOptions } from './base/repository.types'
+import type { Author } from '@prisma/client'
 
-export class AuthorRepository {
-  findMany(query?: FindAuthorsQueryDTO) {
-    const where: Prisma.AuthorWhereInput = {}
-    if (query?.search) {
-      where.name = { contains: query.search }
-    }
-    return prisma.author.findMany({ where, orderBy: { name: 'asc' } })
+type CreateAuthorData = Pick<Author, 'name'>
+type UpdateAuthorData = Partial<Pick<Author, 'name'>>
+
+export class AuthorRepository extends BaseRepository {
+  async create(data: CreateAuthorData): Promise<Author> {
+    return this.prisma.author.create({ data })
   }
 
-  findById(id: string) {
-    return prisma.author.findUnique({ where: { id } })
+  async update(id: string, data: UpdateAuthorData): Promise<Author> {
+    return this.prisma.author.update({ where: { id }, data })
   }
 
-  async existsByName(name: string, excludeId?: string): Promise<boolean> {
-    const rows = await prisma.$queryRaw<Array<{ id: string }>>(
-      Prisma.sql`SELECT id FROM Author WHERE LOWER(name) = LOWER(${name}) ${excludeId ? Prisma.sql`AND id != ${excludeId}` : Prisma.empty} LIMIT 1`
-    )
-    return rows.length > 0
+  async delete(id: string): Promise<void> {
+    await this.prisma.author.delete({ where: { id } })
   }
 
-  create(data: Prisma.AuthorCreateInput) {
-    return prisma.author.create({ data })
+  async findById(id: string): Promise<Author | null> {
+    return this.prisma.author.findUnique({ where: { id } })
   }
 
-  update(id: string, data: Prisma.AuthorUpdateInput) {
-    return prisma.author.update({ where: { id }, data })
+  async findMany(options?: FindOptions) {
+    const { skip, take } = getPaginationParams(options?.pagination)
+
+    const where = options?.search
+      ? { name: { contains: options.search } }
+      : {}
+
+    const [data, total] = await Promise.all([
+      this.prisma.author.findMany({
+        where,
+        skip,
+        take,
+        orderBy: { name: 'asc' }
+      }),
+      this.prisma.author.count({ where })
+    ])
+
+    return toPaginatedResult(data, total, options?.pagination)
   }
 
-  delete(id: string) {
-    return prisma.author.delete({ where: { id } })
+  async existsByName(name: string): Promise<boolean> {
+    const count = await this.prisma.author.count({ where: { name } })
+    return count > 0
+  }
+
+  async count(): Promise<number> {
+    return this.prisma.author.count()
   }
 }

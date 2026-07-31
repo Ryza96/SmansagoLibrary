@@ -1,34 +1,67 @@
-import { AppError } from '../errorHandler'
+import { BorrowRepository } from '../repositories/borrow.repository'
+import { BorrowDetailRepository } from '../repositories/borrow-detail.repository'
 import { BookCopyRepository } from '../repositories/book-copy.repository'
-import { BorrowingItemRepository } from '../repositories/borrowing-item.repository'
-import { BorrowingRepository } from '../repositories/borrowing.repository'
-import { ReturnRepository } from '../repositories/return.repository'
-import type { BorrowingDTO, BorrowingByBarcodeResult, ReturnBookInput } from '../../shared/dto/borrowing'
+import type { BorrowingByBarcodeResult, BorrowingDTO, BorrowingItemDetailDTO, ReturnBookInput } from '../../shared/dto/borrowing'
+import { AppError } from '../../../electron/main/errorHandler'
 
-function toBorrowingDTO(borrowing: any): BorrowingDTO {
+function toItemDTO(item: {
+  id: string
+  bookCopyId: string
+  returnedAt: Date | null
+  conditionBack: string | null
+  note: string | null
+  bookTitle: string
+  bookCopy: { barcode: string | null; inventoryNumber: string; book: { title: string } } | null
+}): BorrowingItemDetailDTO {
+  return {
+    id: item.id,
+    bookCopyId: item.bookCopyId,
+    status: item.returnedAt ? 'RETURNED' : 'BORROWED',
+    returnedAt: item.returnedAt?.toISOString() ?? null,
+    condition: item.conditionBack ?? null,
+    fine: null,
+    notes: item.note ?? null,
+    bookTitle: item.bookCopy?.book?.title ?? item.bookTitle,
+    barcode: item.bookCopy?.barcode ?? null,
+    inventoryNumber: item.bookCopy?.inventoryNumber ?? ''
+  }
+}
+
+function toDTO(borrowing: {
+  id: string
+  borrowNumber: string
+  memberId: string
+  borrowDate: Date
+  dueDate: Date
+  returnDate: Date | null
+  notes: string | null
+  memberName: string
+  memberNumber: string
+  createdAt: Date
+  updatedAt: Date
+  member: { fullName: string; memberNumber: string } | null
+  details: Array<{
+    id: string
+    bookCopyId: string
+    returnedAt: Date | null
+    conditionBack: string | null
+    note: string | null
+    bookTitle: string
+    bookCopy: { barcode: string | null; inventoryNumber: string; book: { title: string } } | null
+  }>
+}): BorrowingDTO {
   return {
     id: borrowing.id,
-    borrowingNumber: borrowing.borrowingNumber,
+    borrowingNumber: borrowing.borrowNumber,
     memberId: borrowing.memberId,
-    memberName: borrowing.member?.fullName ?? '',
-    memberNumber: borrowing.member?.number ?? '',
+    memberName: borrowing.member?.fullName ?? borrowing.memberName,
+    memberNumber: borrowing.member?.memberNumber ?? borrowing.memberNumber,
     borrowDate: borrowing.borrowDate.toISOString(),
     dueDate: borrowing.dueDate.toISOString(),
-    status: borrowing.status,
-    notes: borrowing.notes ?? null,
-    totalItems: borrowing.totalItems,
-    items: (borrowing.items ?? []).map((item: any) => ({
-      id: item.id,
-      bookCopyId: item.bookCopyId,
-      status: item.status,
-      returnedAt: item.returnedAt?.toISOString() ?? null,
-      condition: item.condition ?? null,
-      fine: item.fine ?? null,
-      notes: item.notes ?? null,
-      bookTitle: item.bookCopy?.book?.title ?? '',
-      barcode: item.bookCopy?.barcode ?? null,
-      inventoryNumber: item.bookCopy?.inventoryNumber ?? ''
-    })),
+    status: borrowing.returnDate ? 'COMPLETED' : 'ACTIVE',
+    notes: borrowing.notes,
+    totalItems: borrowing.details.length,
+    items: borrowing.details.map(toItemDTO),
     createdAt: borrowing.createdAt.toISOString(),
     updatedAt: borrowing.updatedAt.toISOString()
   }
@@ -36,10 +69,9 @@ function toBorrowingDTO(borrowing: any): BorrowingDTO {
 
 export class ReturnService {
   constructor(
-    private bookCopyRepository: BookCopyRepository,
-    private borrowingItemRepository: BorrowingItemRepository,
-    private borrowingRepository: BorrowingRepository,
-    private returnRepository: ReturnRepository
+    private borrowRepository: BorrowRepository,
+    private borrowDetailRepository: BorrowDetailRepository,
+    private bookCopyRepository: BookCopyRepository
   ) {}
 
   async findBorrowingByBarcode(barcode: string): Promise<BorrowingByBarcodeResult> {
@@ -48,50 +80,44 @@ export class ReturnService {
       throw new AppError(404, 'Not Found', 'Buku tidak ditemukan.')
     }
 
-    const activeItem = await this.borrowingItemRepository.findActiveByBookCopyId(bookCopy.id)
-    if (!activeItem) {
+    const detail = await this.borrowDetailRepository.findActiveByBookCopyId(bookCopy.id)
+    if (!detail) {
       throw new AppError(400, 'Not Borrowed', 'Buku tidak sedang dipinjam.')
     }
 
-    const borrowing = await this.borrowingRepository.findById(activeItem.borrowingId)
-    if (!borrowing) {
-      throw new AppError(404, 'Not Found', 'Data peminjaman tidak ditemukan.')
-    }
+    const borrow = detail.borrow
 
     return {
       bookCopyId: bookCopy.id,
       barcode: bookCopy.barcode ?? '',
       inventoryNumber: bookCopy.inventoryNumber,
       bookTitle: bookCopy.book?.title ?? '',
-      borrowingId: borrowing.id,
-      borrowingNumber: borrowing.borrowingNumber,
-      memberId: borrowing.memberId,
-      memberName: borrowing.member?.fullName ?? '',
-      memberNumber: borrowing.member?.number ?? '',
-      borrowDate: borrowing.borrowDate.toISOString(),
-      dueDate: borrowing.dueDate.toISOString()
+      borrowingId: borrow.id,
+      borrowingNumber: borrow.borrowNumber,
+      memberId: borrow.memberId,
+      memberName: borrow.member?.fullName ?? borrow.memberName,
+      memberNumber: borrow.member?.memberNumber ?? borrow.memberNumber,
+      borrowDate: borrow.borrowDate.toISOString(),
+      dueDate: borrow.dueDate.toISOString()
     }
   }
 
   async returnBook(input: ReturnBookInput): Promise<BorrowingDTO> {
-    const activeItem = await this.borrowingItemRepository.findActiveByBookCopyId(input.bookCopyId)
-    if (!activeItem) {
+    const detail = await this.borrowDetailRepository.findActiveByBookCopyId(input.bookCopyId)
+    if (!detail) {
       throw new AppError(400, 'Not Borrowed', 'Buku tidak sedang dipinjam.')
     }
 
-    await this.returnRepository.createReturnTransaction({
-      borrowingItemId: activeItem.id,
-      bookCopyId: input.bookCopyId,
-      borrowingId: activeItem.borrowingId,
-      condition: input.condition,
-      notes: input.notes
-    })
+    const updated = await this.borrowRepository.processReturn(
+      detail.id,
+      input.condition,
+      input.notes ?? null
+    )
 
-    const borrowing = await this.borrowingRepository.findById(activeItem.borrowingId)
-    if (!borrowing) {
-      throw new AppError(404, 'Not Found', 'Data peminjaman tidak ditemukan.')
+    if (!updated) {
+      throw new AppError(404, 'Not Found', 'Data peminjaman tidak ditemukan')
     }
 
-    return toBorrowingDTO(borrowing)
+    return toDTO(updated)
   }
 }

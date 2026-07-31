@@ -1,110 +1,84 @@
-import { prisma } from '../database'
-import { Prisma } from '@prisma/client'
+import { BaseRepository } from './base/base.repository'
+import { getPaginationParams, toPaginatedResult } from './base/pagination'
+import type { FindOptions } from './base/repository.types'
+import type { Book, Prisma } from '@prisma/client'
 
-interface CreateBookRepoInput {
-  title: string
+type CreateBookData = Pick<Book, 'title'> & {
   isbn?: string
-  categoryId?: string
+  authorId?: string
   publisherId?: string
+  categoryId?: string
   publicationYear?: number
-  edition?: string
-  language?: string
-  pageCount?: number
   description?: string
-  authorIds: string[]
 }
 
-export class BookRepository {
-  findManyWithCount() {
-    return prisma.book.findMany({
-      include: {
-        category: { select: { name: true } },
-        publisher: { select: { name: true } },
-        _count: { select: { bookCopies: true } }
-      },
-      orderBy: { createdAt: 'desc' }
-    })
+type UpdateBookData = Partial<CreateBookData>
+
+type BookWithRelations = Prisma.BookGetPayload<{
+  include: { author: true; publisher: true; category: true }
+}>
+
+const bookInclude = {
+  author: true,
+  publisher: true,
+  category: true
+} as const
+
+export class BookRepository extends BaseRepository {
+  async create(data: CreateBookData): Promise<Book> {
+    return this.prisma.book.create({ data })
   }
 
-  findById(id: string) {
-    return prisma.book.findUnique({ where: { id } })
+  async update(id: string, data: UpdateBookData): Promise<Book> {
+    return this.prisma.book.update({ where: { id }, data })
   }
 
-  findByIdWithDetails(id: string) {
-    return prisma.book.findUnique({
+  async delete(id: string): Promise<void> {
+    await this.prisma.book.delete({ where: { id } })
+  }
+
+  async findById(id: string): Promise<BookWithRelations | null> {
+    return this.prisma.book.findUnique({
       where: { id },
-      include: {
-        category: { select: { id: true, name: true } },
-        publisher: { select: { id: true, name: true } },
-        authors: {
-          include: { author: { select: { id: true, name: true } } }
-        },
-        bookCopies: {
-          select: { id: true, inventoryNumber: true, status: true },
-          orderBy: { inventoryNumber: 'asc' }
+      include: bookInclude
+    })
+  }
+
+  async findByISBN(isbn: string): Promise<Book | null> {
+    return this.prisma.book.findUnique({ where: { isbn } })
+  }
+
+  async findMany(options?: FindOptions) {
+    const { skip, take } = getPaginationParams(options?.pagination)
+
+    const where = options?.search
+      ? {
+          OR: [
+            { isbn: { contains: options.search } },
+            { title: { contains: options.search } }
+          ]
         }
-      }
-    })
-  }
+      : {}
 
-  createWithAuthors(input: CreateBookRepoInput) {
-    const { authorIds, ...bookData } = input
-    return prisma.book.create({
-      data: {
-        ...bookData,
-        publicationYear: bookData.publicationYear ?? undefined,
-        pageCount: bookData.pageCount ?? undefined,
-        authors: {
-          create: authorIds.map((authorId) => ({
-            author: { connect: { id: authorId } }
-          }))
-        }
-      }
-    })
-  }
-
-  replaceAuthors(bookId: string, authorIds: string[]) {
-    return prisma.$transaction([
-      prisma.bookAuthor.deleteMany({ where: { bookId } }),
-      prisma.bookAuthor.createMany({
-        data: authorIds.map((authorId) => ({ bookId, authorId }))
-      })
+    const [data, total] = await Promise.all([
+      this.prisma.book.findMany({
+        where,
+        skip,
+        take,
+        orderBy: { title: 'asc' }
+      }),
+      this.prisma.book.count({ where })
     ])
+
+    return toPaginatedResult(data, total, options?.pagination)
   }
 
-  updateBook(id: string, data: Prisma.BookUpdateInput) {
-    return prisma.book.update({ where: { id }, data })
-  }
-
-  deleteWithAuthors(id: string) {
-    return prisma.$transaction([
-      prisma.bookAuthor.deleteMany({ where: { bookId: id } }),
-      prisma.book.delete({ where: { id } })
-    ])
-  }
-
-  async existsByIsbn(isbn: string, excludeId?: string): Promise<boolean> {
-    const count = await prisma.book.count({
-      where: {
-        isbn,
-        ...(excludeId ? { id: { not: excludeId } } : {})
-      }
-    })
+  async existsByISBN(isbn: string): Promise<boolean> {
+    const count = await this.prisma.book.count({ where: { isbn } })
     return count > 0
   }
 
-  async existsByAuthorId(authorId: string): Promise<boolean> {
-    const count = await prisma.bookAuthor.count({ where: { authorId } })
-    return count > 0
-  }
-
-  async existsByPublisherId(publisherId: string): Promise<boolean> {
-    const count = await prisma.book.count({ where: { publisherId } })
-    return count > 0
-  }
-
-  async existsByCategoryId(categoryId: string): Promise<boolean> {
-    const count = await prisma.book.count({ where: { categoryId } })
-    return count > 0
+  async count(): Promise<number> {
+    return this.prisma.book.count()
   }
 }
