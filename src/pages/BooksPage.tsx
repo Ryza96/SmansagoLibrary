@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Search, RefreshCw } from 'lucide-react'
+import { Plus, Search, RefreshCw, Upload } from 'lucide-react'
 import { BookListItemDTO } from '../types/dtos/book'
 import BookTable from '../components/books/BookTable'
 import { LABELS } from '../utils/labels'
@@ -69,8 +69,15 @@ export default function BooksPage() {
               <RefreshCw size={16} className="text-slate-500" />
             </button>
             <button
+              onClick={() => navigate(ROUTES.BOOK_IMPORT)}
+              className="flex items-center gap-1.5 ml-auto px-3 py-2 border border-slate-300 text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors"
+            >
+              <Upload size={16} />
+              {LABELS.BOOK.IMPORT}
+            </button>
+            <button
               onClick={() => navigate(ROUTES.BOOK_NEW)}
-              className="flex items-center gap-1.5 ml-auto px-3 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+              className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
             >
               <Plus size={16} />
               {LABELS.BOOK.NEW}

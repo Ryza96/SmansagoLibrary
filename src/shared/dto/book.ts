@@ -66,6 +66,11 @@ export interface CreateBookCopiesDTO {
   quantity: number
   shelfLocation: string
   condition?: string
+  acquisitionDate?: string
+  acquisitionSource?: string
+  acquisitionCost?: number
+  acquisitionSourceDetail?: string
+  acquisitionNotes?: string
 }
 
 export interface SelectOption {

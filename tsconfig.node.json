@@ -18,6 +18,12 @@
     "electron/preload/**/*",
     "electron/ipc/**/*",
     "src/shared/**/*",
+    "src/services/strategies/**/*",
+    "src/services/MatchingEngineService.ts",
+    "src/services/DummyMatchStrategies.ts",
+    "src/services/DummyMatchProviders.ts",
+    "src/services/MatchProviders.ts",
+    "src/types/import.ts",
     "src/main/**/*",
     "electron.vite.config.ts"
   ]

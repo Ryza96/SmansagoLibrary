@@ -43,6 +43,37 @@ export class AuthorRepository extends BaseRepository {
     return toPaginatedResult(data, total, options?.pagination)
   }
 
+  async findExact(name: string): Promise<Author[]> {
+    return this.prisma.author.findMany({
+      where: { name: { equals: name } },
+      take: 10,
+      orderBy: { name: 'asc' }
+    })
+  }
+
+  async findContains(name: string): Promise<Author[]> {
+    return this.prisma.author.findMany({
+      where: { name: { contains: name } },
+      take: 10,
+      orderBy: { name: 'asc' }
+    })
+  }
+
+  async findPrefix(name: string): Promise<Author[]> {
+    return this.prisma.author.findMany({
+      where: { name: { startsWith: name } },
+      take: 10,
+      orderBy: { name: 'asc' }
+    })
+  }
+
+  async findAll(limit = 500): Promise<Author[]> {
+    return this.prisma.author.findMany({
+      take: Math.min(500, Math.max(1, limit)),
+      orderBy: { name: 'asc' }
+    })
+  }
+
   async existsByName(name: string): Promise<boolean> {
     const count = await this.prisma.author.count({ where: { name } })
     return count > 0

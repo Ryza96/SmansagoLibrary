@@ -43,6 +43,37 @@ export class CategoryRepository extends BaseRepository {
     return toPaginatedResult(data, total, options?.pagination)
   }
 
+  async findExact(name: string): Promise<Category[]> {
+    return this.prisma.category.findMany({
+      where: { name: { equals: name } },
+      take: 10,
+      orderBy: { name: 'asc' }
+    })
+  }
+
+  async findContains(name: string): Promise<Category[]> {
+    return this.prisma.category.findMany({
+      where: { name: { contains: name } },
+      take: 10,
+      orderBy: { name: 'asc' }
+    })
+  }
+
+  async findPrefix(name: string): Promise<Category[]> {
+    return this.prisma.category.findMany({
+      where: { name: { startsWith: name } },
+      take: 10,
+      orderBy: { name: 'asc' }
+    })
+  }
+
+  async findAll(limit = 500): Promise<Category[]> {
+    return this.prisma.category.findMany({
+      take: Math.min(500, Math.max(1, limit)),
+      orderBy: { name: 'asc' }
+    })
+  }
+
   async existsByName(name: string): Promise<boolean> {
     const count = await this.prisma.category.count({ where: { name } })
     return count > 0

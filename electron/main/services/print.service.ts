@@ -2,13 +2,19 @@ import { BrowserWindow } from 'electron'
 import { AppError } from '../errorHandler'
 import { BorrowRepository } from '../../../src/main/repositories/borrow.repository'
 import { SettingService } from './setting.service'
-import type { BorrowReceiptData, ReturnReceiptData } from '../../../src/shared/dto/print'
+import { generateLabelsHtml } from '../../../src/main/services/label.service'
+import type { BorrowReceiptData, ReturnReceiptData, BookLabelData } from '../../../src/shared/dto/print'
 
 export class PrintService {
   constructor(
     private borrowRepository: BorrowRepository,
     private settingService: SettingService
   ) {}
+
+  async printBookLabels(data: BookLabelData): Promise<void> {
+    const html = generateLabelsHtml(data)
+    await this.printHtml(html, { margins: { marginType: 'none' } })
+  }
 
   async printBorrowReceipt(borrowingId: string): Promise<void> {
     const [borrowing, settings] = await Promise.all([
@@ -122,7 +128,7 @@ export class PrintService {
 </body></html>`
   }
 
-  private printHtml(html: string): Promise<void> {
+  private printHtml(html: string, printOptions?: Electron.WebContentsPrintOptions): Promise<void> {
     return new Promise((resolve, reject) => {
       const printWindow = new BrowserWindow({
         width: 800,
@@ -138,7 +144,7 @@ export class PrintService {
 
       printWindow.webContents.on('did-finish-load', () => {
         printWindow.webContents.print(
-          { margins: { marginType: 'default' }, printBackground: true },
+          { margins: { marginType: 'default' }, printBackground: true, ...printOptions },
           (success, failureReason) => {
             if (!printWindow.isDestroyed()) printWindow.close()
             if (success) {

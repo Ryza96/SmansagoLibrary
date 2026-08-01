@@ -62,6 +62,10 @@ interface ElectronAPI {
       condition: string
       status: string
       acquisitionDate: string | null
+      acquisitionSource: string | null
+      acquisitionCost: number | null
+      acquisitionSourceDetail: string | null
+      acquisitionNotes: string | null
       notes: string | null
       createdAt: string
       updatedAt: string
@@ -120,6 +124,7 @@ interface ElectronAPI {
   print: {
     borrowReceipt: (borrowingId: string) => Promise<void>
     returnReceipt: (borrowingId: string) => Promise<void>
+    bookLabels: (input: import('../../src/shared/dto/print').BookLabelData) => Promise<void>
   }
   academicYears: {
     findMany: (search?: string, page?: number, limit?: number) => Promise<{
@@ -188,6 +193,10 @@ interface ElectronAPI {
       notes: string | null
       occurredAt: string
     }>>
+  }
+  imports: {
+    match: (canonicalRows: import('../types/import').CanonicalRow[]) => Promise<import('../types/import').MatchedWorkbook>,
+    downloadTemplate: () => Promise<import('../types/import').DownloadTemplateResult>,
   }
   settings: {
     get: () => Promise<{

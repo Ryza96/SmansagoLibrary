@@ -7,6 +7,10 @@ type CreateBookCopyData = Pick<BookCopy, 'bookId' | 'inventoryNumber' | 'barcode
   condition?: string
   status?: string
   acquisitionDate?: Date
+  acquisitionSource?: string
+  acquisitionCost?: number
+  acquisitionSourceDetail?: string
+  acquisitionNotes?: string
   notes?: string
 }
 
@@ -23,6 +27,10 @@ const bookCopyInclude = {
 export class BookCopyRepository extends BaseRepository {
   async create(data: CreateBookCopyData): Promise<BookCopy> {
     return this.prisma.bookCopy.create({ data })
+  }
+
+  async createManyWithTx(tx: Prisma.TransactionClient, data: CreateBookCopyData[]): Promise<{ count: number }> {
+    return tx.bookCopy.createMany({ data })
   }
 
   async update(id: string, data: UpdateBookCopyData): Promise<BookCopy> {

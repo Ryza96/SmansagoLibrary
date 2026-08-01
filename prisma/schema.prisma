@@ -140,17 +140,21 @@ model Book {
 }
 
 model BookCopy {
-  id              String    @id @default(uuid())
-  bookId          String
-  inventoryNumber String    @unique
-  barcode         String    @unique
-  condition       String    @default("GOOD")
-  status          String    @default("AVAILABLE")
-  shelfLocation   String
-  acquisitionDate DateTime?
-  notes           String?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id                      String    @id @default(uuid())
+  bookId                  String
+  inventoryNumber         String    @unique
+  barcode                 String    @unique
+  condition               String    @default("GOOD")
+  status                  String    @default("AVAILABLE")
+  shelfLocation           String
+  acquisitionDate         DateTime?
+  acquisitionSource       String?
+  acquisitionCost         Int?
+  acquisitionSourceDetail String?
+  acquisitionNotes        String?
+  notes                   String?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
 
   book          Book           @relation(fields: [bookId], references: [id])
   borrowDetails BorrowDetail[]
@@ -161,14 +165,14 @@ model BookCopy {
 }
 
 model AssetEvent {
-  id          String   @id @default(uuid())
-  bookCopyId  String
-  eventType   String
-  actorType   String
-  actorId     String?
-  metadata    String?
-  notes       String?
-  occurredAt  DateTime @default(now())
+  id         String   @id @default(uuid())
+  bookCopyId String
+  eventType  String
+  actorType  String
+  actorId    String?
+  metadata   String?
+  notes      String?
+  occurredAt DateTime @default(now())
 
   bookCopy BookCopy @relation(fields: [bookCopyId], references: [id])
 
@@ -227,34 +231,34 @@ model InventorySequence {
 // Settings — Singleton configuration untuk seluruh aplikasi.
 // Hanya ada SATU row. Repository bertanggung jawab memastikan row tersedia.
 model Setting {
-  id              String   @id @default(uuid())
+  id                   String   @id @default(uuid())
   // Identity
-  libraryName     String   @default("APLibrary")
-  schoolName      String   @default("")
-  address         String   @default("")
-  phone           String   @default("")
-  email           String   @default("")
-  website         String   @default("")
-  logoPath        String   @default("")
+  libraryName          String   @default("APLibrary")
+  schoolName           String   @default("")
+  address              String   @default("")
+  phone                String   @default("")
+  email                String   @default("")
+  website              String   @default("")
+  logoPath             String   @default("")
   // Responsible Person
-  principalName   String   @default("")
-  principalNip    String   @default("")
-  librarianName   String   @default("")
-  librarianNip    String   @default("")
+  principalName        String   @default("")
+  principalNip         String   @default("")
+  librarianName        String   @default("")
+  librarianNip         String   @default("")
   // Borrowing
-  defaultBorrowDays Int    @default(7)
-  maxBorrowBooks    Int    @default(5)
-  lateFee           Int    @default(1000)
-  allowRenewal      Boolean @default(true)
+  defaultBorrowDays    Int      @default(7)
+  maxBorrowBooks       Int      @default(5)
+  lateFee              Int      @default(1000)
+  allowRenewal         Boolean  @default(true)
   // Inventory
-  inventoryPrefix        String @default("INV")
-  defaultShelfLocation   String @default("")
-  barcodeFormat          String @default("BC-XXXXXXXXXX")
+  inventoryPrefix      String   @default("INV")
+  defaultShelfLocation String   @default("")
+  barcodeFormat        String   @default("BC-XXXXXXXXXX")
   // Report
-  reportPaperSize  String   @default("A4")
-  reportDateFormat String   @default("DD/MM/YYYY")
-  reportSigner     String   @default("")
+  reportPaperSize      String   @default("A4")
+  reportDateFormat     String   @default("DD/MM/YYYY")
+  reportSigner         String   @default("")
   // System
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 }

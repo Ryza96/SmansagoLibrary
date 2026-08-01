@@ -16,6 +16,10 @@ extraResources:
     filter:
       - "*.node"
       - "schema.prisma"
+  - from: templates/
+    to: templates/
+    filter:
+      - "Template_Import_Buku_v2.0.xlsx"
 
 win:
   target:

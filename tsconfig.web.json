@@ -20,6 +20,10 @@
     "src/types/**/*",
     "src/utils/**/*",
     "src/routes/**/*",
-    "src/shared/**/*"
+    "src/shared/**/*",
+    "src/config/**/*",
+    "src/contexts/**/*",
+    "src/services/**/*",
+    "src/hooks/**/*"
   ]
 }

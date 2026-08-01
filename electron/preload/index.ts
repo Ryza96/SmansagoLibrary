@@ -14,6 +14,7 @@ import { classAPI } from './class.preload'
 import { inventoryAPI } from './inventory.preload'
 import { assetEventAPI } from './asset-event.preload'
 import { settingAPI } from './setting.preload'
+import { bookImportAPI } from './book-import.preload'
 
 const electronAPI = {
   ...appAPI,
@@ -30,7 +31,8 @@ const electronAPI = {
   ...classAPI,
   ...inventoryAPI,
   ...assetEventAPI,
-  ...settingAPI
+  ...settingAPI,
+  ...bookImportAPI
 }
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI)

@@ -2,6 +2,8 @@ export const ROUTES = {
   DASHBOARD: '/dashboard',
   BOOKS: '/books',
   BOOK_NEW: '/books/new',
+  BOOK_IMPORT: '/books/import',
+  BOOK_IMPORT_PREVIEW: '/books/import/preview',
   BOOK_DETAIL: '/books/:id',
   BOOK_EDIT: '/books/:id/edit',
   MEMBERS: '/members',

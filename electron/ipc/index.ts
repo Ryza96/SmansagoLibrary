@@ -17,7 +17,11 @@ import type { ClassService } from '../../src/main/services/class.service'
 import type { InventoryService } from '../main/services/inventory.service'
 import type { AssetEventService } from '../main/services/asset-event.service'
 import type { SettingService } from '../main/services/setting.service'
+import type { MatchingEngineService } from '../../src/services/MatchingEngineService'
+import type { AutoCreateService } from '../../src/main/services/auto-create.service'
+import type { BookImportService } from '../../src/main/services/book-import.service'
 import { registerAppHandlers } from './app.ipc'
+import { registerBookImportHandlers } from './book-import.ipc'
 import { registerBookHandlers } from './book.ipc'
 import { registerBookCopyHandlers } from './book-copy.ipc'
 import { registerMemberHandlers } from './member.ipc'
@@ -53,10 +57,14 @@ export function registerAllHandlers(
     inventoryService: InventoryService
     assetEventService: AssetEventService
     settingService: SettingService
+    matchingEngine: MatchingEngineService
+    autoCreateService: AutoCreateService
+    bookImportService: BookImportService
   },
   mainWindow: () => BrowserWindow | null
 ): void {
   registerAppHandlers(mainWindow)
+  registerBookImportHandlers(services.matchingEngine, services.autoCreateService, services.bookImportService)
   registerBookHandlers(services.bookService)
   registerBookCopyHandlers(services.bookCopyService, services.newBookCopyService)
   registerMemberHandlers(services.memberService)

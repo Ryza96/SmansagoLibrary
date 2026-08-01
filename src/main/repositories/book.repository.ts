@@ -29,6 +29,10 @@ export class BookRepository extends BaseRepository {
     return this.prisma.book.create({ data })
   }
 
+  async createWithTx(tx: Prisma.TransactionClient, data: CreateBookData): Promise<Book> {
+    return tx.book.create({ data })
+  }
+
   async update(id: string, data: UpdateBookData): Promise<Book> {
     return this.prisma.book.update({ where: { id }, data })
   }
@@ -71,6 +75,13 @@ export class BookRepository extends BaseRepository {
     ])
 
     return toPaginatedResult(data, total, options?.pagination)
+  }
+
+  async findAll(limit = 500): Promise<Book[]> {
+    return this.prisma.book.findMany({
+      take: Math.min(500, Math.max(1, limit)),
+      orderBy: { title: 'asc' }
+    })
   }
 
   async existsByISBN(isbn: string): Promise<boolean> {

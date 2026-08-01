@@ -7,6 +7,8 @@ release/
 # NOTE: prisma/migrations/ (active baseline) MUST stay tracked for fresh-clone recovery
 prisma/*.db
 prisma/*.db-journal
+prisma/*.db-wal
+prisma/*.db-shm
 
 # IDE
 .vscode/
@@ -21,6 +23,7 @@ Thumbs.db
 # Logs
 *.log
 npm-debug.log*
+
 # Environment
 .env
 .env.local

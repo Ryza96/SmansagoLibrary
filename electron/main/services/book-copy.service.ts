@@ -24,6 +24,8 @@ const VALID_CONDITIONS = [
   BookCopyCondition.HEAVY_DAMAGE
 ]
 
+const VALID_ACQUISITION_SOURCES = ['PEMBELIAN', 'DONASI', 'HIBAH', 'BANTUAN_PEMERINTAH', 'LAINNYA']
+
 export class BookCopyService {
   constructor(
     private repository: BookCopyRepository,
@@ -72,7 +74,29 @@ export class BookCopyService {
       throw new AppError(400, 'Validation Error', `Kondisi "${condition}" tidak valid.`)
     }
 
-    const copies = await this.executeAddCopiesTransaction(bookId, input.quantity, input.shelfLocation.trim(), condition)
+    if (input.acquisitionCost !== undefined && input.acquisitionCost !== null) {
+      if (!Number.isInteger(input.acquisitionCost) || input.acquisitionCost < 0) {
+        throw new AppError(400, 'Validation Error', 'Harga perolehan harus berupa bilangan bulat positif.')
+      }
+    }
+
+    if (input.acquisitionSource !== undefined && input.acquisitionSource !== null) {
+      if (!VALID_ACQUISITION_SOURCES.includes(input.acquisitionSource)) {
+        throw new AppError(400, 'Validation Error', 'Sumber perolehan tidak valid.')
+      }
+    }
+
+    const copies = await this.executeAddCopiesTransaction(
+      bookId,
+      input.quantity,
+      input.shelfLocation.trim(),
+      condition,
+      input.acquisitionDate,
+      input.acquisitionSource,
+      input.acquisitionCost,
+      input.acquisitionSourceDetail,
+      input.acquisitionNotes
+    )
 
     return this.getCopiesByBookId(bookId)
   }
@@ -81,7 +105,12 @@ export class BookCopyService {
     bookId: string,
     quantity: number,
     shelfLocation: string,
-    condition: string
+    condition: string,
+    acquisitionDate?: string,
+    acquisitionSource?: string,
+    acquisitionCost?: number,
+    acquisitionSourceDetail?: string,
+    acquisitionNotes?: string
   ): Promise<Array<{ inventoryNumber: string; barcode: string }>> {
     const MAX_RETRIES = 3
 
@@ -90,16 +119,19 @@ export class BookCopyService {
         return await prisma.$transaction(async (tx) => {
           const inventoryNumbers = await this.allocator.allocate(tx, quantity)
 
-          const barcodes = this.generateBarcodes(quantity)
-
-          const copiesData = inventoryNumbers.map((invNum, i) => ({
+          const copiesData = inventoryNumbers.map((invNum) => ({
             id: crypto.randomUUID(),
             bookId,
             inventoryNumber: invNum,
-            barcode: barcodes[i],
+            barcode: invNum,
             shelfLocation,
             condition,
-            status: BookCopyStatus.AVAILABLE
+            status: BookCopyStatus.AVAILABLE,
+            acquisitionDate: acquisitionDate ? new Date(acquisitionDate) : undefined,
+            acquisitionSource,
+            acquisitionCost,
+            acquisitionSourceDetail,
+            acquisitionNotes
           }))
 
           await this.repository.createManyWithTx(tx, copiesData)
@@ -183,17 +215,6 @@ export class BookCopyService {
         })
       })
     })
-  }
-
-  private generateBarcodes(count: number): string[] {
-    const barcodes = new Set<string>()
-
-    while (barcodes.size < count) {
-      const hex = crypto.randomBytes(6).toString('hex').toUpperCase()
-      barcodes.add(`BC-${hex}`)
-    }
-
-    return Array.from(barcodes)
   }
 
   private validateStatusTransition(currentStatus: string, newStatus: string): void {

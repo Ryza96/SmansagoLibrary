@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Plus, Trash2, AlertTriangle } from 'lucide-react'
+import { Plus, Trash2, AlertTriangle, Printer } from 'lucide-react'
 import { BookDetailDTO, BookCopyDTO, CreateBookCopiesDTO } from '../../types/dtos/book'
 import { LABELS } from '../../utils/labels'
 
@@ -27,6 +27,11 @@ export default function BookDetail({ book, copies, onAddCopies, onDecommissionCo
   const [quantity, setQuantity] = useState(1)
   const [shelfLocation, setShelfLocation] = useState('')
   const [condition, setCondition] = useState('GOOD')
+  const [acquisitionDate, setAcquisitionDate] = useState('')
+  const [acquisitionSource, setAcquisitionSource] = useState('')
+  const [acquisitionSourceDetail, setAcquisitionSourceDetail] = useState('')
+  const [acquisitionCost, setAcquisitionCost] = useState('')
+  const [acquisitionNotes, setAcquisitionNotes] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
@@ -41,12 +46,23 @@ export default function BookDetail({ book, copies, onAddCopies, onDecommissionCo
       await onAddCopies({
         quantity,
         shelfLocation: shelfLocation.trim(),
-        condition
+        condition,
+        acquisitionDate: acquisitionDate || undefined,
+        acquisitionSource: acquisitionSource || undefined,
+        acquisitionSourceDetail:
+          acquisitionSource === 'LAINNYA' ? acquisitionSourceDetail.trim() || undefined : undefined,
+        acquisitionCost: acquisitionCost ? parseInt(acquisitionCost, 10) : undefined,
+        acquisitionNotes: acquisitionNotes.trim() || undefined
       })
       setShowAddDialog(false)
       setQuantity(1)
       setShelfLocation('')
       setCondition('GOOD')
+      setAcquisitionDate('')
+      setAcquisitionSource('')
+      setAcquisitionSourceDetail('')
+      setAcquisitionCost('')
+      setAcquisitionNotes('')
     } finally {
       setSubmitting(false)
     }
@@ -58,6 +74,23 @@ export default function BookDetail({ book, copies, onAddCopies, onDecommissionCo
       : LABELS.COPY.CONFIRM_DECOMMISSION
     if (!window.confirm(msg)) return
     await onDecommissionCopy(copy.id)
+  }
+
+  async function handlePrintLabels() {
+    if (copies.length === 0) return
+    try {
+      await window.electronAPI.print.bookLabels({
+        bookTitle: book.title,
+        items: copies.map((copy) => ({
+          barcode: copy.barcode ?? copy.inventoryNumber,
+          inventoryNumber: copy.inventoryNumber,
+          shelfLocation: copy.shelfLocation ?? ''
+        }))
+      })
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Gagal mencetak label.'
+      alert(message)
+    }
   }
 
   return (
@@ -123,6 +156,14 @@ export default function BookDetail({ book, copies, onAddCopies, onDecommissionCo
           <h2 className="text-lg font-semibold text-slate-800">
             {LABELS.COPY.TITLE} ({copies.length})
           </h2>
+          <button
+            onClick={handlePrintLabels}
+            disabled={copies.length === 0}
+            className="flex items-center gap-1.5 px-3 py-2 border border-slate-300 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Printer size={16} />
+            {LABELS.COPY.PRINT_LABELS}
+          </button>
           <button
             onClick={() => setShowAddDialog(true)}
             className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
@@ -221,6 +262,83 @@ export default function BookDetail({ book, copies, onAddCopies, onDecommissionCo
                   <option value="HEAVY_DAMAGE">{LABELS.COPY.CONDITION_MAP.HEAVY_DAMAGE}</option>
                 </select>
               </div>
+
+              <div className="border-t border-slate-200 pt-4">
+                <p className="text-sm font-semibold text-slate-700 mb-3">{LABELS.BOOK_SECTION.PROCUREMENT}</p>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">
+                        {LABELS.FIELD.ACQUISITION_DATE}
+                      </label>
+                      <input
+                        type="date"
+                        value={acquisitionDate}
+                        onChange={(e) => setAcquisitionDate(e.target.value)}
+                        className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">
+                        {LABELS.FIELD.ACQUISITION_SOURCE}
+                      </label>
+                      <select
+                        value={acquisitionSource}
+                        onChange={(e) => setAcquisitionSource(e.target.value)}
+                        className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                      >
+                        <option value="">- Pilih -</option>
+                        {LABELS.ACQUISITION_SOURCES.map((s) => (
+                          <option key={s.value} value={s.value}>
+                            {s.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  {acquisitionSource === 'LAINNYA' && (
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">
+                        {LABELS.FIELD.ACQUISITION_SOURCE_DETAIL}
+                      </label>
+                      <input
+                        type="text"
+                        value={acquisitionSourceDetail}
+                        onChange={(e) => setAcquisitionSourceDetail(e.target.value)}
+                        placeholder={LABELS.ACQUISITION_SOURCE_DETAIL_PLACEHOLDER}
+                        className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                  )}
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                      {LABELS.FIELD.ACQUISITION_COST}
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">Rp</span>
+                      <input
+                        type="number"
+                        min={0}
+                        value={acquisitionCost}
+                        onChange={(e) => setAcquisitionCost(e.target.value)}
+                        className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                      {LABELS.FIELD.ACQUISITION_NOTES}
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={acquisitionNotes}
+                      onChange={(e) => setAcquisitionNotes(e.target.value)}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                    />
+                  </div>
+                </div>
+              </div>
+
               <div className="space-y-1">
                 <p className="text-xs text-slate-400">{LABELS.COPY.BARCODE_AUTO}</p>
                 <p className="text-xs text-slate-400">{LABELS.COPY.INV_AUTO}</p>

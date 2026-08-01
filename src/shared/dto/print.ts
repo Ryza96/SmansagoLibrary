@@ -25,3 +25,14 @@ export interface ReturnReceiptData {
   items: ReceiptItemData[]
   totalItems: number
 }
+
+export interface BookLabelItemData {
+  barcode: string
+  inventoryNumber: string
+  shelfLocation: string
+}
+
+export interface BookLabelData {
+  bookTitle: string
+  items: BookLabelItemData[]
+}

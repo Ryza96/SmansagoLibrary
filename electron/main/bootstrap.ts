@@ -31,6 +31,14 @@ import { CurriculumService } from '../../src/main/services/curriculum.service'
 import { CurriculumRepository } from '../../src/main/repositories/curriculum.repository'
 import { ClassService } from '../../src/main/services/class.service'
 import { ClassRepository } from '../../src/main/repositories/class.repository'
+import { MatchingEngineService } from '../../src/services/MatchingEngineService'
+import { createProductionStrategies } from '../../src/main/strategies/index'
+import { AutoCreateService } from '../../src/main/services/auto-create.service'
+import { BookImportService } from '../../src/main/services/book-import.service'
+import { AuthorRepository as NewAuthorRepository } from '../../src/main/repositories/author.repository'
+import { PublisherRepository as NewPublisherRepository } from '../../src/main/repositories/publisher.repository'
+import { CategoryRepository as NewCategoryRepository } from '../../src/main/repositories/category.repository'
+import { BookRepository as NewBookRepository } from '../../src/main/repositories/book.repository'
 
 export interface Container {
   bookService: BookService
@@ -51,6 +59,9 @@ export interface Container {
   inventoryService: InventoryService
   assetEventService: AssetEventService
   settingService: SettingService
+  matchingEngine: MatchingEngineService
+  autoCreateService: AutoCreateService
+  bookImportService: BookImportService
 }
 
 export function createContainer(): Container {
@@ -89,6 +100,10 @@ export function createContainer(): Container {
   const curriculumService = new CurriculumService(curriculumRepository, classRepository)
   const classService = new ClassService(classRepository, academicYearRepository, curriculumRepository, newMemberRepository)
 
+  const matchingEngine = new MatchingEngineService(createProductionStrategies())
+  const autoCreateService = new AutoCreateService(new NewAuthorRepository(), new NewPublisherRepository(), new NewCategoryRepository())
+  const bookImportService = new BookImportService(new NewBookRepository(), new NewBookCopyRepository())
+
   return {
     bookService,
     authorService,
@@ -107,6 +122,9 @@ export function createContainer(): Container {
     borrowRepository,
     inventoryService,
     assetEventService,
-    settingService
+    settingService,
+    matchingEngine,
+    autoCreateService,
+    bookImportService
   }
 }

@@ -1,10 +1,12 @@
-import { createHashRouter, Navigate } from 'react-router-dom'
+import { createHashRouter, Navigate, Outlet } from 'react-router-dom'
 import AppLayout from '../components/layout/AppLayout'
+import { BookImportProvider } from '../contexts/BookImportContext'
 import DashboardPage from '../pages/DashboardPage'
 import BooksPage from '../pages/BooksPage'
 import BookDetailPage from '../pages/BookDetailPage'
 import BookFormPage from '../pages/BookFormPage'
-import MembersPage from '../pages/MembersPage'
+import BookImportPage from '../pages/BookImportPage'
+import BookImportPreviewPage from '../pages/BookImportPreviewPage'
 import MemberListPage from '../pages/MemberListPage'
 import MemberCreatePage from '../pages/MemberCreatePage'
 import MemberEditPage from '../pages/MemberEditPage'
@@ -31,6 +33,18 @@ export const router = createHashRouter([
       { path: 'dashboard', element: <DashboardPage /> },
       { path: 'books', element: <BooksPage /> },
       { path: 'books/new', element: <BookFormPage /> },
+      {
+        path: 'books/import',
+        element: (
+          <BookImportProvider>
+            <Outlet />
+          </BookImportProvider>
+        ),
+        children: [
+          { index: true, element: <BookImportPage /> },
+          { path: 'preview', element: <BookImportPreviewPage /> },
+        ],
+      },
       { path: 'books/:id', element: <BookDetailPage /> },
       { path: 'books/:id/edit', element: <BookFormPage /> },
       { path: 'members', element: <Navigate to="/members/students" replace /> },

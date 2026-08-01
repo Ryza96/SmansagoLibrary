@@ -194,3 +194,125 @@ Audit menyeluruh terhadap Borrowing Module: Prisma schema, Repository, Service, 
 - Field Prisma ter-map: `memberNumber`/`borrowNumber` (bukan `number`); smoke seed wajib pakai `memberNumber`.
 - `prisma/migrations/` di-gitignore; `prisma/migrations_archive/` TIDAK tercakup pola gitignore (jika nanti commit, perlu pola tambahan).
 - Squash baseline: arsipkan folder lama → generate `--from-empty` baseline → `migrate resolve --applied` (dev yang sudah ada schema final) → status hijau. Fresh deploy hanya 1 migration.
+
+---
+
+## WO13: Procurement Information Activation (COMPLETE)
+
+### Ringkasan
+- Feature "Informasi Pengadaan" diaktifkan: kolom procurement ditambahkan ke `BookCopy` (bukan model `Procurement` terpisah): `acquisitionSource String?`, `acquisitionPrice Int?`, `acquisitionNotes String?` — reuse `acquisitionDate` yang sudah ada.
+- **Schema & Migration (DONE):** `prisma/migrations/20260731_wo13_procurement_fields/` (3 ALTER). Baseline `20260731_adr002_initial` TIDAK dimodifikasi.
+- **Backend (DONE):** `electron/main/services/book-copy.service.ts` `addCopies` validasi harga (integer non-negatif) + persist 4 field via `executeAddCopiesTransaction`; `src/main/repositories/book-copy.repository.ts` `CreateBookCopyData` + 3 field; `src/shared/dto/book.ts` `CreateBookCopiesDTO` + 4 field opsional; `src/renderer/env.d.ts` `bookCopies.findById` + 3 field. TIDAK ada perubahan IPC/preload/bootstrap (channel `bookCopies:addCopies` sudah ada).
+- **Frontend (DONE):** dialog "Tambah Eksemplar" di `BookDetail.tsx` kini punya form procurement aktif (Tanggal, Sumber dropdown + "Lainnya", Harga, Catatan); placeholder disabled dihapus dari `BookForm.tsx` (helper `Section` hilang prop `placeholder`); `InventoryDetailPage.tsx` menampilkan Sumber/Harga/Catatan Pengadaan; `labels.ts` + `ACQUISITION_SOURCES`, `FIELD.ACQUISITION_*`.
+- **Validation:** `npm run lint` PASS, `npm run build` PASS, fresh DB `migrate deploy` PASS (urutan baseline→WO13 benar), `migrate status` hijau (dev & fresh), `migrate diff` = "No difference detected", smoke test Prisma client (insert+baca 4 field procurement) PASS.
+- **Status: READY.** Perubahan WO13 ada di working tree di atas 194 perubahan staged WO-BR-99 (belum commit).
+
+### Pelajaran (retain)
+- **Urutan folder migration Prisma = sort lexicographic.** `20260731094204_...` (`'0'`=0x30) mengurut SEBELUM `20260731_adr002_initial` (`'_'`=0x5F) → fresh deploy menerapkan ALTER sebelum baseline → P3018. Fix: nama folder `20260731_wo13_procurement_fields` (urut setelah `adr002`). **SELALU verifikasi fresh-DB deploy setelah menambah migration**, bukan hanya dev DB (dev DB menyembunyikan masalah urutan karena baseline sudah applied).
+- Reconcile dev DB setelah rename folder: `prisma migrate resolve --applied <nama-baru>` + `prisma db execute` DELETE record stale dari `_prisma_migrations` (bukan edit checksum).
+- Smoke test env: `$env:DATABASE_URL` di-override akan menang atas `.env`; relative SQLite path diselesaikan oleh Prisma — pakai absolute `file:C:/...` untuk DB uji. Script import `@prisma/client` harus berada di dalam repo (node resolve dari lokasi script).
+- WO13 adalah WO pertama yang menyentuh schema setelah baseline squash — alur baku: edit schema → `prisma migrate diff --from-migrations --to-schema-datamodel --script` → tulis folder `prisma/migrations/<ts>_<name>/migration.sql` → `prisma migrate deploy` → `prisma generate` → lint+build+smoke.
+
+---
+
+## WO13-R1: Procurement Revision 1 (COMPLETE)
+
+### Ringkasan
+- **Rename:** `acquisitionPrice` → `acquisitionCost` (kolom, DTO, repository, service, env.d.ts). Label UI: **"Harga Perolehan"** (bukan "Harga Beli").
+- **`acquisitionSource` = enum ketat:** `PEMBELIAN`, `DONASI`, `HIBAH`, `BANTUAN_PEMERINTAH`, `LAINNYA` — free text tidak lagi disimpan; validasi enum ditambahkan di `book-copy.service.ts` (`VALID_ACQUISITION_SOURCES`).
+- **Field baru `acquisitionSourceDetail String?`:** textbox "Jelaskan Sumber Perolehan" hanya tampil saat source=`LAINNYA`; disimpan ke field ini.
+- **Inventory Detail:** tampilkan "Sumber Perolehan: Lainnya" + blok "Detail" saat `LAINNYA`; blok Detail disembunyikan untuk source lain bila kosong.
+- **Migration baru:** `prisma/migrations/20260731_wo13_revision1_source_detail/` — ditulis manual `RENAME COLUMN` (mengawetkan data; Prisma diff akan DROP+ADD). Migration lama & baseline TIDAK diedit.
+- **Validation:** `prisma generate`, `migrate deploy`, `migrate status`, `migrate diff` = "No difference detected" — semua PASS; fresh DB deploy urutan benar (baseline→WO13→R1); `npm run lint` PASS; `npm run build` PASS; smoke test (insert LAINNYA+detail, kolom lama ditolak client) PASS.
+- **Status: READY.** Laporan: `WO13_REVISION1_REPORT.md`. Belum commit (menunggu instruksi).
+
+### Pelajaran (retain)
+- **Rename kolom SQLite** = tulis migration manual `ALTER TABLE ... RENAME COLUMN` (Prisma diff menghasilkan DROP+ADD → data hilang). Verifikasi: akses kolom lama via Prisma client harus error.
+- **Nama folder migration baru wajib sort AFTER folder WO13:** `revision1` (`r` > `p`) benar; tetap verifikasi fresh deploy karena ini WO ke-2 yang menyentuh `BookCopy` setelah baseline.
+- Istilah UI harga perolehan: **"Harga Perolehan"** — `FIELD.PRICE` (labels.ts) adalah key mati lama yang masih berisi "Harga Beli" (tidak dipakai, di luar scope).
+
+---
+
+## WO-8: Barcode & Label (COMPLETE — READY review PO)
+
+### Ringkasan
+- **Keputusan PO:** (1) nilai barcode di DB = `inventoryNumber` (bukan `BC-XXXX`); (2) simbol **Code128**; (3) gambar barcode **TIDAK disimpan** — dirender saat cetak; (4) `Setting.barcodeFormat` dibiarkan (tidak dikonsumsi).
+- **File baru:** `src/main/services/barcode.service.ts` (`generateBarcodeSvg` Code128 via `bwip-js/node`), `src/main/services/label.service.ts` (`generateLabelsHtml` A4 2-kolom, `.label` 50%×63mm, escapeHtml, fallback `item.barcode || item.inventoryNumber`), DTO `BookLabelData`/`BookLabelItemData` di `src/shared/dto/print.ts`.
+- **Modifikasi:** `electron/main/services/print.service.ts` (`printBookLabels` + `printHtml(html, printOptions?)` opsional non-breaking), `electron/ipc/print.ipc.ts` (`printing:bookLabels`), `electron/preload/print.preload.ts` (`print.bookLabels`), `src/renderer/env.d.ts`, `electron/main/services/book-copy.service.ts` (**Decision #1:** `barcode: invNum`, `generateBarcodes` dihapus, `crypto.randomUUID` tetap), `src/components/books/BookDetail.tsx` (tombol "Cetak Label"), `src/utils/labels.ts` (`COPY.PRINT_LABELS`), `package.json`+`package-lock.json` (`bwip-js@^4.11.2`).
+- **TIDAK diubah:** Matching/Validation/AutoCreate/BookImportService/BookCopyRepository; schema+migrasi DB; `Setting.barcodeFormat`; backfill.
+- **Validation:** `npm run lint` PASS, `npm run build` PASS (main 1,746.12 kB), smoke unit 16/16 (SVG Code128, HTML label, escaping, fallback), smoke DB `addCopies` asli 16/16 (fresh DB 3 migration: barcode===inventoryNumber tiap row, unik `INV-`, `findByBarcode` bekerja). DB uji dibersihkan.
+- **Laporan:** `SPRINT9_WO8_IMPLEMENTATION_REPORT.md`, `SPRINT9_WO8_ARCHITECTURE_CHECKLIST.md`, `SPRINT9_WO8_DECISION_LOG.md`, `SPRINT9_WO8_TECHNICAL_DEBT.md`.
+- **Status: DONE — Architecture Gate BERHENTI**, menunggu review Product Owner (tidak lanjut WO berikutnya).
+
+### Pelajaran (retain)
+- **`bwip-js` wajib import `bwip-js/node`** (bukan `bwip-js`) — paket memakai conditional exports (`node`/`browser`/`electron`); dengan `moduleResolution: bundler` import default tidak resolve. Untuk menjalankan smoke JS yang mengimpor `bwip-js/node` di luar bundle, set `NODE_PATH=<repo>\node_modules`.
+- **Smoke DB service legacy:** `electron/main/database.ts` memakai singleton `prisma` yang hanya terisi setelah `initDatabase()`; repo/service mengimpor `prisma` via binding modul (live) — jangan destructure `const { prisma } = require(...)` saat require (tertangkan `undefined`), akses `db.prisma` setelah `await initDatabase()`.
+- **Compile terpisah service legacy utk smoke:** `npx tsc --module commonjs --target es2022 --moduleResolution node --esModuleInterop --skipLibCheck --outDir <temp>` daftar file ts → jalankan hasil `.js` dengan `$env:DATABASE_URL` absolute `file:C:/...` temp DB (fresh `prisma migrate deploy`).
+- Nilai barcode kini seragam `= inventoryNumber` di kedua jalur (manual + import); nilai `INV-...` valid sebagai input Code128 → label eksisting render tanpa backfill.
+- **DB smoke WAJIB fresh DB per run:** assertion `sequential inventory numbers` mengharapkan `INV-000001...`; bila DB temp masih menyimpan baris dari run sebelumnya, `InventorySequence` berlanjut ke `004+` dan smoke FAIL padahal kode benar. Prosedur: hapus file `.db`/`-wal`/`-shm` → `prisma migrate deploy` → run.
+
+### Revisi (Review PO — DB Smoke blocker, DONE)
+- Blocker: DB smoke FAIL (`TypeError reading 'book'` + `sequential inventory numbers`). Root cause **bukan kode aplikasi**: (1) smoke destructure `prisma` sebelum `initDatabase()`; (2) DB temp stale dari run sebelumnya.
+- Fix: smoke akses `db.prisma` setelah init; fresh DB per run. Kode aplikasi **tidak berubah** (tidak ada fitur/refactor/scope creep).
+- Re-run PASS: lint, build (main 1,746.12 kB), HTML Smoke 16/16, DB Smoke 16/16.
+- **Status: DONE — menunggu review PO.**
+
+---
+
+## Sprint 10 WO-2: Import Commit (COMPLETE — READY review PO)
+
+### Ringkasan
+- Audit WO-1 menemukan dead-end: `BookImportPreviewPage` tanpa tombol commit; `api.imports.match` 0 panggilan di `src/`. WO-2 menutupnya.
+- **Modifikasi (3 file renderer; TIDAK ada perubahan backend):** `src/pages/BookImportPreviewPage.tsx` (state `committing`/`importError`/`importSuccess`; `handleCommit()` → `await window.electronAPI.imports.match(validatedWorkbook.canonicalRows)` → pesan sukses/gagal; action bar "Import Buku" + loading `Hourglass` inline; tombol "Kembali" → "Kembali ke Daftar Buku" setelah sukses), `src/utils/labels.ts` (6 label baru blok `IMPORT`: IMPORT_ACTION, IMPORT_PROCESSING, IMPORT_SUCCESS, IMPORT_ERROR, COMMIT_HINT, BACK_TO_BOOKS). `src/utils/bookImport.ts` TIDAK ditambah (revisi).
+- **Revisi (Review PO):** iterasi awal memakai `buildImportSummary()` di renderer untuk menghitung statistik (Book/BookCopy/Author/Publisher/Category) dari messageKey — **DITOLAK PO** (business logic import & dependensi string `bookImport.*` tidak boleh di renderer). Dihapus total; UI kini menampilkan **status sukses tanpa statistik** karena backend tidak menyediakan summary resmi.
+- **TIDAK diubah:** Validation/Matching/AutoCreate/BookImportService/BookCopyRepository; IPC/preload/env.d.ts (channel `imports:match`); schema+migrasi; dependency; tidak pakai Modal/Stepper/ProgressBar/Toast.
+- **Validation:** `npm run lint` PASS, `npm run build` PASS (main 1,746.12 kB; preload 6.59 kB; renderer 887.52 kB); grep sisa `buildImportSummary|ImportSummary|BOOK_FAILURE_MESSAGE_KEYS|SUMMARY_*` di `src/` = 0 match.
+- **Laporan:** `SPRINT10_WO2_IMPLEMENTATION_REPORT.md`, `SPRINT10_WO2_ARCHITECTURE_CHECKLIST.md`, `SPRINT10_WO2_DECISION_LOG.md`, `SPRINT10_WO2_TECHNICAL_DEBT.md` (semua revisi).
+- **Status: DONE — Architecture Gate BERHENTI**, menunggu review Product Owner (tidak lanjut WO berikutnya).
+
+### Pelajaran (retain)
+- **Renderer tidak boleh punya business logic import.** Statistik hasil import (Book/BookCopy/Author/Publisher/Category dibuat) hanya boleh datang dari backend sebagai kontrak IPC formal; renderer cukup menunggu resolve/reject promise dan menampilkan status.
+- **messageKey (`bookImport.*`, `autoCreate.*`) bukan kontrak sistem** — jangan parsing di renderer.
+- Jika backend belum menyediakan summary resmi, tampilkan status sukses saja; jangan derivasi sendiri.
+
+---
+
+## WO-2 Investigation: Import Buku tidak muncul di aplikasi PO (DONE — READ ONLY)
+
+### Ringkasan
+- PO membuka Menu Buku di aplikasi → **tidak ada tombol "Import Buku"**, tidak ada akses pipeline import.
+- **Root cause = artifact build basi, BUKAN bug source.** Aplikasi yang PO jalankan adalah `dist/win-unpacked/` (electron-builder, dibuild **31/07 10:24**) dari kode sebelum fitur import ada. Grep `app.asar`: `Import Buku`/`BOOK_IMPORT`/`books/import`/`imports:match` = **0 kemunculan**.
+- Commit terakhir `437b50a "release: v1.0 release candidate"` (31/07 16:01) **TIDAK memuat fitur import sama sekali** (`git ls-tree` 0 file import; routes/labels/navigation/BooksPage versi commit tanpa import). Seluruh Sprint 5–10 (termasuk WO-2/WO-3/WO-8/WO-13) ada di **working tree yang belum di-commit**.
+- Build source terkini `out/` (01/08 12:37) **benar & lengkap**: `index-DiqpmWbM.js` memuat `Import Buku`×6, `BOOK_IMPORT`×11, `books/import`×3; `out/main/index.js` memuat `imports:match`×1.
+- **Bukan** feature flag / permission / conditional rendering / route berbeda / layout berbeda (diverifikasi). File implementasi sudah benar.
+- **Perbaikan (belum dieksekusi):** rebuild `npm run build` → repackage electron-builder → verifikasi `app.asar` memuat string import → commit seluruh working tree → aturan baku "WO selesai = build+repackage+verifikasi artifact sebelum review PO".
+- **Laporan:** `SPRINT10_WO2_INVESTIGATION.md` (Root Cause, Active UI File, Mengapa PO tidak melihat perubahan, Rencana perbaikan).
+- **Status: DONE — menunggu review PO.**
+
+### Pelajaran (retain)
+- **Verifikasi review PO = uji ARTIFACT (`dist/`), bukan source.** `npm run build` menghasilkan `out/` yang benar, tetapi aplikasi yang diinstal PO berasal dari `dist/` (electron-builder) yang harus di-rebuild & di-repackage ulang terpisah.
+- **Grep string di `app.asar`** adalah cara cepat memastikan fitur masuk package: `Import Buku`/`BOOK_IMPORT`/`books/import` di bundle renderer, `imports:match` di `out/main/index.js`.
+- **Git repo hanya 3 commit**; seluruh kerja Sprint 5+ belum di-commit. Commit `437b50a` = baseline release yang belum punya import. Jangan asumsikan working tree = apa yang dirilis.
+
+---
+
+## Sprint 10 WO-3: Import UAT (COMPLETE — READY review PO)
+
+### Ringkasan
+- End-to-End User Acceptance Test alur produksi `Buku → Import Buku → Pilih File → Validasi → Preview → Import Buku → Matching → Auto Create → Book → BookCopy (Barcode) → Selesai`. **READ ONLY** — tanpa perubahan kode, tanpa commit.
+- **Hasil: 95/95 PASS** + static UI review PASS.
+  - Reader real: `uat_wo3/reader.check.cjs` 3/3 (file `.xlsx` OOXML dibuat via .NET ZipArchive, dibaca `read-excel-file`; return `Sheet[] {sheet, data}` cocok persis mapping `WorkbookReaderService`).
+  - E2E rantai penuh: `uat_wo3/e2e.smoke.ts` 20/20 (xlsx → reader → `validationEngineService.validate` → pipeline produksi `createProductionStrategies` → DB; 2 Book, 2 BookCopy `INV-000001`/`-2` barcode===inventoryNumber, entitas & relasi benar).
+  - Validation layer: `uat_wo3/validation.smoke.ts` 22/22 (S1 normal; S2/S3/S4 entity baru; S5 ISBN dup tetap valid — cek duplikat ada di pipeline; S6 judul kosong `IMP-013`; S7 publisher kosong `IMP-013`; S8 header "Penerbit"; S9 header "Publisher" → normalized `penerbit`; S10 3 baris).
+  - Import pipeline: `uat_wo3/import.smoke.ts` 50/50 pada fresh DB (S1 + S2/S3/S4 + S10 reuse entitas + S5 `isbnDuplicate` baris dilewati + S5b 1 dibuat 1 gagal + S7 `entityMissing` + S6 `titleMissing`; tally books=6 copies=6 authors=4 publishers=3 categories=3).
+- **Bug Found (tidak diperbaiki, dicatat di laporan):** B1 (MODERATE) baris gagal pipeline tidak tampil ke user — `imports:match` resolve tanpa throw, error tersembunyi di `matchingResult.errors`, UI hanya status sukses (konsekuensi keputusan WO-2); B2 (LOW–MODERATE) `AutoCreateService.apply` berjalan sebelum `importBooks` → entitas yatim untuk baris yang gagal ISBN duplikat dengan entitas baru; B3 (LOW) tidak ada pesan per-baris; B4 (INFO) header synonyms terbatas (`publisher`→`penerbit`).
+- **Regression:** lint PASS, build PASS (main 1,746.12 kB · preload 6.59 kB · renderer 887.52 kB), migrate deploy fresh PASS, diff = no difference.
+- **Laporan:** `SPRINT10_WO3_UAT_REPORT.md` (format: Test Matrix, Test Result, Bug Found, Regression Check, Recommendation).
+- **Status: DONE — Architecture Gate BERHENTI**, menunggu review Product Owner (rekomendasi: fitur LULUS jalur utama; B1/B2 diajukan follow-up sebelum rilis).
+
+### Pelajaran (retain)
+- **`read-excel-file` v9 return `Sheet[]` (`{sheet, data}`)**, bukan array row langsung — mapping di `WorkbookReaderService` (`sheet.sheet`→name, `sheet.data`→rows) adalah satu-satunya tempat kontrak shape. Uji reader Wajib menebak shape ini (header row = `data[0]`).
+- **`imports:match` TIDAK pernah throw untuk kegagalan baris** — error dikumpulkan ke `matchedWorkbook.matchingResult.errors` (messageKey `bookImport.*`); renderer tidak bisa tahu baris mana gagal tanpa summary dari backend.
+- **AutoCreate berjalan SEBELUM deteksi ISBN duplikat** (`book-import.ipc.ts:24`): entitas untuk baris yang akhirnya gagal tetap dibuat → risiko orphan bila nama entitas baru. Dalam alur UI normal judul/penerbit kosong sudah disaring validasi (IMP-013 → bukan canonical), jadi S6/S7 jarang sampai pipeline; S5 (ISBN dup) tetap bisa membuat orphan.
+- **Validasi UI (renderer) vs guard pipeline (main) adalah dua lapis terpisah:** validasi menyaring baris kosong (IMP-013); pipeline punya guard sendiri (`titleMissing`/`entityMissing`/`isbnDuplicate`) yang aktif bila input canonical di-IPC langsung (mis. smoke).
+- UAT headless dapat meniru alur produksi penuh tanpa Electron dengan: generate file `.xlsx` nyata (OOXML Zip) → `read-excel-file/node` → objek identik IPC → `createProductionStrategies()` (bukan dummy) → fresh DB `migrate deploy`. **Jalankan lint+build di akhir sebagai regression karena WO-3 read-only.**

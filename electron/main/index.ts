@@ -3,6 +3,7 @@ import path from 'path'
 import { initDatabase, closeDatabase } from './database'
 import { createContainer } from './bootstrap'
 import { registerAllHandlers } from '../ipc/index'
+import { databaseReconciliationService } from '../../src/main/services/database-reconciliation.service'
 
 let mainWindow: BrowserWindow | null = null
 
@@ -34,6 +35,7 @@ function createWindow(): void {
 
 app.whenReady().then(async () => {
   await initDatabase()
+  await databaseReconciliationService.run()
 
   const container = createContainer()
   registerAllHandlers(container, () => mainWindow)

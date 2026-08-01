@@ -230,50 +230,6 @@ export default function BookForm({
                 </div>
               </div>
             </Section>
-
-            <Section title={LABELS.BOOK_SECTION.PROCUREMENT} placeholder>
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-500 mb-1">{LABELS.FIELD.ACQUISITION_DATE}</label>
-                  <input
-                    type="date"
-                    disabled
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 text-slate-400 cursor-not-allowed"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-500 mb-1">{LABELS.FIELD.ACQUISITION_SOURCE}</label>
-                  <input
-                    type="text"
-                    disabled
-                    placeholder={LABELS.PLACEHOLDER.ACQUISITION_SOURCE}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 text-slate-400 cursor-not-allowed"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-500 mb-1">{LABELS.FIELD.PRICE}</label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">Rp</span>
-                    <input
-                      type="text"
-                      disabled
-                      className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 text-slate-400 cursor-not-allowed"
-                    />
-                  </div>
-                </div>
-              </div>
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <label className="block text-sm font-medium text-slate-500">{LABELS.FIELD.NOTES}</label>
-                  <span className="text-xs text-slate-400">({LABELS.OPTIONAL})</span>
-                </div>
-                <textarea
-                  disabled
-                  rows={3}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 text-slate-400 cursor-not-allowed resize-none"
-                />
-              </div>
-            </Section>
           </div>
 
           <div className="w-80 flex-shrink-0 space-y-6">
@@ -368,16 +324,11 @@ export default function BookForm({
   )
 }
 
-function Section({ title, children, placeholder }: { title: string; children: React.ReactNode; placeholder?: boolean }) {
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className={`bg-white rounded-lg shadow-sm border p-6 ${placeholder ? 'border-dashed border-slate-300' : 'border-slate-200'}`}>
+    <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
       <div className="flex items-center gap-2 mb-5">
         <h2 className="text-base font-semibold text-slate-800">{title}</h2>
-        {placeholder && (
-          <span className="text-[10px] uppercase tracking-wider text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full font-medium">
-            {LABELS.OPTIONAL}
-          </span>
-        )}
       </div>
       <div className="space-y-4">
         {children}

@@ -22,6 +22,19 @@ const CONDITION_LABEL: Record<string, string> = {
   HEAVY_DAMAGE: 'Rusak Berat'
 }
 
+const ACQUISITION_SOURCE_LABEL: Record<string, string> = {
+  PEMBELIAN: 'Pembelian',
+  DONASI: 'Donasi',
+  HIBAH: 'Hibah',
+  BANTUAN_PEMERINTAH: 'Bantuan Pemerintah',
+  LAINNYA: 'Lainnya'
+}
+
+function formatPrice(value: number | null | undefined): string {
+  if (value === null || value === undefined) return '-'
+  return 'Rp ' + value.toLocaleString('id-ID')
+}
+
 const EVENT_LABEL: Record<string, string> = {
   COPY_CREATED: 'Eksemplar dibuat',
   CONDITION_CHANGED: 'Kondisi diubah'
@@ -92,6 +105,8 @@ export default function InventoryDetailPage() {
   }
 
   const book = copy.book as Record<string, unknown> | null
+  const source = copy.acquisitionSource as string | null
+  const sourceDetail = copy.acquisitionSourceDetail as string | null
 
   return (
     <div>
@@ -118,7 +133,17 @@ export default function InventoryDetailPage() {
           <Field label="Kondisi" value={CONDITION_LABEL[copy.condition as string] ?? (copy.condition as string)} />
           <Field label="Lokasi Rak" value={(copy.shelfLocation as string | null) ?? '-'} />
           <Field label="Tgl. Perolehan" value={(copy.acquisitionDate as string | null) ? new Date(copy.acquisitionDate as string).toLocaleDateString('id-ID') : '-'} />
+          <Field label="Sumber Perolehan" value={source ? (ACQUISITION_SOURCE_LABEL[source] ?? source) : '-'} />
+          <Field label="Harga Perolehan" value={formatPrice(copy.acquisitionCost as number | null | undefined)} />
           <Field label="Tgl. Dibuat" value={new Date(copy.createdAt as string).toLocaleDateString('id-ID')} />
+          {(source === 'LAINNYA' || sourceDetail) && (
+            <div className="col-span-2">
+              <Field label="Detail" value={sourceDetail ?? '-'} />
+            </div>
+          )}
+          <div className="col-span-2">
+            <Field label="Catatan Pengadaan" value={(copy.acquisitionNotes as string | null) ?? '-'} />
+          </div>
           <div className="col-span-2">
             <Field label="Catatan" value={(copy.notes as string | null) ?? '-'} />
           </div>
