@@ -2,6 +2,7 @@ import { BaseRepository } from './base/base.repository'
 import { getPaginationParams, toPaginatedResult } from './base/pagination'
 import type { FindOptions } from './base/repository.types'
 import type { Member, Prisma } from '@prisma/client'
+import { IMPORT_CONFIG } from '../../config/import.config'
 
 type CreateMemberData = Pick<Member, 'memberNumber' | 'fullName'> & {
   memberType?: string
@@ -104,6 +105,49 @@ export class MemberRepository extends BaseRepository {
 
   async count(): Promise<number> {
     return this.prisma.member.count()
+  }
+
+  async findManyByNISNs(nisns: string[]): Promise<Member[]> {
+    const unique = [...new Set(nisns)]
+    const chunk = IMPORT_CONFIG.MEMBER_IMPORT_LOOKUP_CHUNK
+    const found: Member[] = []
+    for (let i = 0; i < unique.length; i += chunk) {
+      const rows = await this.prisma.member.findMany({
+        where: { nisn: { in: unique.slice(i, i + chunk) } }
+      })
+      found.push(...rows)
+    }
+    return found
+  }
+
+  async findManyByEmails(emails: string[]): Promise<Member[]> {
+    const unique = [...new Set(emails)]
+    const chunk = IMPORT_CONFIG.MEMBER_IMPORT_LOOKUP_CHUNK
+    const found: Member[] = []
+    for (let i = 0; i < unique.length; i += chunk) {
+      const rows = await this.prisma.member.findMany({
+        where: { email: { in: unique.slice(i, i + chunk) } }
+      })
+      found.push(...rows)
+    }
+    return found
+  }
+
+  async findLastMemberNumberByPrefix(prefix: string, tx?: Prisma.TransactionClient): Promise<string | null> {
+    const client = tx ?? this.prisma
+    const row = await client.member.findFirst({
+      where: { memberNumber: { startsWith: `${prefix}-` } },
+      select: { memberNumber: true },
+      orderBy: { memberNumber: 'desc' }
+    })
+    return row?.memberNumber ?? null
+  }
+
+  async createManyWithTx(tx: Prisma.TransactionClient, rows: Prisma.MemberCreateManyInput[]): Promise<void> {
+    const chunk = IMPORT_CONFIG.MEMBER_IMPORT_WRITE_CHUNK
+    for (let i = 0; i < rows.length; i += chunk) {
+      await tx.member.createMany({ data: rows.slice(i, i + chunk) })
+    }
   }
 
   async countBorrows(memberId: string): Promise<number> {

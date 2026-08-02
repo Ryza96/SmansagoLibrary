@@ -13,6 +13,9 @@ import { InventoryAllocator } from './services/inventory-allocator'
 import { PrintService } from './services/print.service'
 
 import { MemberService } from '../../src/main/services/member.service'
+import { MemberDuplicateChecker } from '../../src/main/services/member-duplicate-checker.service'
+import { MemberClassResolver } from '../../src/main/services/member-class-resolver.service'
+import { MemberImportService } from '../../src/main/services/member-import.service'
 import { NumberGeneratorService } from '../../src/main/services/number-generator.service'
 import { MemberRepository as NewMemberRepository } from '../../src/main/repositories/member.repository'
 import { BorrowService } from '../../src/main/services/borrow.service'
@@ -47,6 +50,7 @@ export interface Container {
   categoryService: CategoryService
   bookCopyService: BookCopyService
   memberService: MemberService
+  memberImportService: MemberImportService
   borrowService: BorrowService
   printService: PrintService
   academicYearService: AcademicYearService
@@ -100,6 +104,15 @@ export function createContainer(): Container {
   const curriculumService = new CurriculumService(curriculumRepository, classRepository)
   const classService = new ClassService(classRepository, academicYearRepository, curriculumRepository, newMemberRepository)
 
+  const memberDuplicateChecker = new MemberDuplicateChecker(newMemberRepository)
+  const memberClassResolver = new MemberClassResolver(academicYearRepository, classRepository)
+  const memberImportService = new MemberImportService(
+    memberDuplicateChecker,
+    memberClassResolver,
+    numberGeneratorService,
+    newMemberRepository
+  )
+
   const matchingEngine = new MatchingEngineService(createProductionStrategies())
   const autoCreateService = new AutoCreateService(new NewAuthorRepository(), new NewPublisherRepository(), new NewCategoryRepository())
   const bookImportService = new BookImportService(new NewBookRepository(), new NewBookCopyRepository())
@@ -111,6 +124,7 @@ export function createContainer(): Container {
     categoryService,
     bookCopyService,
     memberService,
+    memberImportService,
     borrowService,
     printService,
     academicYearService,

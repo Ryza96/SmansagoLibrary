@@ -24,6 +24,7 @@
     "src/services/DummyMatchProviders.ts",
     "src/services/MatchProviders.ts",
     "src/types/import.ts",
+    "src/config/**/*",
     "src/main/**/*",
     "electron.vite.config.ts"
   ]

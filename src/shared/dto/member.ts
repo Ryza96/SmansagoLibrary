@@ -58,3 +58,57 @@ export interface UpdateMemberDTO {
   classId?: string
   status?: string
 }
+
+export interface MemberImportRowInput {
+  rowNumber: number
+  fullName: string
+  className: string
+  gender: 'male' | 'female'
+  nisn: string
+  birthPlace?: string
+  birthDate?: string
+  address: string
+  phone: string
+  email?: string
+}
+
+export interface MemberImportPreviewIssue {
+  rowNumber: number
+  messageKey: string
+  field?: 'nisn' | 'email'
+  existingMemberNumber?: string
+  existingMemberName?: string
+  className?: string
+}
+
+export interface MemberImportPreviewDTO {
+  valid: boolean
+  errorCount: number
+  warningCount: number
+  errors: MemberImportPreviewIssue[]
+  warnings: MemberImportPreviewIssue[]
+}
+
+export interface MemberImportResultDTO {
+  success: boolean
+  totalRows: number
+  created: number
+  failed: number
+  warnings: number
+  durationMs: number
+  errors: MemberImportPreviewIssue[]
+}
+
+export type MemberImportStage =
+  | 'preparing'
+  | 'checking-duplicate'
+  | 'resolving-class'
+  | 'generating-number'
+  | 'saving'
+  | 'completed'
+
+export interface MemberImportProgressEvent {
+  stage: MemberImportStage
+  current: number
+  total: number
+}

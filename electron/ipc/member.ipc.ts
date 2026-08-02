@@ -2,7 +2,8 @@ import { app, BrowserWindow, dialog, ipcMain, type IpcMainInvokeEvent } from 'el
 import fs from 'fs'
 import path from 'path'
 import type { MemberService } from '../../src/main/services/member.service'
-import type { CreateMemberDTO, UpdateMemberDTO } from '../../src/shared/dto/member'
+import type { MemberImportService } from '../../src/main/services/member-import.service'
+import type { CreateMemberDTO, MemberImportRowInput, UpdateMemberDTO } from '../../src/shared/dto/member'
 import type { DownloadTemplateResult } from '../../src/types/import'
 
 const TEMPLATE_FILE_NAME = 'Template_Import_Anggota_v1.0.xlsx'
@@ -45,7 +46,7 @@ async function downloadTemplate(event: IpcMainInvokeEvent): Promise<DownloadTemp
   }
 }
 
-export function registerMemberHandlers(memberService: MemberService): void {
+export function registerMemberHandlers(memberService: MemberService, memberImportService: MemberImportService): void {
   ipcMain.handle('members:findMany', async (_event, search?: string, page?: number, limit?: number, memberType?: string) =>
     memberService.findMany(search, page, limit, memberType)
   )
@@ -67,4 +68,14 @@ export function registerMemberHandlers(memberService: MemberService): void {
   )
 
   ipcMain.handle('members:downloadTemplate', (event) => downloadTemplate(event))
+
+  ipcMain.handle('members:previewCheck', async (_event, rows: MemberImportRowInput[]) =>
+    memberImportService.previewCheck(rows)
+  )
+
+  ipcMain.handle('members:import', async (event, rows: MemberImportRowInput[]) =>
+    memberImportService.import(rows, {
+      onProgress: (progress) => event.sender.send('members:importProgress', progress)
+    })
+  )
 }

@@ -6,6 +6,7 @@ import type { CategoryService } from '../main/services/category.service'
 import type { BookCopyService as LegacyBookCopyService } from '../main/services/book-copy.service'
 import type { BookCopyService } from '../../src/main/services/book-copy.service'
 import type { MemberService } from '../../src/main/services/member.service'
+import type { MemberImportService } from '../../src/main/services/member-import.service'
 import type { BorrowService } from '../../src/main/services/borrow.service'
 import type { ReturnService as NewReturnService } from '../../src/main/services/return.service'
 import type { PrintService } from '../main/services/print.service'
@@ -45,6 +46,7 @@ export function registerAllHandlers(
     categoryService: CategoryService
     bookCopyService: LegacyBookCopyService
     memberService: MemberService
+    memberImportService: MemberImportService
     borrowService: BorrowService
     printService: PrintService
     academicYearService: AcademicYearService
@@ -67,7 +69,7 @@ export function registerAllHandlers(
   registerBookImportHandlers(services.matchingEngine, services.autoCreateService, services.bookImportService)
   registerBookHandlers(services.bookService)
   registerBookCopyHandlers(services.bookCopyService, services.newBookCopyService)
-  registerMemberHandlers(services.memberService)
+  registerMemberHandlers(services.memberService, services.memberImportService)
   registerBorrowHandlers(services.borrowService, services.newReturnService, services.borrowDetailRepository, services.borrowRepository)
   registerAuthorHandlers(services.authorService)
   registerPublisherHandlers(services.publisherService)

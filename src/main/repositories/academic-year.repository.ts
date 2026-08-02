@@ -26,6 +26,13 @@ export class AcademicYearRepository extends BaseRepository {
     return this.prisma.academicYear.findUnique({ where: { id } })
   }
 
+  async findActive(): Promise<AcademicYear | null> {
+    return this.prisma.academicYear.findFirst({
+      where: { isActive: true },
+      orderBy: { startDate: 'desc' }
+    })
+  }
+
   async findMany(options?: FindOptions) {
     const { skip, take } = getPaginationParams(options?.pagination)
 

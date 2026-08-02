@@ -98,6 +98,9 @@ interface ElectronAPI {
   }
   memberImport: {
     downloadTemplate: () => Promise<import('../types/import').DownloadTemplateResult>,
+    previewCheck: (rows: import('../../src/shared/dto/member').MemberImportRowInput[]) => Promise<import('../../src/shared/dto/member').MemberImportPreviewDTO>,
+    import: (rows: import('../../src/shared/dto/member').MemberImportRowInput[]) => Promise<import('../../src/shared/dto/member').MemberImportResultDTO>,
+    onProgress: (callback: (event: import('../../src/shared/dto/member').MemberImportProgressEvent) => void) => () => void,
   }
   borrowings: {
     findMany: (search?: string, page?: number, limit?: number) => Promise<{
