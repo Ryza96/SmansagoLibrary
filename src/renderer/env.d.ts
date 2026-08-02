@@ -96,6 +96,9 @@ interface ElectronAPI {
     update: (id: string, input: import('../../src/shared/dto/member').UpdateMemberDTO) => Promise<import('../../src/shared/dto/member').MemberDTO>
     delete: (id: string) => Promise<void>
   }
+  memberImport: {
+    downloadTemplate: () => Promise<import('../types/import').DownloadTemplateResult>,
+  }
   borrowings: {
     findMany: (search?: string, page?: number, limit?: number) => Promise<{
       data: Array<{

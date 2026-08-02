@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Search, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Plus, Search, RefreshCw, ChevronLeft, ChevronRight, FileUp } from 'lucide-react'
 import type { MemberDTO } from '../shared/dto/member'
 import { LABELS } from '../utils/labels'
 import { memberEditPath } from '../utils/navigation'
+import MemberImportDialog from '../components/members/MemberImportDialog'
 
 const api = window.electronAPI
 
@@ -28,6 +29,7 @@ export default function MemberListPage({ memberType, title, newButtonLabel }: Me
 
   const [query, setQuery] = useState({ search: '', page: 1 })
   const limit = 10
+  const [importOpen, setImportOpen] = useState(false)
 
   async function fetchMembers() {
     setLoading(true)
@@ -77,9 +79,20 @@ export default function MemberListPage({ memberType, title, newButtonLabel }: Me
             >
               <RefreshCw size={16} className="text-slate-500" />
             </button>
+            {memberType === 'student' && (
+              <button
+                onClick={() => {
+                  setImportOpen(true)
+                }}
+                className="flex items-center gap-1.5 px-3 py-2 border border-blue-600 text-blue-600 text-sm font-medium rounded-lg hover:bg-blue-50 transition-colors"
+              >
+                <FileUp size={16} />
+                Import Siswa
+              </button>
+            )}
             <button
               onClick={() => navigate(`/members/new?type=${memberType}`)}
-              className="flex items-center gap-1.5 ml-auto px-3 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+              className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
             >
               <Plus size={16} />
               {newButtonLabel}
@@ -194,6 +207,15 @@ export default function MemberListPage({ memberType, title, newButtonLabel }: Me
           )}
         </div>
       </div>
+
+      {importOpen && (
+        <MemberImportDialog
+          onClose={() => {
+            setImportOpen(false)
+            fetchMembers()
+          }}
+        />
+      )}
     </div>
   )
 }

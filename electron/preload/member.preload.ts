@@ -12,5 +12,8 @@ export const memberAPI = {
       ipcRenderer.invoke('members:update', id, input),
     delete: (id: string) =>
       ipcRenderer.invoke('members:delete', id)
-  }
+  },
+  memberImport: {
+    downloadTemplate: () => ipcRenderer.invoke('members:downloadTemplate'),
+  },
 }
