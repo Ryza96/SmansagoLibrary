@@ -38,8 +38,13 @@ export default function BooksPage() {
 
   async function handleDelete(id: string) {
     if (!window.confirm(LABELS.BOOK.CONFIRM_DELETE)) return
-    await api.books.delete(id)
-    setBooks((prev) => prev.filter((b) => b.id !== id))
+    try {
+      await api.books.delete(id)
+      setBooks((prev) => prev.filter((b) => b.id !== id))
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : LABELS.BOOK.DELETE_ERROR
+      alert(message)
+    }
   }
 
   return (

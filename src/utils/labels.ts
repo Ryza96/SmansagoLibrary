@@ -39,6 +39,7 @@ export const LABELS = {
     CANCEL: 'Batal',
     SAVE_DRAFT: 'Simpan Draft',
     CONFIRM_DELETE: 'Apakah Anda yakin ingin menghapus buku ini?',
+    DELETE_ERROR: 'Gagal menghapus buku.',
     DELETED: 'Buku berhasil dihapus.',
     CREATED: 'Buku berhasil ditambahkan.',
     UPDATED: 'Buku berhasil diperbarui.',
@@ -318,5 +319,14 @@ export const LABELS = {
     VIEW: 'Lihat',
     EDIT: 'Edit',
     DELETE: 'Hapus',
+  },
+  LABEL_PREVIEW: {
+    TITLE: 'Pratinjau Label',
+    PRINT: 'Cetak',
+    PRINTING: 'Mencetak...',
+    LOADING: 'Memuat pratinjau...',
+    NO_DATA: 'Tidak ada label untuk ditampilkan.',
+    BOOK_NOT_FOUND: 'Buku tidak ditemukan.',
+    ERROR: 'Terjadi kesalahan saat memuat pratinjau label.',
   },
 } as const

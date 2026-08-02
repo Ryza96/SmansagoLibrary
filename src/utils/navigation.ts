@@ -6,6 +6,7 @@ export const ROUTES = {
   BOOK_IMPORT_PREVIEW: '/books/import/preview',
   BOOK_DETAIL: '/books/:id',
   BOOK_EDIT: '/books/:id/edit',
+  BOOK_LABEL_PREVIEW: '/books/:id/labels-preview',
   MEMBERS: '/members',
   MEMBERS_STUDENTS: '/members/students',
   MEMBERS_TEACHERS: '/members/teachers',
@@ -36,6 +37,10 @@ export function bookDetailPath(id: string) {
 
 export function bookEditPath(id: string) {
   return `/books/${id}/edit`
+}
+
+export function bookLabelPreviewPath(id: string) {
+  return `/books/${id}/labels-preview`
 }
 
 export function memberDetailPath(id: string) {

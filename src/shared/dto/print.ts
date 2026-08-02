@@ -33,6 +33,7 @@ export interface BookLabelItemData {
 }
 
 export interface BookLabelData {
+  libraryName?: string
   bookTitle: string
   items: BookLabelItemData[]
 }

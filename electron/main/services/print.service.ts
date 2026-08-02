@@ -11,6 +11,10 @@ export class PrintService {
     private settingService: SettingService
   ) {}
 
+  getLabelPreviewHtml(data: BookLabelData): string {
+    return generateLabelsHtml(data)
+  }
+
   async printBookLabels(data: BookLabelData): Promise<void> {
     const html = generateLabelsHtml(data)
     await this.printHtml(html, { margins: { marginType: 'none' } })

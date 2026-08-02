@@ -1,7 +1,9 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Plus, Trash2, AlertTriangle, Printer } from 'lucide-react'
 import { BookDetailDTO, BookCopyDTO, CreateBookCopiesDTO } from '../../types/dtos/book'
 import { LABELS } from '../../utils/labels'
+import { bookLabelPreviewPath } from '../../utils/navigation'
 
 interface BookDetailProps {
   book: BookDetailDTO
@@ -23,6 +25,7 @@ function conditionLabel(condition: string): string {
 }
 
 export default function BookDetail({ book, copies, onAddCopies, onDecommissionCopy }: BookDetailProps) {
+  const navigate = useNavigate()
   const [showAddDialog, setShowAddDialog] = useState(false)
   const [quantity, setQuantity] = useState(1)
   const [shelfLocation, setShelfLocation] = useState('')
@@ -76,21 +79,9 @@ export default function BookDetail({ book, copies, onAddCopies, onDecommissionCo
     await onDecommissionCopy(copy.id)
   }
 
-  async function handlePrintLabels() {
+  function handlePrintLabels() {
     if (copies.length === 0) return
-    try {
-      await window.electronAPI.print.bookLabels({
-        bookTitle: book.title,
-        items: copies.map((copy) => ({
-          barcode: copy.barcode ?? copy.inventoryNumber,
-          inventoryNumber: copy.inventoryNumber,
-          shelfLocation: copy.shelfLocation ?? ''
-        }))
-      })
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Gagal mencetak label.'
-      alert(message)
-    }
+    navigate(bookLabelPreviewPath(book.id))
   }
 
   return (

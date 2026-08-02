@@ -122,6 +122,7 @@ interface ElectronAPI {
     returnBook: (input: import('../types/dtos/borrowing').ReturnBookInput) => Promise<import('../types/dtos/borrowing').BorrowingDTO>
   }
   print: {
+    getLabelPreviewHtml: (input: import('../../src/shared/dto/print').BookLabelData) => Promise<string>
     borrowReceipt: (borrowingId: string) => Promise<void>
     returnReceipt: (borrowingId: string) => Promise<void>
     bookLabels: (input: import('../../src/shared/dto/print').BookLabelData) => Promise<void>
