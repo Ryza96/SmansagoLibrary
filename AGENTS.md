@@ -356,3 +356,19 @@ Audit menyeluruh terhadap Borrowing Module: Prisma schema, Repository, Service, 
 - **tsc single-file outDir:** input `dir/file.ts` dengan `--outDir` menghasilkan `<outDir>/file.js` (rootDir diinfer dari input), bukan `<outDir>/dir/file.js`.
 - **Kolom workflow (status/mode/outcome) bebas string tanpa default** — konsisten pola schema existing; validasi enum ada di Service layer, bukan DB. Uniqueness semantik ("satu kelas aktif per anggota") juga domain Service.
 - **Cek bentrok nama laporan SEBELUM menulis file:** `WORK_ORDER_2_IMPLEMENTATION_REPORT.md` sudah dipakai laporan sprint Import Anggota (commit `a7adf66`) — laporan F2a diberi suffix `_F2A_` (`WORK_ORDER_2_F2A_IMPLEMENTATION_REPORT.md`). Jangan `git checkout` lalu `Move-Item -Destination` ke file baru di satu perintah — gunakan nama baru langsung agar isi tidak tertimpa.
+
+---
+
+## WO-3 (F2b): Backfill + Reconciliation (COMPLETE — READY review PO)
+
+### Ringkasan
+- Source of Truth: `MASTER_DATA_AKADEMIK_ARCHITECTURE_RFC.md` (LOCKED) + `MASTER_DATA_AKADEMIK_WBS.md` (LOCKED) + `WO3_DISCOVERY_REPORT.md` (APPROVED). Scope: **backfill idempoten** `Member.classId → MemberEnrollment(ACTIVE)` memakai `class.academicYearId` (RFC §15 F1). **TIDAK** mengubah schema/migration/Repository/Service/IPC/UI; `Member.classId` tetap ada.
+- **Deliverable (2 file):** `scripts/backfill-member-enrollment.ts` (ekspor `runBackfillEnrollment(prisma)` — skip bila ACTIVE sudah ada, orphan dilaporkan+dilewati, satu `$transaction` via `runTransaction`, CLI dengan guard `require.main === module`) + `wo3_f2b_smoke/smoke.ts` **28/28 PASS** (seed gaya skema lama: M1/M2 ber-classId, M3 tanpa classId, M4 orphan via raw SQL `PRAGMA foreign_keys=OFF`).
+- **Validation 6/6 PASS:** (1) fresh DB deploy + smoke; (2) idempotensi run-2 = 0 created, total tetap 2; (3) orphan dilaporkan tanpa insert; (4) empty DB no-op — CLI di DB dev (0 member) exit 0; (5) `npm run lint`; (6) `npm run build`.
+- **Laporan:** `WORK_ORDER_3_F2B_IMPLEMENTATION_REPORT.md`, `WO3_FINAL_REVIEW.md`, `WO3_RELEASE_REPORT.md`. Status: **DONE — menunggu review PO** (tidak lanjut WO berikutnya, AY-1a).
+
+### Pelajaran (retain)
+- **Orphan (`classId` menggantung) praktis mustahil di DB normal** — FK `Member.classId → Class` di-enforce SQLite (`FOREIGN KEY constraint failed`). Seed orphan untuk smoke: `$executeRawUnsafe('PRAGMA foreign_keys = OFF')` lalu raw INSERT di **koneksi Prisma yang sama** (Prisma SQLite memakai satu koneksi — pragma bertahan), lalu `PRAGMA ... = ON`. **`PRAGMA foreign_keys` adalah no-op di dalam `$transaction`** (SQLite) — harus di luar transaction.
+- **Raw SQL tabel `Member` wajib kolom fisik `number`/`birthplace`** (bukan `memberNumber`/`birthPlace`) karena `@map` (pelajaran WO-006B). Error `table Member has no column named memberNumber` = petunjuk kolom ter-map.
+- **Prisma SQLite satu koneksi:** `$executeRawUnsafe('PRAGMA ...')` memengaruhi query berikutnya pada instance yang sama (bukan pooled terpisah).
+- **Script one-time di `scripts/`**: TS + `PrismaClient` langsung, tanpa tsx/ts-node — compile `npx tsc --module commonjs ... --outDir <temp>` lalu `node` dengan `DATABASE_URL` + `NODE_PATH`. `require.main === module` untuk CLI guard agar fungsi bisa di-import smoke.
