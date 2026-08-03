@@ -54,6 +54,28 @@ export default function AcademicYearListPage() {
     }
   }
 
+  async function handleActivate(year: AcademicYearDTO) {
+    if (!window.confirm(LABELS.ACADEMIC_YEAR.ACTIVATE_CONFIRM)) return
+    try {
+      await api.academicYears.activate(year.id)
+      alert(LABELS.ACADEMIC_YEAR.ACTIVATED)
+      fetchYears()
+    } catch (err: any) {
+      alert(err.message)
+    }
+  }
+
+  async function handleDeactivate(year: AcademicYearDTO) {
+    if (!window.confirm(LABELS.ACADEMIC_YEAR.DEACTIVATE_CONFIRM)) return
+    try {
+      await api.academicYears.deactivate(year.id)
+      alert(LABELS.ACADEMIC_YEAR.DEACTIVATED)
+      fetchYears()
+    } catch (err: any) {
+      alert(err.message)
+    }
+  }
+
   const columns: Column<AcademicYearDTO>[] = [
     { key: 'name', label: LABELS.ACADEMIC_YEAR.NAME, render: (y) => y.name },
     { key: 'startDate', label: LABELS.ACADEMIC_YEAR.START_DATE, render: (y) => formatDate(y.startDate) },
@@ -70,6 +92,26 @@ export default function AcademicYearListPage() {
           <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-500">
             {LABELS.FIELD.INACTIVE}
           </span>
+        )
+    },
+    {
+      key: 'transition',
+      label: '',
+      render: (y) =>
+        y.isActive ? (
+          <button
+            onClick={() => handleDeactivate(y)}
+            className="px-2 py-1 rounded text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 transition-colors"
+          >
+            {LABELS.ACADEMIC_YEAR.DEACTIVATE}
+          </button>
+        ) : (
+          <button
+            onClick={() => handleActivate(y)}
+            className="px-2 py-1 rounded text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition-colors"
+          >
+            {LABELS.ACADEMIC_YEAR.ACTIVATE}
+          </button>
         )
     }
   ]

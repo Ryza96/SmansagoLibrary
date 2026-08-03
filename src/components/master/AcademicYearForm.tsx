@@ -4,7 +4,7 @@ import type { AcademicYearDTO } from '../../types/dtos/academic'
 
 interface AcademicYearFormProps {
   initial?: AcademicYearDTO | null
-  onSubmit: (input: { name: string; startDate: string; endDate: string; isActive: boolean }) => Promise<void>
+  onSubmit: (input: { name: string; startDate: string; endDate: string }) => Promise<void>
   onCancel: () => void
 }
 
@@ -17,7 +17,6 @@ export default function AcademicYearForm({ initial, onSubmit, onCancel }: Academ
   const [name, setName] = useState(initial?.name ?? '')
   const [startDate, setStartDate] = useState(toDateInputValue(initial?.startDate))
   const [endDate, setEndDate] = useState(toDateInputValue(initial?.endDate))
-  const [isActive, setIsActive] = useState(initial?.isActive ?? false)
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
@@ -45,8 +44,7 @@ export default function AcademicYearForm({ initial, onSubmit, onCancel }: Academ
       await onSubmit({
         name: name.trim(),
         startDate: new Date(startDate).toISOString(),
-        endDate: new Date(endDate).toISOString(),
-        isActive
+        endDate: new Date(endDate).toISOString()
       })
     } catch {
       setSubmitting(false)
@@ -98,15 +96,15 @@ export default function AcademicYearForm({ initial, onSubmit, onCancel }: Academ
         <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
           <input
             type="checkbox"
-            checked={isActive}
-            onChange={(e) => setIsActive(e.target.checked)}
+            checked={false}
+            disabled
             className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
           />
           <span>{LABELS.FIELD.ACTIVE}</span>
         </label>
-        {isActive && (
-          <p className="text-amber-600 text-xs mt-1">{LABELS.ACADEMIC_YEAR.ACTIVATE_WARNING}</p>
-        )}
+        <p className="text-slate-400 text-xs mt-1">
+          Status aktif diubah melalui aksi &quot;Buka Tahun&quot; / &quot;Tutup Tahun&quot; pada daftar tahun ajaran.
+        </p>
       </div>
 
       {error && <p className="text-red-500 text-xs">{error}</p>}

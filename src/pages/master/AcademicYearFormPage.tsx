@@ -11,7 +11,6 @@ interface AcademicYearFormValue {
   name: string
   startDate: string
   endDate: string
-  isActive: boolean
 }
 
 export default function AcademicYearFormPage() {

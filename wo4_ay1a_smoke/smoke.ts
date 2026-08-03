@@ -16,6 +16,16 @@ function expectEqual<T>(name: string, actual: T, expected: T): void {
   check(name, actual === expected, `expected=${JSON.stringify(expected)} actual=${JSON.stringify(actual)}`)
 }
 
+async function expectRejected(name: string, fn: () => Promise<unknown>, messagePart: string): Promise<void> {
+  try {
+    await fn()
+    check(name, false, 'seharusnya ditolak, tetapi berhasil')
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    check(name, msg.includes(messagePart), `message="${msg}"`)
+  }
+}
+
 async function countActive(prisma: ReturnType<typeof getPrisma>): Promise<number> {
   return prisma.academicYear.count({ where: { isActive: true } })
 }
@@ -63,25 +73,34 @@ async function main(): Promise<void> {
   const bAfterC = await service.findById(b.id)
   expectEqual('B tetap aktif', bAfterC.isActive, true)
 
-  console.log('--- STEP 4: update A aktif -> C dan B nonaktif (guard via update) ---')
-  const aUpdated = await service.update(a.id, { isActive: true })
-  expectEqual('A aktif setelah update', aUpdated.isActive, true)
+  console.log('--- STEP 4: activate A -> C dan B nonaktif (guard via activate) ---')
+  const aActivated = await service.activate(a.id)
+  expectEqual('A aktif setelah activate', aActivated.isActive, true)
   expectEqual('active count == 1 (A saja)', await countActive(prisma), 1)
   const bAfterUpdate = await service.findById(b.id)
   const cAfterUpdate = await service.findById(c.id)
   expectEqual('B nonaktif', bAfterUpdate.isActive, false)
   expectEqual('C nonaktif', cAfterUpdate.isActive, false)
   const activeAfterUpdate = await repository.findActive()
-  expectEqual('findActive returns A (update path)', activeAfterUpdate?.id, a.id)
+  expectEqual('findActive returns A (activate path)', activeAfterUpdate?.id, a.id)
 
-  console.log('--- STEP 5: update B nonaktif -> path biasa, A tidak terganggu ---')
-  const bDeactivated = await service.update(b.id, { isActive: false })
-  expectEqual('B tetap nonaktif', bDeactivated.isActive, false)
-  expectEqual('active count tetap 1', await countActive(prisma), 1)
-  const aFinal = await service.findById(a.id)
-  expectEqual('A tetap aktif', aFinal.isActive, true)
+  console.log('--- STEP 5: activate C -> A dan B nonaktif (guard idempoten) ---')
+  const cActivated = await service.activate(c.id)
+  expectEqual('C aktif setelah activate', cActivated.isActive, true)
+  expectEqual('active count == 1 (C saja)', await countActive(prisma), 1)
+  const aAfterActivate = await service.findById(a.id)
+  expectEqual('A nonaktif', aAfterActivate.isActive, false)
+  const activeFinal = await repository.findActive()
+  expectEqual('findActive returns C', activeFinal?.id, c.id)
 
-  console.log('--- STEP 6: nama duplikat tetap ditolak (regresi create) ---')
+  console.log('--- STEP 6: update dengan isActive ditolak (kontrak K3) ---')
+  await expectRejected(
+    'update(B, isActive:true) ditolak',
+    () => service.update(b.id, { isActive: true }),
+    'activate/deactivate'
+  )
+
+  console.log('--- STEP 7: nama duplikat tetap ditolak (regresi create) ---')
   let dupRejected = false
   try {
     await service.create({
@@ -95,16 +114,16 @@ async function main(): Promise<void> {
   }
   check('create nama duplikat ditolak', dupRejected)
 
-  console.log('--- STEP 7: id tidak ada saat update ditolak (regresi update) ---')
+  console.log('--- STEP 8: id tidak ada saat update ditolak (regresi update) ---')
   let notFound = false
   try {
-    await service.update('does-not-exist', { isActive: true })
+    await service.update('does-not-exist', { name: 'X' })
   } catch {
     notFound = true
   }
   check('update id tidak ada ditolak', notFound)
 
-  console.log('--- STEP 8: assert akhir findActive() <= 1 ---')
+  console.log('--- STEP 9: assert akhir findActive() <= 1 ---')
   expectEqual('active count akhir == 1', await countActive(prisma), 1)
 
   await prisma.$disconnect()

@@ -50,12 +50,28 @@ async function main(): Promise<void> {
   const y1After = await service.findById(y1.id)
   expectEqual('Y1 otomatis nonaktif', y1After.isActive, false)
 
-  console.log('--- UAT 3: Edit tahun (nama + toggle) ---')
-  const y1Edited = await service.update(y1.id, { name: '2026/2027', isActive: true })
-  expectEqual('Y1 aktif setelah edit', y1Edited.isActive, true)
+  console.log('--- UAT 3: Buka Tahun (activate) -> Y2 nonaktif ---')
+  const y1Activated = await service.activate(y1.id)
+  expectEqual('Y1 aktif setelah activate', y1Activated.isActive, true)
   expectEqual('active count == 1 (guard tetap)', await countActive(prisma), 1)
   const y2After = await service.findById(y2.id)
   expectEqual('Y2 otomatis nonaktif', y2After.isActive, false)
+
+  console.log('--- UAT 3b: Update nama tanpa isActive (regresi, kontrak baru) ---')
+  const y1Renamed = await service.update(y1.id, { name: '2026/2027 rev' })
+  expectEqual('Y1 nama berubah', y1Renamed.name, '2026/2027 rev')
+  expectEqual('Y1 tetap aktif', y1Renamed.isActive, true)
+  expectEqual('active count == 1', await countActive(prisma), 1)
+
+  console.log('--- UAT 3c: Update isActive ditolak (kontrak K3) ---')
+  let activeChangeRejected = false
+  try {
+    await service.update(y2.id, { isActive: true })
+  } catch (e: any) {
+    activeChangeRejected = e?.message?.includes('activate/deactivate') === true
+  }
+  check('update isActive berubah ditolak (400)', activeChangeRejected)
+  expectEqual('Y2 tetap nonaktif', (await service.findById(y2.id)).isActive, false)
 
   console.log('--- UAT 4: Delete tahun yang dipakai kelas (Delete Guard) ---')
   const curriculum = new CurriculumRepository()
@@ -94,7 +110,7 @@ async function main(): Promise<void> {
   let dupRejected = false
   try {
     await service.create({
-      name: '2026/2027',
+      name: '2026/2027 rev',
       startDate: '2026-07-01T00:00:00.000Z',
       endDate: '2027-06-30T00:00:00.000Z',
       isActive: false

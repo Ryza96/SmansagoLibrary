@@ -145,6 +145,8 @@ interface ElectronAPI {
     create: (input: import('../../src/shared/dto/academic').CreateAcademicYearDTO) => Promise<import('../../src/shared/dto/academic').AcademicYearDTO>
     update: (id: string, input: import('../../src/shared/dto/academic').UpdateAcademicYearDTO) => Promise<import('../../src/shared/dto/academic').AcademicYearDTO>
     delete: (id: string) => Promise<void>
+    activate: (id: string) => Promise<import('../../src/shared/dto/academic').AcademicYearDTO>
+    deactivate: (id: string) => Promise<import('../../src/shared/dto/academic').AcademicYearDTO>
   }
   curricula: {
     findMany: (search?: string, page?: number, limit?: number) => Promise<{

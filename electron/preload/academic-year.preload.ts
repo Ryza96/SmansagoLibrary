@@ -11,6 +11,10 @@ export const academicYearAPI = {
     update: (id: string, input: Record<string, unknown>) =>
       ipcRenderer.invoke('academic-years:update', id, input),
     delete: (id: string) =>
-      ipcRenderer.invoke('academic-years:delete', id)
+      ipcRenderer.invoke('academic-years:delete', id),
+    activate: (id: string) =>
+      ipcRenderer.invoke('academic-years:activate', id),
+    deactivate: (id: string) =>
+      ipcRenderer.invoke('academic-years:deactivate', id)
   }
 }
