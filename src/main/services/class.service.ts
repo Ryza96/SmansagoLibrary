@@ -2,8 +2,10 @@ import { ClassRepository } from '../repositories/class.repository'
 import { AcademicYearRepository } from '../repositories/academic-year.repository'
 import { CurriculumRepository } from '../repositories/curriculum.repository'
 import { MemberRepository } from '../repositories/member.repository'
-import type { ClassDTO, CreateClassDTO, UpdateClassDTO } from '../../shared/dto/academic'
+import type { ClassDTO, CreateClassDTO, UpdateClassDTO, CloneClassResult } from '../../shared/dto/academic'
 import { EDUCATION_LEVELS } from '../../shared/config/education-level'
+import { getPrisma } from '../repositories/base/prisma'
+import { runTransaction } from '../repositories/base/transaction'
 import { AppError } from '../../../electron/main/errorHandler'
 
 function toDTO(record: NonNullable<Awaited<ReturnType<ClassRepository['findById']>>>): ClassDTO {
@@ -138,5 +140,58 @@ export class ClassService {
     }
 
     await this.repository.delete(id)
+  }
+
+  // WO-9 CL-2b: clone struktur kelas (tanpa enrollment) ke tahun ajaran baru — RFC §7.
+  // Hanya menyalin curriculumId, educationLevel, parallel.
+  // Kelas baru: homeroomTeacher = null, isActive = true.
+  async cloneToYear(sourceAcademicYearId: string, targetAcademicYearId: string): Promise<CloneClassResult> {
+    if (sourceAcademicYearId === targetAcademicYearId) {
+      throw new AppError(400, 'Conflict', 'Tahun ajaran sumber dan target tidak boleh sama')
+    }
+
+    const [sourceExists, targetExists] = await Promise.all([
+      this.academicYearRepository.existsById(sourceAcademicYearId),
+      this.academicYearRepository.existsById(targetAcademicYearId)
+    ])
+    if (!sourceExists) {
+      throw new AppError(400, 'Conflict', `Tahun Ajaran ${sourceAcademicYearId} tidak ditemukan`)
+    }
+    if (!targetExists) {
+      throw new AppError(400, 'Conflict', `Tahun Ajaran ${targetAcademicYearId} tidak ditemukan`)
+    }
+
+    const sourceClasses = await this.repository.findByAcademicYear(sourceAcademicYearId)
+
+    return runTransaction(getPrisma(), async (tx) => {
+      let created = 0
+      let skipped = 0
+      for (const source of sourceClasses) {
+        const dup = await tx.class.findFirst({
+          where: {
+            academicYearId: targetAcademicYearId,
+            curriculumId: source.curriculumId,
+            educationLevel: source.educationLevel,
+            parallel: source.parallel
+          }
+        })
+        if (dup) {
+          skipped += 1
+          continue
+        }
+        await tx.class.create({
+          data: {
+            academicYearId: targetAcademicYearId,
+            curriculumId: source.curriculumId,
+            educationLevel: source.educationLevel,
+            parallel: source.parallel,
+            homeroomTeacher: null,
+            isActive: true
+          }
+        })
+        created += 1
+      }
+      return { created, skipped }
+    })
   }
 }

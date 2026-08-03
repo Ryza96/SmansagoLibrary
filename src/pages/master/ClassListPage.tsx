@@ -1,8 +1,9 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Copy } from 'lucide-react'
 import type { ClassDTO, AcademicYearDTO, CurriculumDTO } from '../../types/dtos/academic'
 import MasterTable, { type Column } from '../../components/master/MasterTable'
+import ClassCloneModal from '../../components/master/ClassCloneModal'
 import { LABELS } from '../../utils/labels'
 import { ROUTES, classEditPath } from '../../utils/navigation'
 
@@ -31,6 +32,7 @@ export default function ClassListPage() {
   const [curriculumFilter, setCurriculumFilter] = useState('')
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
+  const [showClone, setShowClone] = useState(false)
 
   async function fetchData() {
     setLoading(true)
@@ -153,6 +155,14 @@ export default function ClassListPage() {
             <option key={curriculum.id} value={curriculum.id}>{curriculum.name}</option>
           ))}
         </select>
+        <button
+          type="button"
+          onClick={() => setShowClone(true)}
+          className="flex items-center gap-1.5 px-3 py-2 border border-slate-300 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-100 transition-colors"
+        >
+          <Copy size={16} />
+          {LABELS.CLASS.CLONE}
+        </button>
       </div>
 
       <MasterTable
@@ -167,6 +177,14 @@ export default function ClassListPage() {
         onDelete={handleDelete}
         loading={loading}
       />
+
+      {showClone && (
+        <ClassCloneModal
+          academicYears={academicYears}
+          onClose={() => setShowClone(false)}
+          onCloned={fetchData}
+        />
+      )}
     </div>
   )
 }

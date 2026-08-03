@@ -18,4 +18,7 @@ export function registerClassHandlers(service: ClassService): void {
   ipcMain.handle('classes:delete', async (_event, id: string) =>
     service.delete(id)
   )
+  ipcMain.handle('classes:cloneToYear', async (_event, sourceAcademicYearId: string, targetAcademicYearId: string) =>
+    service.cloneToYear(sourceAcademicYearId, targetAcademicYearId)
+  )
 }

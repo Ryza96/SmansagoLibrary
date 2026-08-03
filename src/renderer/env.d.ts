@@ -171,6 +171,7 @@ interface ElectronAPI {
     create: (input: import('../../src/shared/dto/academic').CreateClassDTO) => Promise<import('../../src/shared/dto/academic').ClassDTO>
     update: (id: string, input: import('../../src/shared/dto/academic').UpdateClassDTO) => Promise<import('../../src/shared/dto/academic').ClassDTO>
     delete: (id: string) => Promise<void>
+    cloneToYear: (sourceAcademicYearId: string, targetAcademicYearId: string) => Promise<import('../../src/shared/dto/academic').CloneClassResult>
   }
   inventory: {
     findMany: (params: {

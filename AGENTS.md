@@ -462,3 +462,21 @@ Audit menyeluruh terhadap Borrowing Module: Prisma schema, Repository, Service, 
 - **Client-side filter:** renderer memegang `yearFilter`/`curriculumFilter`/`search` + `useMemo` filter pada dataset; lookup nama AY/kurikulum via `Map<id,name>` dibangun dari fetch paralel `Promise.all([academicYears, curricula, classes])`.
 - **Immutable CL-1 di UI:** field Tingkat/Paralel `disabled` saat edit (hint amber) + payload update tidak mengirim keduanya → double-layer dengan guard service (WO-7).
 - Smoke wo8 memakai fresh DB temp dan dibersihkan; DB live dev tidak pernah disentuh.
+
+---
+
+## WO-9 (CL-2b): Class Clone ke Tahun Baru (COMPLETE - READY review PO)
+
+### Ringkasan
+- Source of Truth: `MASTER_DATA_AKADEMIK_ARCHITECTURE_RFC.md` (LOCKED, RFC §7 prasyarat promosi) + `MASTER_DATA_AKADEMIK_WBS.md` (LOCKED, WO-10 CL-2b) + `WO9_DISCOVERY_REPORT.md` (APPROVED). Keputusan PO: **Clone HANYA menyalin `curriculumId`, `educationLevel`, `parallel`; `homeroomTeacher = null`, `isActive = true`**. Scope: 1 Service method + 1 IPC channel + 1 preload method + 1 env.d.ts entry + UI Clone.
+- **Modifikasi (3 source + 1 DTO + 1 UI baru):** `src/main/services/class.service.ts` (+`cloneToYear(sourceAY, targetAY)` - validasi `source !== target` + `existsById` kedua tahun; loop kelas sumber `findByAcademicYear`; SATU `$transaction` via `runTransaction(getPrisma(), ...)`; per kelas cek duplikat komposit `(targetAY, curriculumId, educationLevel, parallel)` - ada -> skip, belum -> `create` dgn `homeroomTeacher: null`, `isActive: true`; return `{ created, skipped }`), `electron/ipc/class.ipc.ts` (+`classes:cloneToYear`), `electron/preload/class.preload.ts` (+`classes.cloneToYear`), `src/renderer/env.d.ts` (+entry), `src/shared/dto/academic.ts` (+`CloneClassResult`), `src/components/master/ClassCloneModal.tsx` (**baru** - modal Tahun Sumber + Tahun Target + hasil created/skipped), `src/pages/master/ClassListPage.tsx` (+tombol "Clone ke Tahun Baru" di toolbar filter + render modal + re-fetch `onCloned`), `src/utils/labels.ts` (+blok `CLASS.CLONE_*`).
+- **TIDAK diubah:** Repository, Schema, Migration, CRUD `classes:*` eksisting, Academic Year, Curriculum, Enrollment, Promotion. Service import `getPrisma` + `runTransaction` dari base (pola transaction base, bukan repo baru).
+- **Validation PASS:** (1) `npm run lint`; (2) `npm run build` (main 1,778.91 kB · preload 7.84 kB · renderer 985.76 kB); (3) smoke `wo9_cl2b_smoke/smoke.ts` **26/26 PASS** pada fresh DB (clone 3 row baru copy curriculumId/level/parallel, homeroomTeacher null + isActive true, idempotency run ulang created=0 skipped=3, duplicate skip clone balik, source=target ditolak 400, tahun tak ditemukan ditolak 400, regresi CRUD update guru + immutable CL-1); (4) grep bundle `classes:cloneToYear` (main) & `Clone ke Tahun Baru` (renderer) = ter-render.
+- **Laporan:** `WO9_DISCOVERY_REPORT.md`, `WORK_ORDER_9_IMPLEMENTATION_REPORT.md`, `WO9_FINAL_REVIEW.md`, `WO9_RELEASE_REPORT.md`. Status: **DONE - menunggu review PO** (tidak lanjut WO berikutnya).
+
+### Pelajaran (retain)
+- **Clone struktur kelas = service method, bukan repository.** Semua kebutuhan sudah ada di repo (`findByAcademicYear`), sehingga batch create dalam transaksi dilakukan langsung via `runTransaction(getPrisma(), ...)` + `tx.class.findFirst`/`tx.class.create` - tanpa menyentuh Repository (constraint WO).
+- **Idempotensi clone**: cek duplikat komposit per-baris lalu SKIP (bukan throw) - hasil `{ created, skipped }`; run ulang = created 0. Guard `source === target` -> AppError 400 "tidak boleh sama" dipisah dari guard tahun tidak ditemukan.
+- **Keputusan PO domain**: clone hanya menyalin identitas kelas (curriculumId/educationLevel/parallel); `homeroomTeacher` dikosongkan & `isActive=true` (guru/status adalah kepemilikan tahun berjalan, bukan struktur). Jangan menyalin field non-struktur.
+- **UI modal tanpa route baru**: tombol di toolbar ClassListPage membuka `ClassCloneModal` (reuse data `academicYears` yang sudah di-fetch page) - tidak perlu sentuh `navigation.ts`/routes.
+- Smoke wo9 memakai fresh DB temp dan dibersihkan; DB live dev tidak pernah disentuh.

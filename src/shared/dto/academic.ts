@@ -67,3 +67,8 @@ export interface UpdateClassDTO {
   homeroomTeacher?: string | null
   isActive?: boolean
 }
+
+export interface CloneClassResult {
+  created: number
+  skipped: number
+}

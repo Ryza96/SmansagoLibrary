@@ -11,6 +11,8 @@ export const classAPI = {
     update: (id: string, input: Record<string, unknown>) =>
       ipcRenderer.invoke('classes:update', id, input),
     delete: (id: string) =>
-      ipcRenderer.invoke('classes:delete', id)
+      ipcRenderer.invoke('classes:delete', id),
+    cloneToYear: (sourceAcademicYearId: string, targetAcademicYearId: string) =>
+      ipcRenderer.invoke('classes:cloneToYear', sourceAcademicYearId, targetAcademicYearId)
   }
 }
