@@ -85,4 +85,39 @@ export class EnrollmentRepository extends BaseRepository {
       await tx.memberEnrollment.createMany({ data: rows.slice(i, i + chunk) })
     }
   }
+
+  // WO P-1 — baca enrollment ACTIVE untuk BANYAK kelas di SATU tahun (preview
+  // promosi, RFC §7.1 step 1). Read-only. Service TIDAK mengakses Prisma
+  // langsung — seluruh akses data lewat repository (arsitektur project).
+  // Mengembalikan enrollment + nama member + kelas sumber (level/parallel/kurikulum).
+  async findActiveByClasses(
+    classIds: string[],
+    academicYearId: string
+  ): Promise<
+    Array<{
+      id: string
+      memberId: string
+      classId: string
+      member: { fullName: string }
+      class: { id: string; educationLevel: string; parallel: string; curriculumId: string }
+    }>
+  > {
+    if (classIds.length === 0) return []
+    return this.prisma.memberEnrollment.findMany({
+      where: {
+        academicYearId,
+        classId: { in: classIds },
+        status: ACADEMIC_STATUS.active,
+        leftAt: null
+      },
+      select: {
+        id: true,
+        memberId: true,
+        classId: true,
+        member: { select: { fullName: true } },
+        class: { select: { id: true, educationLevel: true, parallel: true, curriculumId: true } }
+      },
+      orderBy: [{ class: { educationLevel: 'asc' } }, { class: { parallel: 'asc' } }, { member: { fullName: 'asc' } }]
+    })
+  }
 }

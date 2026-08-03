@@ -1,6 +1,7 @@
 // WO P-1 — Unit test decide() (Single Decision Engine, MURNI, tanpa DB).
 // Memverifikasi keputusan deterministik Mode A (Automatic) RFC §7:
-// X→XI, XI→XII, XII→GRADUATED, NO_TARGET, REPEATED, level invalid, determinism.
+// X→XI, XI→XII, XII→GRADUATED (menang atas repeat), NO_TARGET, REPEATED (X/XI),
+// level invalid, determinism.
 import { decide } from '../src/main/services/promotion-preview.service'
 import type { PromotionDecideInput, PromotionTargetClassInput } from '../src/shared/dto/promotion'
 
@@ -90,10 +91,10 @@ function main(): void {
   expectEqual('outcome', d7.outcome, 'NO_TARGET')
   expectEqual('targetClassId null', d7.targetClassId, null)
 
-  console.log('--- STEP 8: XII + repeat → REPEATED (repeat eksplisit menang atas GRADUATED otomatis) ---')
+  console.log('--- STEP 8: XII + repeat → GRADUATED (XII → GRADUATED tanpa syarat per RFC; REPEATED hanya X→X/XI→XI) ---')
   const d8 = decide(baseInput({ sourceLevel: 'XII', sourceClassLabel: 'XII MERDEKA 1', repeat: true }))
-  expectEqual('outcome', d8.outcome, 'REPEATED')
-  expectEqual('targetClassId (kelas XII tersedia)', d8.targetClassId, 'target-xii-merdeka-1')
+  expectEqual('outcome', d8.outcome, 'GRADUATED')
+  expectEqual('targetClassId null', d8.targetClassId, null)
 
   console.log('--- STEP 9: tingkat tidak dikenal → ERROR ---')
   const d9 = decide(baseInput({ sourceLevel: 'IX', sourceClassLabel: 'IX MERDEKA 1' }))

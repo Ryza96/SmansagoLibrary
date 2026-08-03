@@ -4,6 +4,7 @@
 import { PromotionPreviewService } from '../src/main/services/promotion-preview.service'
 import { AcademicYearRepository } from '../src/main/repositories/academic-year.repository'
 import { ClassRepository } from '../src/main/repositories/class.repository'
+import { EnrollmentRepository } from '../src/main/repositories/enrollment.repository'
 import { getPrisma } from '../src/main/repositories/base/prisma'
 import { ACADEMIC_STATUS } from '../src/shared/config/academic-status'
 
@@ -32,7 +33,7 @@ async function expectRejected(name: string, fn: () => Promise<unknown>, messageP
 
 async function main(): Promise<void> {
   const prisma = getPrisma()
-  const service = new PromotionPreviewService(new AcademicYearRepository(), new ClassRepository())
+  const service = new PromotionPreviewService(new AcademicYearRepository(), new ClassRepository(), new EnrollmentRepository())
 
   console.log('--- STEP 0: seed master data (fresh DB) ---')
   const curriculum = await prisma.curriculum.create({ data: { name: 'MERDEKA' } })

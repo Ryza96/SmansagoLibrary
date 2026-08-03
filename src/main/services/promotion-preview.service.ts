@@ -1,8 +1,7 @@
 import { AcademicYearRepository } from '../repositories/academic-year.repository'
 import { ClassRepository } from '../repositories/class.repository'
-import { ACADEMIC_STATUS } from '../../shared/config/academic-status'
+import { EnrollmentRepository } from '../repositories/enrollment.repository'
 import { levelOrder } from '../../shared/config/education-level'
-import { getPrisma } from '../repositories/base/prisma'
 import { AppError } from '../../../electron/main/errorHandler'
 import type {
   PromotionDecideInput,
@@ -20,7 +19,8 @@ import type {
 //
 // Mode A (Automatic, RFC §7): siswa ACTIVE dipromosikan ke levelOrder+1,
 // parallel + kurikulum dicocokkan otomatis (X MERDEKA 1 → XI MERDEKA 1);
-// XII → GRADUATED; tanpa target → NO_TARGET; repeat (eksplisit) → REPEATED.
+// XII → GRADUATED (menang atas repeat — RFC tanpa syarat); tanpa target →
+// NO_TARGET; repeat (eksplisit) → REPEATED untuk X/XI.
 // ===========================================================================
 export function decide(input: PromotionDecideInput): PromotionDecision {
   const order = levelOrder(input.sourceLevel)
@@ -31,6 +31,18 @@ export function decide(input: PromotionDecideInput): PromotionDecision {
       targetClassId: null,
       targetClassLabel: null,
       message: `Tingkat tidak dikenal: ${input.sourceLevel}`
+    }
+  }
+
+  // XII → GRADUATED (RFC §7 Mode A). "XII → GRADUATED" dinyatakan TANPA syarat;
+  // REPEATED hanya untuk tinggal kelas di tingkat yang sama (X→X, XI→XI),
+  // bukan untuk XII yang terminal. GRADUATED MENANG atas repeat.
+  if (order === 3) {
+    return {
+      outcome: 'GRADUATED',
+      targetClassId: null,
+      targetClassLabel: null,
+      message: null
     }
   }
 
@@ -46,16 +58,6 @@ export function decide(input: PromotionDecideInput): PromotionDecision {
           targetClassLabel: null,
           message: `Tidak ada kelas target tingkat sama untuk ${input.sourceClassLabel}`
         }
-  }
-
-  // XII → GRADUATED (RFC §7 Mode A). Tidak ada kelas target di atasnya.
-  if (order === 3) {
-    return {
-      outcome: 'GRADUATED',
-      targetClassId: null,
-      targetClassLabel: null,
-      message: null
-    }
   }
 
   // Promosi ke tingkat berikutnya.
@@ -101,7 +103,8 @@ function toDecision(outcome: 'PROMOTED' | 'REPEATED', target: PromotionTargetCla
 export class PromotionPreviewService {
   constructor(
     private academicYearRepository: AcademicYearRepository,
-    private classRepository: ClassRepository
+    private classRepository: ClassRepository,
+    private enrollmentRepository: EnrollmentRepository
   ) {}
 
   async preview(input: AutomaticPromotionPreviewInput): Promise<PromotionPreviewDTO> {
@@ -142,21 +145,13 @@ export class PromotionPreviewService {
       curriculumId: cls.curriculumId
     }))
 
-    // Enrollment ACTIVE sumber — read-only, langsung via getPrisma() (pola
-    // enrollment.service.ts). Repository = N/A untuk WO P-1 (preview).
-    const rows = await getPrisma().memberEnrollment.findMany({
-      where: {
-        academicYearId: input.fromYearId,
-        classId: { in: sourceClasses.map((cls) => cls.id) },
-        status: ACADEMIC_STATUS.active,
-        leftAt: null
-      },
-      include: {
-        member: { select: { fullName: true } },
-        class: { select: { id: true, educationLevel: true, parallel: true, curriculumId: true } }
-      },
-      orderBy: [{ class: { educationLevel: 'asc' } }, { class: { parallel: 'asc' } }, { member: { fullName: 'asc' } }]
-    })
+    // Enrollment ACTIVE sumber — read-only melalui EnrollmentRepository
+    // (Service TIDAK mengakses Prisma langsung; arsitektur project = Service
+    // melalui Repository).
+    const rows = await this.enrollmentRepository.findActiveByClasses(
+      sourceClasses.map((cls) => cls.id),
+      input.fromYearId
+    )
 
     const sourceClassById = new Map(sourceClasses.map((cls) => [cls.id, cls]))
 

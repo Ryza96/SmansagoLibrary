@@ -1,7 +1,7 @@
 # P1_RELEASE_REPORT
 
 - **WO:** P-1 — Promotion Foundation
-- **Status:** READY TO RELEASE (menunggu review PO — gate berhenti, satu commit di bawah)
+- **Status:** REVISED (Review PO, 2 poin dibereskan) — READY Final Review (gate berhenti menunggu approval)
 
 ---
 
@@ -11,6 +11,7 @@
 |------|----------|
 | `src/shared/dto/promotion.ts` | DTO (kontrak shared) |
 | `src/main/services/promotion-preview.service.ts` | Service (decide + preview) |
+| `src/main/repositories/enrollment.repository.ts` | Repository (+`findActiveByClasses` — revisi PO poin 1) |
 | `p1_decide_smoke/decide.unit.ts` | Unit test decide (30/30) |
 | `p1_preview_smoke/smoke.ts` | Smoke preview fresh DB (33/33) |
 | `WORK_ORDER_P1_IMPLEMENTATION_REPORT.md`, `P1_FINAL_REVIEW.md`, `P1_RELEASE_REPORT.md` | Laporan |
@@ -26,10 +27,10 @@
 - Tidak ada perubahan schema / migration / DB.
 - Tidak ada IPC / preload / UI baru (keputusan PO: P-2 menyambung executor).
 
-## 4. Komit & push
+## 4. Revisi Review PO (2 poin — COMPLETE)
 
-- Satu commit final: `feat: promotion foundation with pure decide() and preview (WO P-1)`.
-- Push ke `origin/main`.
+1. **Service akses Prisma langsung → dibereskan:** preview baca enrollment via `EnrollmentRepository.findActiveByClasses()` (baru); `getPrisma` dihapus dari service.
+2. **repeat vs graduated → GRADUATED menang:** analisis RFC menyimpulkan "XII → GRADUATED" tanpa syarat; REPEATED hanya X→X/XI→XI. `decide()` kini cek XII sebelum repeat; unit STEP 8 = `XII + repeat → GRADUATED`.
 
 ## 5. Catatan rilis
 
