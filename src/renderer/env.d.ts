@@ -175,6 +175,12 @@ interface ElectronAPI {
     delete: (id: string) => Promise<void>
     cloneToYear: (sourceAcademicYearId: string, targetAcademicYearId: string) => Promise<import('../../src/shared/dto/academic').CloneClassResult>
   }
+  enrollments: {
+    enroll: (input: import('../../src/shared/dto/enrollment').CreateEnrollmentDTO) => Promise<import('../../src/shared/dto/enrollment').EnrollmentDTO>
+    close: (enrollmentId: string, input: import('../../src/shared/dto/enrollment').CloseEnrollmentDTO) => Promise<import('../../src/shared/dto/enrollment').EnrollmentDTO>
+    repoint: (enrollmentId: string, input: import('../../src/shared/dto/enrollment').RepointEnrollmentDTO) => Promise<import('../../src/shared/dto/enrollment').EnrollmentDTO>
+    findActiveByMember: (memberId: string) => Promise<import('../../src/shared/dto/enrollment').EnrollmentDTO | null>
+  }
   inventory: {
     findMany: (params: {
       page?: number

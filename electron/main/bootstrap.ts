@@ -34,6 +34,8 @@ import { CurriculumService } from '../../src/main/services/curriculum.service'
 import { CurriculumRepository } from '../../src/main/repositories/curriculum.repository'
 import { ClassService } from '../../src/main/services/class.service'
 import { ClassRepository } from '../../src/main/repositories/class.repository'
+import { EnrollmentService } from '../../src/main/services/enrollment.service'
+import { EnrollmentRepository } from '../../src/main/repositories/enrollment.repository'
 import { MatchingEngineService } from '../../src/services/MatchingEngineService'
 import { createProductionStrategies } from '../../src/main/strategies/index'
 import { AutoCreateService } from '../../src/main/services/auto-create.service'
@@ -56,6 +58,7 @@ export interface Container {
   academicYearService: AcademicYearService
   curriculumService: CurriculumService
   classService: ClassService
+  enrollmentService: EnrollmentService
   newBookCopyService: NewBookCopyService
   newReturnService: NewReturnService
   borrowDetailRepository: BorrowDetailRepository
@@ -103,6 +106,8 @@ export function createContainer(): Container {
   const academicYearService = new AcademicYearService(academicYearRepository, classRepository)
   const curriculumService = new CurriculumService(curriculumRepository, classRepository)
   const classService = new ClassService(classRepository, academicYearRepository, curriculumRepository, newMemberRepository)
+  const enrollmentRepository = new EnrollmentRepository()
+  const enrollmentService = new EnrollmentService(enrollmentRepository, newMemberRepository, classRepository)
 
   const memberDuplicateChecker = new MemberDuplicateChecker(newMemberRepository)
   const memberClassResolver = new MemberClassResolver(academicYearRepository, classRepository)
@@ -130,6 +135,7 @@ export function createContainer(): Container {
     academicYearService,
     curriculumService,
     classService,
+    enrollmentService,
     newBookCopyService,
     newReturnService,
     borrowDetailRepository,

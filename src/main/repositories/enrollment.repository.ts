@@ -1,0 +1,52 @@
+import { BaseRepository } from './base/base.repository'
+import type { Prisma } from '@prisma/client'
+import { ACADEMIC_STATUS } from '../../shared/config/academic-status'
+
+type CreateEnrollmentData = Pick<import('@prisma/client').MemberEnrollment, 'memberId' | 'classId' | 'academicYearId'> & {
+  status: string
+  note?: string
+}
+
+type CloseEnrollmentData = {
+  status: string
+  leftAt: Date
+  note?: string
+}
+
+const enrollmentInclude = {
+  member: true,
+  class: true,
+  academicYear: true
+} as const
+
+type EnrollmentWithRelations = Prisma.MemberEnrollmentGetPayload<{
+  include: typeof enrollmentInclude
+}>
+
+export class EnrollmentRepository extends BaseRepository {
+  async create(data: CreateEnrollmentData): Promise<EnrollmentWithRelations> {
+    return this.prisma.memberEnrollment.create({ data, include: enrollmentInclude })
+  }
+
+  async findById(id: string): Promise<EnrollmentWithRelations | null> {
+    return this.prisma.memberEnrollment.findUnique({ where: { id }, include: enrollmentInclude })
+  }
+
+  async findActiveByMember(memberId: string): Promise<EnrollmentWithRelations | null> {
+    return this.prisma.memberEnrollment.findFirst({
+      where: { memberId, status: ACADEMIC_STATUS.active, leftAt: null },
+      include: enrollmentInclude,
+      orderBy: { enrolledAt: 'desc' }
+    })
+  }
+
+  async countActiveByMember(memberId: string): Promise<number> {
+    return this.prisma.memberEnrollment.count({
+      where: { memberId, status: ACADEMIC_STATUS.active, leftAt: null }
+    })
+  }
+
+  async close(id: string, data: CloseEnrollmentData): Promise<EnrollmentWithRelations> {
+    return this.prisma.memberEnrollment.update({ where: { id }, data, include: enrollmentInclude })
+  }
+}
