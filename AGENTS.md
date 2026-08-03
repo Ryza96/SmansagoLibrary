@@ -336,3 +336,23 @@ Audit menyeluruh terhadap Borrowing Module: Prisma schema, Repository, Service, 
 - **Jangan mengubah tipe DTO baca (`MemberDTO.memberType`) ke union domain** — kolom DB string bebas; union hanya di tipe INPUT (Create/Update) yang sudah tervalidasi, helper menerima `string | null` dan men-narrow.
 - **Nama file laporan WO-1 bentrok** dengan `WORK_ORDER_1_IMPLEMENTATION_REPORT.md` lama (sprint Import Anggota) → laporan baru diberi suffix `_F1_`; jangan overwrite laporan WO lama.
 - Verifikasi sisa hardcode pakai grep tool (bukan `rg` — tidak ada di Windows env ini).
+
+---
+
+## WO-2 (F2a): Schema + Migration Master Data Akademik (COMPLETE — READY review PO)
+
+### Ringkasan
+- Source of Truth: `MASTER_DATA_AKADEMIK_ARCHITECTURE_RFC.md` (LOCKED) + `MASTER_DATA_AKADEMIK_WBS.md` (LOCKED) + `WO2_DISCOVERY_REPORT.md` (APPROVED). Scope: **Schema + Migration saja** — TIDAK ada Repository/Service/IPC/Preload/UI, TIDAK ada backfill, `Member.classId` tidak disentuh.
+- **Schema (`prisma/schema.prisma`):** 3 model baru — `MemberEnrollment` (SSOT penempatan per tahun ajaran), `PromotionRun` (audit operasi massal/promosi), `PromotionRunItem` (detail per-anggota); 4 back-relation (`AcademicYear.memberEnrollments` + `promotionRunsFrom`/`promotionRunsTo` named `PromotionRunFromYear`/`PromotionRunToYear`, `Class.memberEnrollments`, `Member.memberEnrollments` + `promotionRunItems`). FK semuanya `ON DELETE RESTRICT`.
+- **Desain kunci: business rule TIDAK pindah ke DB** — `MemberEnrollment.status` (ACTIVE/PROMOTED/REPEATED/REDISTRIBUTED/TRANSFERRED/DROPPED/GRADUATED), `PromotionRun.mode` (AUTOMATIC/MAPPING/BULK_EDIT) & `status` (SUCCESS/PARTIAL/FAILED), `PromotionRunItem.outcome` = `TEXT NOT NULL` **tanpa DEFAULT** (Service yang menentukan). Kombinasi `(memberId, academicYearId, classId)` **tidak unique** — mendukung REDISTRIBUTED (2 baris setahun); "1 kelas aktif" adalah rule Service.
+- **Migration:** `prisma/migrations/20260803_wo2_f2a_master_data_akademik/` — murni additive (3 CREATE TABLE + 11 CREATE INDEX, tanpa ALTER). Sort order benar setelah `20260731_wo13_revision1_source_detail`. Baseline & WO13 tidak dimodifikasi. 11 index punya business purpose terdokumentasi (`WORK_ORDER_2_F2A_IMPLEMENTATION_REPORT.md` §3).
+- **Validation:** `prisma validate` PASS, dev deploy + status PASS (4 migrations), fresh DB deploy PASS (urutan baseline→WO13→R1→F2a), `migrate diff` = "No difference detected", `prisma generate` PASS (setelah dev server dihentikan), smoke `wo2_f2a_smoke/smoke.ts` **35/35 PASS** (relasi include, semua index-query, 2 baris setahun, FK RESTRICT P2003, no-DB-default dibuktikan 2 lapis: client validation + raw SQL `NOT NULL constraint failed`), `npm run lint` PASS, `npm run build` PASS (main tidak berubah — schema hanya).
+- **Laporan:** `WORK_ORDER_2_F2A_IMPLEMENTATION_REPORT.md`, `WO2_FINAL_REVIEW.md`, `WO2_RELEASE_REPORT.md`. Status: **DONE — menunggu review PO** (tidak lanjut WO berikutnya).
+
+### Pelajaran (retain)
+- **`prisma generate` gagal EPERM saat dev server berjalan** — `npm run dev` (electron-vite) memuat `query_engine-windows.dll.node` ke memori sehingga file tidak bisa di-rename. Prosedur: hentikan dev server (dengan izin PO) sebelum `prisma generate`; jangan abaikan error EPERM.
+- **Smoke DB wajib fresh DB per run** (ulang pelajaran WO-8): fixture unique (`AcademicYear.name`) bertabrakan bila DB temp menyimpan baris run sebelumnya — hapus `.db` lalu `migrate deploy` ulang.
+- **Uji "no DB default" butuh 2 lapis:** (1) panggilan Prisma client yang omit kolom → PrismaClientValidationError tanpa `.code` (bukan P2011) karena validasi client-side mendahului DB; (2) `$executeRaw` INSERT omit kolom → error `Code: 1299 ... NOT NULL constraint failed` (bukti di level DB). Jangan assert P2011 untuk omit kolom wajib via client.
+- **tsc single-file outDir:** input `dir/file.ts` dengan `--outDir` menghasilkan `<outDir>/file.js` (rootDir diinfer dari input), bukan `<outDir>/dir/file.js`.
+- **Kolom workflow (status/mode/outcome) bebas string tanpa default** — konsisten pola schema existing; validasi enum ada di Service layer, bukan DB. Uniqueness semantik ("satu kelas aktif per anggota") juga domain Service.
+- **Cek bentrok nama laporan SEBELUM menulis file:** `WORK_ORDER_2_IMPLEMENTATION_REPORT.md` sudah dipakai laporan sprint Import Anggota (commit `a7adf66`) — laporan F2a diberi suffix `_F2A_` (`WORK_ORDER_2_F2A_IMPLEMENTATION_REPORT.md`). Jangan `git checkout` lalu `Move-Item -Destination` ke file baru di satu perintah — gunakan nama baru langsung agar isi tidak tertimpa.

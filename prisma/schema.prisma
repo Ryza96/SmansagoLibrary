@@ -23,7 +23,10 @@ model AcademicYear {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  classes Class[]
+  classes           Class[]
+  memberEnrollments MemberEnrollment[]
+  promotionRunsFrom PromotionRun[] @relation("PromotionRunFromYear")
+  promotionRunsTo   PromotionRun[] @relation("PromotionRunToYear")
 }
 
 model Curriculum {
@@ -46,13 +49,80 @@ model Class {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  academicYear AcademicYear @relation(fields: [academicYearId], references: [id])
-  curriculum   Curriculum   @relation(fields: [curriculumId], references: [id])
-  members      Member[]
+  academicYear     AcademicYear @relation(fields: [academicYearId], references: [id])
+  curriculum       Curriculum   @relation(fields: [curriculumId], references: [id])
+  members          Member[]
+  memberEnrollments MemberEnrollment[]
 
   @@unique([academicYearId, curriculumId, educationLevel, parallel])
   @@index([academicYearId])
   @@index([curriculumId])
+}
+
+// Academic Context — SSOT penempatan anggota di kelas per tahun ajaran (RFC §2.1).
+// status: ACTIVE | PROMOTED | REPEATED | REDISTRIBUTED | TRANSFERRED | DROPPED | GRADUATED
+// (tanpa DEFAULT — ditentukan Service di Work Order berikutnya)
+model MemberEnrollment {
+  id             String   @id @default(uuid())
+  memberId       String
+  classId        String
+  academicYearId String
+  status         String
+  enrolledAt     DateTime @default(now())
+  leftAt         DateTime?
+  note           String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  member       Member       @relation(fields: [memberId], references: [id])
+  class        Class        @relation(fields: [classId], references: [id])
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id])
+
+  @@index([memberId, academicYearId])
+  @@index([memberId, status])
+  @@index([classId])
+  @@index([academicYearId])
+  @@index([status])
+}
+
+// Academic Context — audit operasi massal / promosi (RFC §2.2, §10).
+// mode: AUTOMATIC | MAPPING | BULK_EDIT; status: SUCCESS | PARTIAL | FAILED
+// (tanpa DEFAULT — ditentukan Service di Work Order berikutnya)
+model PromotionRun {
+  id         String   @id @default(uuid())
+  fromYearId String
+  toYearId   String
+  mode       String
+  runBy      String?
+  status     String
+  summary    String?
+  startedAt  DateTime @default(now())
+  finishedAt DateTime?
+
+  fromYear AcademicYear      @relation("PromotionRunFromYear", fields: [fromYearId], references: [id])
+  toYear   AcademicYear      @relation("PromotionRunToYear", fields: [toYearId], references: [id])
+  items    PromotionRunItem[]
+
+  @@index([fromYearId])
+  @@index([toYearId])
+  @@index([status])
+}
+
+model PromotionRunItem {
+  id             String  @id @default(uuid())
+  promotionRunId String
+  memberId       String
+  sourceClassId  String
+  targetClassId  String?
+  outcome        String
+  message        String?
+
+  promotionRun PromotionRun @relation(fields: [promotionRunId], references: [id])
+  member       Member       @relation(fields: [memberId], references: [id])
+
+  @@index([promotionRunId])
+  @@index([memberId])
+  @@index([outcome])
 }
 
 model Author {
@@ -110,8 +180,10 @@ model Member {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
-  class   Class?   @relation(fields: [classId], references: [id])
-  borrows Borrow[]
+  class             Class?    @relation(fields: [classId], references: [id])
+  borrows           Borrow[]
+  memberEnrollments MemberEnrollment[]
+  promotionRunItems PromotionRunItem[]
 
   @@index([fullName])
   @@index([status])
