@@ -110,7 +110,7 @@ export function createContainer(): Container {
   const borrowService = new BorrowService(borrowRepository, borrowDetailRepository, newMemberRepository, newBookCopyRepository, enrollmentService)
 
   const memberDuplicateChecker = new MemberDuplicateChecker(newMemberRepository)
-  const memberClassResolver = new MemberClassResolver(academicYearRepository, classRepository)
+  const memberClassResolver = new MemberClassResolver(classRepository)
   const memberImportService = new MemberImportService(
     memberDuplicateChecker,
     memberClassResolver,

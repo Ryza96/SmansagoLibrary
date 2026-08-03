@@ -106,14 +106,13 @@ export interface MemberImportResultDTO {
   errors: MemberImportPreviewIssue[]
 }
 
-// WO-17 MI-1 — skop resolusi kelas saat import (RFC §12.1 step 1/4).
-// academicYearId: tahun target (wajib diisi UI MI-2; null tidak diterima di sini).
-// curriculumId: kurikulum target; null = tanpa filter kurikulum (backward-compat
-// jalur UI lama yang belum memilih scope) — bila satu nama kelas ada di beberapa
-// kurikulum tahun yang sama, resolver mengembalikan classAmbiguous (BLOCKER).
+// WO-17 MI-1 / WO-20 MI-4 — skop eksplisit resolusi kelas saat import
+// (RFC §12.1 step 1/4). WAJIB diisi UI (MI-4): academicYearId = tahun target
+// (default UI = tahun aktif), curriculumId = kurikulum target. Tidak ada lagi
+// jalur tanpa scope (fallback tahun aktif implicit dihapus pada MI-4).
 export interface MemberImportScope {
   academicYearId: string
-  curriculumId: string | null
+  curriculumId: string
 }
 
 export type MemberImportStage =

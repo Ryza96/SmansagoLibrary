@@ -16,9 +16,9 @@ export const memberAPI = {
   },
   memberImport: {
     downloadTemplate: () => ipcRenderer.invoke('members:downloadTemplate'),
-    previewCheck: (rows: MemberImportRowInput[], scope?: MemberImportScope) =>
+    previewCheck: (rows: MemberImportRowInput[], scope: MemberImportScope) =>
       ipcRenderer.invoke('members:previewCheck', rows, scope),
-    import: (rows: MemberImportRowInput[], scope?: MemberImportScope) =>
+    import: (rows: MemberImportRowInput[], scope: MemberImportScope) =>
       ipcRenderer.invoke('members:import', rows, scope),
     onProgress: (callback: (event: MemberImportProgressEvent) => void) => {
       const listener = (_event: Electron.IpcRendererEvent, progress: MemberImportProgressEvent) =>

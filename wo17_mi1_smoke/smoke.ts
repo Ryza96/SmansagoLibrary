@@ -1,5 +1,4 @@
 import { MemberClassResolver } from '../src/main/services/member-class-resolver.service'
-import { AcademicYearRepository } from '../src/main/repositories/academic-year.repository'
 import { ClassRepository } from '../src/main/repositories/class.repository'
 import { MemberRepository } from '../src/main/repositories/member.repository'
 import { NumberGeneratorService } from '../src/main/services/number-generator.service'
@@ -7,7 +6,7 @@ import { MemberDuplicateChecker } from '../src/main/services/member-duplicate-ch
 import { MemberImportService } from '../src/main/services/member-import.service'
 import { EnrollmentRepository } from '../src/main/repositories/enrollment.repository'
 import { getPrisma } from '../src/main/repositories/base/prisma'
-import type { MemberImportRowInput, MemberImportScope } from '../src/shared/dto/member'
+import type { MemberImportRowInput } from '../src/shared/dto/member'
 
 let pass = 0
 let fail = 0
@@ -36,7 +35,7 @@ function row(rowNumber: number, className: string, nisn: string): MemberImportRo
 
 async function main(): Promise<void> {
   const prisma = getPrisma()
-  const classResolver = new MemberClassResolver(new AcademicYearRepository(), new ClassRepository())
+  const classResolver = new MemberClassResolver(new ClassRepository())
   const memberRepo = new MemberRepository()
   const enrollmentRepo = new EnrollmentRepository()
   const memberImportService = new MemberImportService(
@@ -98,27 +97,20 @@ async function main(): Promise<void> {
   const r4c = await classResolver.resolve([row(7, 'tanpa-paralel', '1007')], yearA.id, k1.id)
   expectEqual('className tak ter-parse -> notFound', r4c.errors[0]?.messageKey, 'memberImport.classNotFound')
 
-  console.log('--- STEP 5: classAmbiguous tetap BLOCKER (tanpa filter kurikulum) ---')
-  const r5 = await classResolver.resolve([row(8, 'X A', '1008')], yearA.id, null)
-  expectEqual('X A (curriculum null) -> ambiguous', r5.errors[0]?.messageKey, 'memberImport.classAmbiguous')
-  expectEqual('ambiguous item classId null', r5.items[0]?.classId, null)
-  const r5b = await classResolver.resolve([row(9, 'X A', '1009')], yearA.id, k1.id)
-  expectEqual('X A (k1 eksplisit) -> classA, TIDAK ambigu', r5b.items[0]?.classId, classA.id)
-  expectEqual('k1 eksplisit errors 0', r5b.errors.length, 0)
+  console.log('--- STEP 5: scope WAJIB (WO-20 MI-4) — tidak ada fallback; kurikulum eksplisit mempersempit ---')
+  const r5 = await classResolver.resolve([row(8, 'X A', '1008')], yearA.id, k1.id)
+  expectEqual('X A (yearA + k1) -> classA, TIDAK ambigu', r5.items[0]?.classId, classA.id)
+  expectEqual('X A k1 errors 0', r5.errors.length, 0)
+  const r5b = await classResolver.resolve([row(9, 'X A', '1009')], yearA.id, k2.id)
+  expectEqual('X A (yearA + k2) -> classC, TIDAK ambigu', r5b.items[0]?.classId, classC.id)
+  expectEqual('X A k2 errors 0', r5b.errors.length, 0)
 
-  console.log('--- STEP 6: fallback tahun aktif (academicYearId null, backward-compat) ---')
-  const r6 = await classResolver.resolve([row(10, 'X B', '1010')], null, k1.id)
-  expectEqual('fallback tahun aktif -> classB', r6.items[0]?.classId, classB.id)
-  const r6b = await classResolver.resolve([row(11, 'X A', '1011')], null, null)
-  expectEqual('fallback aktif tanpa kurikulum -> ambiguous', r6b.errors[0]?.messageKey, 'memberImport.classAmbiguous')
+  console.log('--- STEP 6: tahun dari scope WAJIB dihormati (tahun non-aktif) ---')
+  const r6 = await classResolver.resolve([row(10, 'X A', '1010')], yearB.id, k1.id)
+  expectEqual('X A (yearB + k1) -> classD, bukan fallback tahun aktif', r6.items[0]?.classId, classD.id)
+  expectEqual('tahun scope yearB errors 0', r6.errors.length, 0)
 
-  console.log('--- STEP 7: tanpa tahun aktif -> semua classNotFound ---')
-  await prisma.academicYear.update({ where: { id: yearA.id }, data: { isActive: false } })
-  const r7 = await classResolver.resolve([row(12, 'X A', '1012')], null, k1.id)
-  expectEqual('tidak ada tahun aktif -> classNotFound', r7.errors[0]?.messageKey, 'memberImport.classNotFound')
-  await prisma.academicYear.update({ where: { id: yearA.id }, data: { isActive: true } })
-
-  console.log('--- STEP 8: service previewCheck dengan scope ---')
+  console.log('--- STEP 7: service previewCheck dengan scope ---')
   const p1 = await memberImportService.previewCheck([row(1, 'X A', '2001'), row(2, 'X B', '2002')], { academicYearId: yearA.id, curriculumId: k1.id })
   expectEqual('preview valid (scope k1)', p1.valid, true)
   expectEqual('preview errorCount 0', p1.errorCount, 0)
@@ -138,14 +130,14 @@ async function main(): Promise<void> {
   check('enrollment.classId == classA (resolusi skop k1)', en1?.classId === classA.id)
   check('enrollment academicYearId == yearA', en1?.academicYearId === yearA.id)
 
-  console.log('--- STEP 10: import backward-compat tanpa scope -> tahun aktif ---')
-  const i2 = await memberImportService.import([row(2, 'X B', '2002')])
-  expectEqual('import tanpa scope success', i2.success, true)
-  const m2 = await prisma.member.findFirst({ where: { nisn: '2002' } })
-  expectEqual('member.classId null (tanpa scope)', m2?.classId, null)
+  console.log('--- STEP 10: import scope yearB (non-aktif) -> enrollment di yearB, BUKAN tahun aktif ---')
+  const i2 = await memberImportService.import([row(5, 'X A', '2005')], { scope: { academicYearId: yearB.id, curriculumId: k1.id } })
+  expectEqual('import scope yearB success', i2.success, true)
+  const m2 = await prisma.member.findFirst({ where: { nisn: '2005' } })
+  expectEqual('member.classId null (scope yearB)', m2?.classId, null)
   const en2 = await enrollmentRepo.findActiveByMember(m2!.id)
-  check('tanpa scope -> enrollment.classId == classB (tahun aktif, X B unik)', en2?.classId === classB.id)
-  check('enrollment2 academicYearId == yearA (tahun aktif)', en2?.academicYearId === yearA.id)
+  check('scope yearB -> enrollment.classId == classD', en2?.classId === classD.id)
+  check('enrollment2 academicYearId == yearB (scope, bukan tahun aktif)', en2?.academicYearId === yearB.id)
 
   console.log('--- STEP 11: import scope kurikulum lain -> enrollment kelas kurikulum itu ---')
   const i3 = await memberImportService.import([row(3, 'X A', '2003')], { scope: { academicYearId: yearA.id, curriculumId: k2.id } })

@@ -483,6 +483,45 @@ Audit menyeluruh terhadap Borrowing Module: Prisma schema, Repository, Service, 
 
 ---
 
+## WO-19 MI-3: Import Duplicate Strategy — Skip & Flag (COMPLETE - READY review PO, ter-release)
+
+### Ringkasan
+- Keputusan PO: **strategi A "Skip & flag"** (RFC §12.2) — member existing tidak lagi diblokir; baris yang SUDAH ACTIVE di tahun target **dilewati** (`skipped`), member existing yang belum terdaftar tahun target mendapat **enrollment-only** (PO #5); member baru → create Member + Enrollment ACTIVE. Email hanya diblokir untuk member BARU.
+- **File diubah (3 source + 1 DTO):** `member-duplicate-checker.service.ts` (NISN existing → `existingByRow: Map<rowNumber, ExistingMemberInfo>` routing, email blocker hanya baris NISN baru; `continue` di baris existing), `enrollment.repository.ts` (+`findMemberIdsActiveInYear(memberIds, year)` batch lookup Set<memberId> — bukan query per baris), `member-import.service.ts` (`RowRouting` = `'create-member'|'enrollment-only'|'skip'`; routing di preflight dengan 1 batch query ACTIVE-per-tahun; `writePhase(rows, routingByRow, existingMemberIdByRow, classIdByRow, academicYearId)` split 3 jalur dalam SATU `$transaction`; `allocateMemberNumbers` hanya utk create-member (count-0 aman); result +`skipped`), `member.ts` (`MemberImportResultDTO` +`skipped: number` aditif).
+- **TIDAK diubah:** UI Import, IPC `members:previewCheck/import(rows, scope?)`, preload, env.d.ts (format fix di env.d.ts dikembalikan identik — tidak ada perubahan), Schema, Migration, `EnrollmentService`, `Member.status` sync (E-3), Promotion, Reporting.
+- **Validation PASS:** lint; build (main 1,797.87 kB · preload 8.62 kB · renderer 999.83 kB); smoke MI-3 **38/38** (baru/enrollment-only/skip/email-blocker-hanya-baru/email-tak-blokir-existing/campuran 1+2/invariant satu-ACTIVE/rollback batch campuran); regression MI-1 44, MI-2 37, E-1 39, E-2 36, E-3 78, E-4 45; `migrate diff` = no drift (schema tidak disentuh).
+- **Commit:** `70d2e15` "feat: import duplicate strategy skip & flag for existing members (WO-19 MI-3)" — di-push (`1855568..70d2e15`, 8 files, +638/−49). Working tree bersih.
+- **Laporan:** `WORK_ORDER_MI3_IMPLEMENTATION_REPORT.md`, `MI3_FINAL_REVIEW.md`, `MI3_RELEASE_REPORT.md`.
+- **Status: DONE — menunggu review PO** (tidak lanjut WO berikutnya).
+
+### Pelajaran (retain)
+- **Migrasi smoke:** `npx prisma migrate deploy --skip-generate` GAGAL dengan "Specify a schema" di Prisma 5.22 setup ini; `prisma migrate deploy` (tanpa `--skip-generate`) dari `workdir=prisma` selalu berhasil. Bila `--skip-generate` dibutuhkan, jalankan dari folder `prisma/` (schema ter-resolve; generate client aman selama dev server mati).
+- **`existingByRow` routing memakai MapIterator** — `duplicateResult.existingByRow.values()` adalah `MapIterator`, bukan array; konversi via `Array.from(map.values(), fn)` (bukan `.map()`).
+- **Strategi A flag = `skipped` count agregat** di `MemberImportResultDTO` (aditif, non-breaking IPC); renderer tidak menurunkan business logic (konsisten WO-2) — field list per-baris tidak ditambahkan.
+- **Prisma `file:` URL** di smoke: gunakan absolute `file:C:/...`; `migrate deploy` sukses memakai `.env` repo root (relative ke schema dir) bila DATABASE_URL tidak diset.
+- **Rollback batch campuran terbukti** — stub `EnrollmentRepository` melempar saat `createManyWithTx` setelah Member createMany → 0 Member + 0 Enrollment tersimpan (all-or-nothing).
+
+---
+
+## WO-20 MI-4: Member Import UI — Scope Wajib (COMPLETE - READY review PO)
+
+### Ringkasan
+- Keputusan PO: **hapus fallback MI-1** — dialog Import Anggota WAJIB meminta Academic Year (default tahun aktif) + Curriculum; scope `{academicYearId, curriculumId}` dikirim eksplisit ke `previewCheck()`/`import()`; resolver tidak pernah lagi memakai "tahun aktif implicit" / "kurikulum opsional".
+- **Kontrak dikencangkan (opsional → WAJIB):** `MemberImportScope` dua field `string`; `previewCheck(rows, scope)`; `import(rows, options:{scope,onProgress?})`; `preflight` resolve `scope.*`; `MemberImportPreflight.academicYearId: string`; `writePhase(..., academicYearId: string)` + guard null dihapus; `MemberClassResolver` ctor hanya `(classRepository)` (dependensi AcademicYearRepository dihapus), `resolve(rows, year, curriculum)`; `ClassRepository.findByAcademicYearAndCurriculum` `curriculumId: string` (spread kondisional dihapus); IPC/preload/env.d.ts scope wajib.
+- **UI (`MemberImportDialog.tsx`):** state `academicYears`/`curricula`/`academicYearId`/`curriculumId`; mount → `Promise.all([academicYears.findMany(), curricula.findMany()])`, default `academicYearId = data.find(y => y.isActive)?.id`; blok "Penempatan Kelas" (2 dropdown `*`); `runPreview(rows, year, curriculum)`; `handleFileChange`/scope onChange re-preview (hint `REQUIRE_SCOPE` bila scope belum lengkap); `handleImport` kirim scope; hasil sukses grid-cols-5 (+ sel **Dilewati** dari `result.skipped` MI-3). `labels.ts` + `SCOPE_*`/`YEAR`/`CURRICULUM`/`SELECT_*`/`RESULT_SKIPPED`.
+- **Smoke:** baru `wo20_mi4_smoke/smoke.ts` **24/24** (kontrak dialog findMany default aktif, picker kurikulum, preview default aktif valid, preview di-scope kurikulum, preview tahun non-aktif dihormati + `yearC` tanpa kelas → classNotFound BUKAN fallback, import scope yearB → enrollment yearB+classD, import scope kurikulum → classC vs classA, invariant satu-ACTIVE). Smoke MI-1 di-update ke kontrak baru (44→43): STEP 5 hapus null-curriculum ambiguous → scope mempersempit unik; STEP 6 hapus fallback → tahun scope non-aktif dihormati; STEP 7 hapus no-active-year; STEP 10 ganti backward-compat → import scope yearB. MI-2 (37) STEP 6 ganti backward-compat → scope yearB. MI-3 (38) hanya ctor.
+- **Validation PASS:** lint; build (main 1,796.83 kB · preload 8.62 kB · renderer 1,006.72 kB); smoke MI-4 24/24 + regression MI-1 43, MI-2 37, MI-3 38, E-1 39, E-2 36, E-3 78, E-4 45 (fresh DB); `prisma migrate diff` = empty (schema tidak disentuh); grep bundle renderer (`Penempatan Kelas`/`Dilewati`) & main (`members:previewCheck`) ter-render.
+- **Laporan:** `WORK_ORDER_MI4_IMPLEMENTATION_REPORT.md`, `MI4_FINAL_REVIEW.md`, `MI4_RELEASE_REPORT.md`. Status: **DONE - menunggu review PO** (tidak lanjut WO berikutnya).
+
+### Pelajaran (retain)
+- **UI dialog = kontrak backend; smoke service adalah bukti kontrak itu.** Default tahun aktif, picker kurikulum, dan hint scope adalah logika renderer (tak ada framework test React di repo) — dibuktikan via `Promise.all(findMany)` contract + `npm run build` + grep bundle; logika backend yang dipakai dialog (findMany/paginated, previewCheck, import, resolver) diuji penuh di smoke.
+- **Kencangkan tipe, jangan hapus fungsionalitas di tengah.** Penghapusan fallback dilakukan bertahap: tipe scope → service → resolver → repository → plumbing IPC/preload/env → smoke; `npm run lint` (tsc node+web) adalah gate cepat antar langkah.
+- **Smoke lama yang menguji perilaku yang dihapus = di-edit, bukan dibuang** — ganti tiap kasus fallback dengan kasus baru yang membuktikan non-fallback (mis. "tahun non-aktif dihormati", "yearC tanpa kelas → classNotFound padahal tahun aktif punya kelas itu").
+- **Smoke historis `uat_*`** masih memakai konstruktor/scope lama dan TIDAK di-upgrade (obsolete oleh keputusan PO, di luar regression suite) — didokumentasikan sebagai tech debt di laporan.
+- Compile & run smoke batch: `npx tsc --module commonjs --target es2022 --moduleResolution node --esModuleInterop --skipLibCheck --rootDir . --outDir <tmp>\out <list smoke.ts>` → fresh DB per smoke (`Remove-Item *.db*` → `npx prisma migrate deploy` dari workdir `prisma/`) → `node <tmp>\out\<wo>_smoke\smoke.js` dgn `$env:DATABASE_URL` absolute + `$env:NODE_PATH=<repo>\node_modules`.
+
+---
+
 ## E-1 (Enrollment Core): EnrollmentRepository + EnrollmentService (COMPLETE - READY review PO)
 
 ### Ringkasan

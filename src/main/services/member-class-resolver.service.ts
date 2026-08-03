@@ -1,5 +1,4 @@
 import type { Class } from '@prisma/client'
-import { AcademicYearRepository } from '../repositories/academic-year.repository'
 import { ClassRepository } from '../repositories/class.repository'
 import type { MemberImportRowInput } from '../../shared/dto/member'
 import { EDUCATION_LEVELS } from '../../shared/config/education-level'
@@ -13,13 +12,12 @@ import { EDUCATION_LEVELS } from '../../shared/config/education-level'
  *   - Kelas tidak ditemukan / ambigu  -> BLOCKER -> import gagal.
  *   - Error WAJIB memuat nama kelas (className) yang gagal dicari.
  *
- * Skop eksplisit (RFC §12.1 step 4 — MI-1):
- *   - resolve(rows, academicYearId, curriculumId) hanya mencari Class pada
+ * Skop eksplisit (RFC §12.1 step 4 — MI-1, dikencangkan WO-20 MI-4):
+ *   - resolve(rows, academicYearId, curriculumId) HANYA mencari Class pada
  *     KOMBINASI AcademicYear + Curriculum.
- *   - academicYearId null  -> fallback tahun ajaran AKTIF (jalur backward-compat
- *     UI import lama yang belum memilih scope; UI MI-2 selalu mengirim tahun).
- *   - curriculumId null    -> filter tahun saja (tanpa kurikulum); bila satu nama
- *     kelas ada di beberapa kurikulum tahun yang sama -> classAmbiguous (BLOCKER).
+ *   - academicYearId WAJIB (string, bukan null) — fallback tahun ajaran AKTIF
+ *     implicit dihapus (MI-4). UI selalu mengirim scope eksplisit.
+ *   - curriculumId WAJIB (string) — filter kurikulum selalu aktif.
  *
  * Strategi batch (RFC §6.3):
  *   - 1 query kelas tahun+kurikulum -> Map<key, Class[]> di memori.
@@ -45,11 +43,10 @@ export interface MemberClassResolutionIssue {
 export interface MemberClassResolutionResult {
   items: MemberClassResolutionItem[]
   errors: MemberClassResolutionIssue[]
-  // WO-18 MI-2 — tahun ajaran yang AKHIRNYA dipakai resolver (termasuk hasil
-  // fallback ke tahun aktif saat academicYearId null). Konsumen write-phase
-  // memakai nilai ini untuk MemberEnrollment.academicYearId agar tahun
-  // enrollment SELALU sama dengan tahun resolusi kelas (SSOT resolusi).
-  academicYearId: string | null
+  // WO-18 MI-2 — tahun ajaran yang DIPAKAI resolver (nilai scope eksplisit).
+  // Konsumen write-phase memakai nilai ini untuk MemberEnrollment.academicYearId
+  // agar tahun enrollment SELALU sama dengan tahun resolusi kelas (SSOT resolusi).
+  academicYearId: string
 }
 
 function normalizeParallel(value: string): string {
@@ -75,31 +72,14 @@ function parseClassName(className: string): { educationLevel: string; parallel: 
 }
 
 export class MemberClassResolver {
-  constructor(
-    private academicYearRepository: AcademicYearRepository,
-    private classRepository: ClassRepository
-  ) {}
+  constructor(private classRepository: ClassRepository) {}
 
   async resolve(
     rows: readonly MemberImportRowInput[],
-    academicYearId: string | null,
-    curriculumId: string | null
+    academicYearId: string,
+    curriculumId: string
   ): Promise<MemberClassResolutionResult> {
-    const yearId = academicYearId ?? (await this.academicYearRepository.findActive())?.id ?? null
-
-    if (yearId === null) {
-      return {
-        items: rows.map((row) => ({ rowNumber: row.rowNumber, className: row.className, classId: null })),
-        errors: rows.map((row) => ({
-          rowNumber: row.rowNumber,
-          className: row.className,
-          messageKey: MEMBER_CLASS_NOT_FOUND_MESSAGE_KEY
-        })),
-        academicYearId: null
-      }
-    }
-
-    const classes = await this.classRepository.findByAcademicYearAndCurriculum(yearId, curriculumId)
+    const classes = await this.classRepository.findByAcademicYearAndCurriculum(academicYearId, curriculumId)
     const classMap = new Map<string, Class[]>()
     for (const klass of classes) {
       const key = classKey(klass.educationLevel, klass.parallel)
@@ -138,6 +118,6 @@ export class MemberClassResolver {
       items.push({ rowNumber: row.rowNumber, className, classId: candidates[0].id })
     }
 
-    return { items, errors, academicYearId: yearId }
+    return { items, errors, academicYearId }
   }
 }

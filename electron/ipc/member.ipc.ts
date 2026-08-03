@@ -69,11 +69,11 @@ export function registerMemberHandlers(memberService: MemberService, memberImpor
 
   ipcMain.handle('members:downloadTemplate', (event) => downloadTemplate(event))
 
-  ipcMain.handle('members:previewCheck', async (_event, rows: MemberImportRowInput[], scope?: MemberImportScope) =>
+  ipcMain.handle('members:previewCheck', async (_event, rows: MemberImportRowInput[], scope: MemberImportScope) =>
     memberImportService.previewCheck(rows, scope)
   )
 
-  ipcMain.handle('members:import', async (event, rows: MemberImportRowInput[], scope?: MemberImportScope) =>
+  ipcMain.handle('members:import', async (event, rows: MemberImportRowInput[], scope: MemberImportScope) =>
     memberImportService.import(rows, {
       scope,
       onProgress: (progress) => event.sender.send('members:importProgress', progress)

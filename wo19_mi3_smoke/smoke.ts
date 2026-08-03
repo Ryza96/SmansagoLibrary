@@ -3,7 +3,6 @@ import { MemberClassResolver } from '../src/main/services/member-class-resolver.
 import { MemberDuplicateChecker } from '../src/main/services/member-duplicate-checker.service'
 import { MemberRepository } from '../src/main/repositories/member.repository'
 import { EnrollmentRepository } from '../src/main/repositories/enrollment.repository'
-import { AcademicYearRepository } from '../src/main/repositories/academic-year.repository'
 import { ClassRepository } from '../src/main/repositories/class.repository'
 import { NumberGeneratorService } from '../src/main/services/number-generator.service'
 import { getPrisma } from '../src/main/repositories/base/prisma'
@@ -47,7 +46,7 @@ async function main(): Promise<void> {
   const prisma = getPrisma()
   const memberRepo = new MemberRepository()
   const enrollmentRepo = new EnrollmentRepository()
-  const classResolver = new MemberClassResolver(new AcademicYearRepository(), new ClassRepository())
+  const classResolver = new MemberClassResolver(new ClassRepository())
 
   function makeService(enrollmentRepoImpl: EnrollmentRepository): MemberImportService {
     return new MemberImportService(

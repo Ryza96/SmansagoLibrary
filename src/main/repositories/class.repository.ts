@@ -55,12 +55,12 @@ export class ClassRepository extends BaseRepository {
   }
 
   // WO-17 MI-1 — kelas pada kombinasi AcademicYear + Curriculum (RFC §12.1 step 4).
-  // curriculumId null => filter tahun saja (jalur backward-compat tanpa skop kurikulum).
-  async findByAcademicYearAndCurriculum(academicYearId: string, curriculumId: string | null): Promise<Class[]> {
+  // WO-20 MI-4 — skop kurikulum WAJIB (tidak ada jalur tanpa kurikulum).
+  async findByAcademicYearAndCurriculum(academicYearId: string, curriculumId: string): Promise<Class[]> {
     return this.prisma.class.findMany({
       where: {
         academicYearId,
-        ...(curriculumId ? { curriculumId } : {})
+        curriculumId
       },
       orderBy: { parallel: 'asc' }
     })

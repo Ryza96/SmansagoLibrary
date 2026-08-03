@@ -19,6 +19,7 @@ import type {
   MemberImportStage,
 } from '../../shared/dto/member'
 import type { ImportCellValue, ImportErrorCode } from '../../types/import'
+import type { AcademicYearDTO, CurriculumDTO } from '../../shared/dto/academic'
 import { validateImportFile, getImportErrorMessage } from '../../utils/bookImport'
 import { normalizeMemberImportRow } from '../../shared/utils/member-import-normalization'
 
@@ -148,7 +149,36 @@ export default function MemberImportDialog({ onClose }: MemberImportDialogProps)
   const [importResult, setImportResult] = useState<MemberImportResultDTO | null>(null)
   const [importSystemError, setImportSystemError] = useState('')
   const [progress, setProgress] = useState<MemberImportProgressEvent | null>(null)
+  const [academicYears, setAcademicYears] = useState<AcademicYearDTO[]>([])
+  const [curricula, setCurricula] = useState<CurriculumDTO[]>([])
+  const [academicYearId, setAcademicYearId] = useState('')
+  const [curriculumId, setCurriculumId] = useState('')
+  const [scopeLoading, setScopeLoading] = useState(true)
+  const [scopeLoadError, setScopeLoadError] = useState('')
+  const [scopeHint, setScopeHint] = useState('')
   const unsubscribeRef = useRef<(() => void) | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    Promise.all([window.electronAPI.academicYears.findMany(), window.electronAPI.curricula.findMany()])
+      .then(([yearsResult, curriculaResult]) => {
+        if (cancelled) return
+        setAcademicYears(yearsResult.data)
+        setCurricula(curriculaResult.data)
+        const activeYear = yearsResult.data.find((year) => year.isActive)
+        setAcademicYearId(activeYear?.id ?? '')
+      })
+      .catch(() => {
+        if (cancelled) return
+        setScopeLoadError(LABELS.MEMBER_IMPORT.SCOPE_LOAD_ERROR)
+      })
+      .finally(() => {
+        if (!cancelled) setScopeLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   useEffect(() => {
     return () => {
@@ -169,6 +199,26 @@ export default function MemberImportDialog({ onClose }: MemberImportDialogProps)
     unsubscribeRef.current = null
   }
 
+  async function runPreview(rows: ParsedMemberRow[], yearId: string, curriculumIdValue: string) {
+    setPreviewChecking(true)
+    setPreviewResult(null)
+    setPreviewError('')
+    setImportResult(null)
+    setImportSystemError('')
+    setProgress(null)
+    try {
+      const previewDto = await window.electronAPI.memberImport.previewCheck(toMemberImportRows(rows), {
+        academicYearId: yearId,
+        curriculumId: curriculumIdValue
+      })
+      setPreviewResult(memberPreviewService.buildPreview(rows, previewDto))
+    } catch {
+      setPreviewError(LABELS.MEMBER_IMPORT.PREVIEW_SYSTEM_ERROR)
+    } finally {
+      setPreviewChecking(false)
+    }
+  }
+
   async function handleFileChange(next: File | null) {
     setFile(next)
     setParsedRows([])
@@ -183,21 +233,42 @@ export default function MemberImportDialog({ onClose }: MemberImportDialogProps)
     setFileErrorCode(code)
     if (code) return
     setParsing(true)
-    setPreviewChecking(true)
     try {
       const rows = await memberExcelParserService.parse(next)
       setParsedRows(rows)
-      try {
-        const previewDto = await window.electronAPI.memberImport.previewCheck(toMemberImportRows(rows))
-        setPreviewResult(memberPreviewService.buildPreview(rows, previewDto))
-      } catch {
-        setPreviewError(LABELS.MEMBER_IMPORT.PREVIEW_SYSTEM_ERROR)
+      if (academicYearId !== '' && curriculumId !== '') {
+        await runPreview(rows, academicYearId, curriculumId)
+      } else {
+        setScopeHint(LABELS.MEMBER_IMPORT.REQUIRE_SCOPE)
       }
     } catch (error) {
       setParseError(error instanceof Error ? error.message : LABELS.MEMBER_IMPORT.PARSE_ERROR)
     } finally {
       setParsing(false)
-      setPreviewChecking(false)
+    }
+  }
+
+  function handleAcademicYearChange(value: string) {
+    setAcademicYearId(value)
+    if (parsedRows.length > 0) {
+      if (value !== '' && curriculumId !== '') {
+        setScopeHint('')
+        runPreview(parsedRows, value, curriculumId)
+      } else {
+        setScopeHint(LABELS.MEMBER_IMPORT.REQUIRE_SCOPE)
+      }
+    }
+  }
+
+  function handleCurriculumChange(value: string) {
+    setCurriculumId(value)
+    if (parsedRows.length > 0) {
+      if (academicYearId !== '' && value !== '') {
+        setScopeHint('')
+        runPreview(parsedRows, academicYearId, value)
+      } else {
+        setScopeHint(LABELS.MEMBER_IMPORT.REQUIRE_SCOPE)
+      }
     }
   }
 
@@ -221,7 +292,10 @@ export default function MemberImportDialog({ onClose }: MemberImportDialogProps)
     setProgress({ stage: 'preparing', current: 0, total: parsedRows.length })
     subscribeProgress()
     try {
-      const result = await window.electronAPI.memberImport.import(toMemberImportRows(parsedRows))
+      const result = await window.electronAPI.memberImport.import(toMemberImportRows(parsedRows), {
+        academicYearId,
+        curriculumId
+      })
       if (result.success) {
         setProgress({ stage: 'completed', current: result.totalRows, total: result.totalRows })
       }
@@ -277,6 +351,48 @@ export default function MemberImportDialog({ onClose }: MemberImportDialogProps)
 
         <div className="p-6 space-y-5 overflow-y-auto">
           <p className="text-sm text-slate-500">{LABELS.MEMBER_IMPORT.SUBTITLE}</p>
+
+          <div>
+            <h4 className="text-sm font-medium text-slate-700 mb-1">{LABELS.MEMBER_IMPORT.SCOPE_TITLE}</h4>
+            <p className="text-sm text-slate-500 mb-4">{LABELS.MEMBER_IMPORT.SCOPE_DESC}</p>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  {LABELS.MEMBER_IMPORT.YEAR} <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={academicYearId}
+                  onChange={(e) => handleAcademicYearChange(e.target.value)}
+                  disabled={scopeLoading || importing}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <option value="">{LABELS.MEMBER_IMPORT.SELECT_YEAR}</option>
+                  {academicYears.map((year) => (
+                    <option key={year.id} value={year.id}>{year.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  {LABELS.MEMBER_IMPORT.CURRICULUM} <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={curriculumId}
+                  onChange={(e) => handleCurriculumChange(e.target.value)}
+                  disabled={scopeLoading || importing}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <option value="">{LABELS.MEMBER_IMPORT.SELECT_CURRICULUM}</option>
+                  {curricula.map((curriculum) => (
+                    <option key={curriculum.id} value={curriculum.id}>{curriculum.name}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            {scopeLoading && <p className="text-xs text-slate-500 mt-2">{LABELS.MEMBER_IMPORT.SCOPE_LOADING}</p>}
+            {scopeLoadError && <p className="text-xs text-red-600 mt-2">{scopeLoadError}</p>}
+            {scopeHint && <p className="text-xs text-amber-600 mt-2">{scopeHint}</p>}
+          </div>
 
           <div>
             <h4 className="text-sm font-medium text-slate-700 mb-1">{LABELS.MEMBER_IMPORT.UPLOAD_STEP_TITLE}</h4>
@@ -427,7 +543,7 @@ export default function MemberImportDialog({ onClose }: MemberImportDialogProps)
                     <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3">
                       <p className="text-sm font-medium text-emerald-700">{LABELS.MEMBER_IMPORT.IMPORT_SUCCESS}</p>
                       <p className="text-xs text-emerald-600 mt-0.5">{LABELS.MEMBER_IMPORT.IMPORT_SUCCESS_DESC}</p>
-                      <div className="mt-3 grid grid-cols-4 gap-3">
+                      <div className="mt-3 grid grid-cols-5 gap-3">
                         <div>
                           <p className="text-xs text-emerald-600">{LABELS.MEMBER_IMPORT.RESULT_TOTAL}</p>
                           <p className="text-lg font-semibold text-emerald-800 tabular-nums">{importResult.totalRows}</p>
@@ -435,6 +551,10 @@ export default function MemberImportDialog({ onClose }: MemberImportDialogProps)
                         <div>
                           <p className="text-xs text-emerald-600">{LABELS.MEMBER_IMPORT.RESULT_CREATED}</p>
                           <p className="text-lg font-semibold text-emerald-800 tabular-nums">{importResult.created}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-amber-600">{LABELS.MEMBER_IMPORT.RESULT_SKIPPED}</p>
+                          <p className="text-lg font-semibold text-amber-700 tabular-nums">{importResult.skipped}</p>
                         </div>
                         <div>
                           <p className="text-xs text-red-600">{LABELS.MEMBER_IMPORT.RESULT_FAILED}</p>

@@ -3,7 +3,6 @@ import { MemberClassResolver } from '../src/main/services/member-class-resolver.
 import { MemberDuplicateChecker } from '../src/main/services/member-duplicate-checker.service'
 import { MemberRepository } from '../src/main/repositories/member.repository'
 import { EnrollmentRepository } from '../src/main/repositories/enrollment.repository'
-import { AcademicYearRepository } from '../src/main/repositories/academic-year.repository'
 import { ClassRepository } from '../src/main/repositories/class.repository'
 import { NumberGeneratorService } from '../src/main/services/number-generator.service'
 import { getPrisma } from '../src/main/repositories/base/prisma'
@@ -56,7 +55,7 @@ async function main(): Promise<void> {
   const prisma = getPrisma()
   const memberRepo = new MemberRepository()
   const enrollmentRepo = new EnrollmentRepository()
-  const classResolver = new MemberClassResolver(new AcademicYearRepository(), new ClassRepository())
+  const classResolver = new MemberClassResolver(new ClassRepository())
 
   function makeService(enrollmentRepoImpl: EnrollmentRepository): MemberImportService {
     return new MemberImportService(
@@ -158,14 +157,14 @@ async function main(): Promise<void> {
   expectEqual('0 member tersimpan (rollback)', afterMembers, beforeMembers)
   expectEqual('0 enrollment tersimpan (rollback)', afterEnrollments, beforeEnrollments)
 
-  console.log('--- STEP 6: backward-compat tanpa scope -> enrollment tahun aktif ---')
-  const res3 = await service.import([row(6, 'X A', '3004')])
-  expectEqual('import tanpa scope success', res3.success, true)
+  console.log('--- STEP 6: scope WAJIB (WO-20 MI-4) — tahun scope dihormati, bukan fallback tahun aktif ---')
+  const res3 = await service.import([row(6, 'X A', '3004')], { scope: { academicYearId: yearB.id, curriculumId: k1.id } })
+  expectEqual('import scope yearB success', res3.success, true)
   const member4 = await prisma.member.findFirst({ where: { nisn: '3004' } })
   const hist4 = await enrollmentRepo.findManyByMember(member4!.id)
   expectEqual('histori 4: 1 baris', hist4.length, 1)
-  check('histori 4: academicYearId == yearA (tahun aktif)', hist4[0]?.academicYearId === yearA.id)
-  check('histori 4: classId == classA', hist4[0]?.classId === classA.id)
+  check('histori 4: academicYearId == yearB (scope, bukan tahun aktif)', hist4[0]?.academicYearId === yearB.id)
+  check('histori 4: classId == classD', hist4[0]?.classId === classD.id)
   expectEqual('member4.classId null', member4?.classId, null)
 
   await prisma.$disconnect()

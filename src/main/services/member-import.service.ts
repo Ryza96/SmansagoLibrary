@@ -43,9 +43,9 @@ import { ACADEMIC_STATUS } from '../../shared/config/academic-status'
  *   - Member.classId TIDAK LAGI ditulis (nilai null di kolom).
  *   - writePhase menulis Member + MemberEnrollment(ACTIVE) dalam SATU
  *     $transaction yang sama. MemberEnrollment = Source of Truth penempatan
- *     kelas. academicYearId enrollment = tahun yang DIPAKAI resolver
- *     (classResult.academicYearId, termasuk fallback tahun aktif) sehingga
- *     tahun enrollment selalu sama dengan tahun resolusi kelas.
+ *     kelas. academicYearId enrollment = scope.academicYearId (WO-20 MI-4:
+ *     scope WAJIB, tidak ada fallback tahun aktif implicit) sehingga tahun
+ *     enrollment selalu sama dengan tahun resolusi kelas.
  *   - Invarian "tidak ada Member tanpa Enrollment": commit sekali di akhir;
  *     bila createMany enrollment gagal (exception apa pun) -> rollback penuh
  *     -> 0 Member + 0 Enrollment tersimpan.
@@ -74,9 +74,9 @@ interface MemberImportPreflight {
   errors: MemberImportPreviewIssue[]
   warnings: MemberImportPreviewIssue[]
   classIdByRow: Map<number, string>
-  // WO-18 MI-2 — tahun ajaran efektif hasil resolusi (termasuk fallback tahun
-  // aktif). Dipakai writePhase untuk MemberEnrollment.academicYearId.
-  academicYearId: string | null
+  // WO-18 MI-2 — tahun ajaran scope eksplisit (nilai yang DIPAKAI resolver).
+  // Dipakai writePhase untuk MemberEnrollment.academicYearId.
+  academicYearId: string
   // WO-19 MI-3 — routing per baris + id member existing (untuk enrollment-only).
   routingByRow: Map<number, RowRouting>
   existingMemberIdByRow: Map<number, string>
@@ -97,10 +97,10 @@ export class MemberImportService {
     return this.importRunning
   }
 
-  // WO-17 MI-1: scope (academicYearId + curriculumId) opsional — bila tidak diberikan
-  // (UI import lama), resolver memakai tahun ajaran aktif tanpa filter kurikulum
-  // (backward-compat). UI MI-2 akan selalu mengirim scope eksplisit.
-  async previewCheck(rows: MemberImportRowInput[], scope?: MemberImportScope): Promise<MemberImportPreviewDTO> {
+  // WO-17 MI-1 / WO-20 MI-4: scope (academicYearId + curriculumId) WAJIB —
+  // UI MI-4 selalu mengirim scope eksplisit; fallback tahun aktif implicit
+  // dihapus (resolver tidak lagi menerima null).
+  async previewCheck(rows: MemberImportRowInput[], scope: MemberImportScope): Promise<MemberImportPreviewDTO> {
     const preflight = await this.preflight(normalizeMemberImportRows(rows), scope)
     return {
       valid: preflight.errors.length === 0,
@@ -113,7 +113,7 @@ export class MemberImportService {
 
   async import(
     rows: MemberImportRowInput[],
-    options?: { onProgress?: (event: MemberImportProgressEvent) => void; scope?: MemberImportScope }
+    options: { scope: MemberImportScope; onProgress?: (event: MemberImportProgressEvent) => void }
   ): Promise<MemberImportResultDTO> {
     const startedAt = Date.now()
     const normalized = normalizeMemberImportRows(rows)
@@ -127,9 +127,9 @@ export class MemberImportService {
     this.importRunning = true
     let preflight: MemberImportPreflight | null = null
     try {
-      options?.onProgress?.({ stage: 'preparing', current: 0, total: normalized.length })
+      options.onProgress?.({ stage: 'preparing', current: 0, total: normalized.length })
 
-      preflight = await this.preflight(normalized, options?.scope, options?.onProgress)
+      preflight = await this.preflight(normalized, options.scope, options.onProgress)
 
       if (preflight.errors.length > 0) {
         return {
@@ -148,16 +148,16 @@ export class MemberImportService {
       // createManyWithTx (MemberRepository, chunked) + createManyWithTx
       // (EnrollmentRepository, ACTIVE) DI DALAM tx yang sama.
       // Commit sekali di akhir oleh prisma.$transaction.
-      options?.onProgress?.({ stage: 'generating-number', current: 0, total: normalized.length })
+      options.onProgress?.({ stage: 'generating-number', current: 0, total: normalized.length })
       const writeResult = await this.writePhase(
         normalized,
         preflight.routingByRow,
         preflight.existingMemberIdByRow,
         preflight.classIdByRow,
         preflight.academicYearId,
-        options?.onProgress
+        options.onProgress
       )
-      options?.onProgress?.({ stage: 'completed', current: normalized.length, total: normalized.length })
+      options.onProgress?.({ stage: 'completed', current: normalized.length, total: normalized.length })
 
       return {
         success: true,
@@ -192,7 +192,7 @@ export class MemberImportService {
 
   private async preflight(
     rows: readonly MemberImportRowInput[],
-    scope?: MemberImportScope,
+    scope: MemberImportScope,
     onProgress?: (event: MemberImportProgressEvent) => void
   ): Promise<MemberImportPreflight> {
     const total = rows.length
@@ -202,11 +202,7 @@ export class MemberImportService {
     onProgress?.({ stage: 'checking-duplicate', current: total, total })
 
     onProgress?.({ stage: 'resolving-class', current: 0, total })
-    const classResult = await this.classResolver.resolve(
-      rows,
-      scope?.academicYearId ?? null,
-      scope?.curriculumId ?? null
-    )
+    const classResult = await this.classResolver.resolve(rows, scope.academicYearId, scope.curriculumId)
     onProgress?.({ stage: 'resolving-class', current: total, total })
 
     const errors: MemberImportPreviewIssue[] = []
@@ -251,30 +247,24 @@ export class MemberImportService {
     const existingMemberIds = Array.from(
       new Set(Array.from(duplicateResult.existingByRow.values(), (info) => info.id))
     )
-    const activeMemberIds =
-      classResult.academicYearId !== null
-        ? await this.enrollmentRepository.findMemberIdsActiveInYear(existingMemberIds, classResult.academicYearId)
-        : new Set<string>()
+    const activeMemberIds = await this.enrollmentRepository.findMemberIdsActiveInYear(
+      existingMemberIds,
+      classResult.academicYearId
+    )
 
     for (const row of rows) {
       if (blockRows.has(row.rowNumber)) continue
 
       const existing = duplicateResult.existingByRow.get(row.rowNumber)
       if (existing) {
-        if (classResult.academicYearId !== null && activeMemberIds.has(existing.id)) {
+        if (activeMemberIds.has(existing.id)) {
           // Strategi A — Skip & flag (RFC §12.2): sudah terdaftar tahun itu.
           routingByRow.set(row.rowNumber, 'skip')
-        } else if (classResult.academicYearId !== null) {
+        } else {
           // PO #5 — impor tahunan: member lama masuk tahun baru -> hanya
           // enrollment (tanpa membuat Member baru, tanpa dua ACTIVE).
           routingByRow.set(row.rowNumber, 'enrollment-only')
           existingMemberIdByRow.set(row.rowNumber, existing.id)
-        } else {
-          // NISN existing TAPI tahun tidak tersedia -> classResult.academicYearId
-          // null hanya bila semua baris classNotFound; baris yang error kelas
-          // sudah diblokir di atas, jadi jalur ini praktis tak tercapai.
-          // Defensif: jangan tulis enrollment tanpa tahun.
-          routingByRow.set(row.rowNumber, 'skip')
         }
       } else {
         routingByRow.set(row.rowNumber, 'create-member')
@@ -304,15 +294,9 @@ export class MemberImportService {
     routingByRow: Map<number, RowRouting>,
     existingMemberIdByRow: Map<number, string>,
     classIdByRow: Map<number, string>,
-    academicYearId: string | null,
+    academicYearId: string,
     _onProgress?: (event: MemberImportProgressEvent) => void
   ): Promise<{ created: number; skipped: number }> {
-    if (academicYearId === null) {
-      // Tidak mungkin terjadi saat preflight.errors kosong (tanpa tahun semua
-      // baris classNotFound). Guard defensif: jangan tulis Member tanpa tahun.
-      throw new Error('MemberImportService: academic year tidak tersedia untuk enrollment')
-    }
-
     return runTransaction(getPrisma(), async (tx) => {
       const createRows = rows.filter((row) => routingByRow.get(row.rowNumber) === 'create-member')
       const enrollmentOnlyRows = rows.filter((row) => routingByRow.get(row.rowNumber) === 'enrollment-only')
