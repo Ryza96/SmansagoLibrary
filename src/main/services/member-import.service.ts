@@ -11,10 +11,12 @@ import { MemberDuplicateChecker } from './member-duplicate-checker.service'
 import { MemberClassResolver } from './member-class-resolver.service'
 import { NumberGeneratorService } from './number-generator.service'
 import { MemberRepository } from '../repositories/member.repository'
+import { EnrollmentRepository } from '../repositories/enrollment.repository'
 import { getPrisma } from '../repositories/base/prisma'
 import { runTransaction } from '../repositories/base/transaction'
 import { normalizeMemberImportRows } from '../../shared/utils/member-import-normalization'
 import { MEMBER_TYPES } from '../../shared/config/member-type'
+import { ACADEMIC_STATUS } from '../../shared/config/academic-status'
 
 /*
  * Orchestrator import anggota (WO-5 P4C — Transaction & Database Write).
@@ -37,6 +39,17 @@ import { MEMBER_TYPES } from '../../shared/config/member-type'
  *   - P2002 (unique constraint) -> MemberImportResultDTO success:false,
  *     TIDAK di-throw (kasus bisnis -> result object).
  *
+ * Scope WO-18 MI-2 (impor berorientasi enrollment — RFC §12.1 step 5):
+ *   - Member.classId TIDAK LAGI ditulis (nilai null di kolom).
+ *   - writePhase menulis Member + MemberEnrollment(ACTIVE) dalam SATU
+ *     $transaction yang sama. MemberEnrollment = Source of Truth penempatan
+ *     kelas. academicYearId enrollment = tahun yang DIPAKAI resolver
+ *     (classResult.academicYearId, termasuk fallback tahun aktif) sehingga
+ *     tahun enrollment selalu sama dengan tahun resolusi kelas.
+ *   - Invarian "tidak ada Member tanpa Enrollment": commit sekali di akhir;
+ *     bila createMany enrollment gagal (exception apa pun) -> rollback penuh
+ *     -> 0 Member + 0 Enrollment tersimpan.
+ *
  * Kontrak lempar-vs-return (RFC §3.2 / §9):
  *   - Kasus bisnis (preflight blocker, P2002 saat commit, single-flight)
  *     -> RESULT OBJECT.
@@ -52,6 +65,9 @@ interface MemberImportPreflight {
   errors: MemberImportPreviewIssue[]
   warnings: MemberImportPreviewIssue[]
   classIdByRow: Map<number, string>
+  // WO-18 MI-2 — tahun ajaran efektif hasil resolusi (termasuk fallback tahun
+  // aktif). Dipakai writePhase untuk MemberEnrollment.academicYearId.
+  academicYearId: string | null
 }
 
 export class MemberImportService {
@@ -61,7 +77,8 @@ export class MemberImportService {
     private readonly duplicateChecker: MemberDuplicateChecker,
     private readonly classResolver: MemberClassResolver,
     private readonly numberGenerator: NumberGeneratorService,
-    private readonly memberRepository: MemberRepository
+    private readonly memberRepository: MemberRepository,
+    private readonly enrollmentRepository: EnrollmentRepository
   ) {}
 
   isImportRunning(): boolean {
@@ -115,10 +132,16 @@ export class MemberImportService {
       }
 
       // SATU transaksi: allocateMemberNumbers (NumberGeneratorService) +
-      // createManyWithTx (MemberRepository, chunked) DI DALAM tx yang sama.
+      // createManyWithTx (MemberRepository, chunked) + createManyWithTx
+      // (EnrollmentRepository, ACTIVE) DI DALAM tx yang sama.
       // Commit sekali di akhir oleh prisma.$transaction.
       options?.onProgress?.({ stage: 'generating-number', current: 0, total: normalized.length })
-      const created = await this.writePhase(normalized, preflight.classIdByRow, options?.onProgress)
+      const created = await this.writePhase(
+        normalized,
+        preflight.classIdByRow,
+        preflight.academicYearId,
+        options?.onProgress
+      )
       options?.onProgress?.({ stage: 'completed', current: normalized.length, total: normalized.length })
 
       return {
@@ -195,30 +218,65 @@ export class MemberImportService {
       if (item.classId !== null) classIdByRow.set(item.rowNumber, item.classId)
     }
 
-    return { errors, warnings, classIdByRow }
+    return { errors, warnings, classIdByRow, academicYearId: classResult.academicYearId }
   }
 
-  // Fase tulis (P4C): SATU $transaction. Alokasi nomor (NumberGeneratorService)
-  // dan createManyWithTx (chunked) memakai objek tx yang sama; commit sekali di
-  // akhir. Exception apa pun -> Prisma ROLLBACK otomatis (all-or-nothing).
+  // Fase tulis (P4C + WO-18 MI-2): SATU $transaction. Alokasi nomor
+  // (NumberGeneratorService), createMany Member (tanpa classId) dan
+  // createMany MemberEnrollment(ACTIVE) memakai objek tx yang sama; commit
+  // sekali di akhir. Exception apa pun -> Prisma ROLLBACK otomatis
+  // (all-or-nothing) -> TIDAK ada Member tanpa Enrollment.
   private async writePhase(
     rows: MemberImportRowInput[],
     classIdByRow: Map<number, string>,
+    academicYearId: string | null,
     _onProgress?: (event: MemberImportProgressEvent) => void
   ): Promise<number> {
+    if (academicYearId === null) {
+      // Tidak mungkin terjadi saat preflight.errors kosong (tanpa tahun semua
+      // baris classNotFound). Guard defensif: jangan tulis Member tanpa tahun.
+      throw new Error('MemberImportService: academic year tidak tersedia untuk enrollment')
+    }
+
     return runTransaction(getPrisma(), async (tx) => {
       const numbers = await this.numberGenerator.allocateMemberNumbers(tx, rows.length, MEMBER_TYPES.student.code)
-      const payload = this.buildPayload(rows, classIdByRow, numbers)
-      await this.memberRepository.createManyWithTx(tx, payload)
-      return payload.length
+      const memberPayload = this.buildMemberPayload(rows, numbers)
+      await this.memberRepository.createManyWithTx(tx, memberPayload)
+
+      const createdMembers = await tx.member.findMany({
+        where: { memberNumber: { in: numbers } },
+        select: { id: true, memberNumber: true }
+      })
+      const idByNumber = new Map(createdMembers.map((member) => [member.memberNumber, member.id]))
+
+      const enrollments = rows.map((row, index) => {
+        const memberNumber = numbers[index]
+        const memberId = memberNumber === undefined ? undefined : idByNumber.get(memberNumber)
+        if (memberNumber === undefined || memberId === undefined) {
+          throw new Error('MemberImportService: enrollment member lookup mismatch')
+        }
+        const classId = classIdByRow.get(row.rowNumber)
+        if (classId === undefined) {
+          throw new Error('MemberImportService: enrollment class lookup mismatch')
+        }
+        return {
+          memberId,
+          classId,
+          academicYearId,
+          status: ACADEMIC_STATUS.active,
+          note: null
+        }
+      })
+
+      await this.enrollmentRepository.createManyWithTx(tx, enrollments)
+      return enrollments.length
     })
   }
 
-  private buildPayload(
-    rows: MemberImportRowInput[],
-    classIdByRow: Map<number, string>,
-    numbers: string[]
-  ): Prisma.MemberCreateManyInput[] {
+  // MemberCreateManyInput TANPA classId (WO-18 MI-2): MemberEnrollment adalah
+  // Source of Truth penempatan kelas. Member.status tetap INACTIVE (RFC §12.1
+  // step 5); status keanggotaan tidak diubah di sini.
+  private buildMemberPayload(rows: MemberImportRowInput[], numbers: string[]): Prisma.MemberCreateManyInput[] {
     return rows.map((row, index) => {
       const memberNumber = numbers[index]
       if (memberNumber === undefined) {
@@ -235,7 +293,6 @@ export class MemberImportService {
         address: row.address,
         phone: row.phone,
         email: row.email,
-        classId: classIdByRow.get(row.rowNumber) ?? null,
         status: 'INACTIVE'
       }
     })

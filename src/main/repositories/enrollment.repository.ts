@@ -1,6 +1,7 @@
 import { BaseRepository } from './base/base.repository'
 import type { Prisma } from '@prisma/client'
 import { ACADEMIC_STATUS } from '../../shared/config/academic-status'
+import { IMPORT_CONFIG } from '../../config/import.config'
 
 type CreateEnrollmentData = Pick<import('@prisma/client').MemberEnrollment, 'memberId' | 'classId' | 'academicYearId'> & {
   status: string
@@ -60,5 +61,16 @@ export class EnrollmentRepository extends BaseRepository {
     return this.prisma.memberEnrollment.count({
       where: { classId, status: ACADEMIC_STATUS.active, leftAt: null }
     })
+  }
+
+  // WO-18 MI-2 — tulis batch enrollment DI DALAM transaksi yang sama dengan
+  // createMany Member (import). Chunked sama seperti MemberRepository. Satu
+  // commit di akhir oleh prisma.$transaction — exception apa pun = rollback
+  // penuh (tidak ada Member tanpa Enrollment, dan sebaliknya).
+  async createManyWithTx(tx: Prisma.TransactionClient, rows: Prisma.MemberEnrollmentCreateManyInput[]): Promise<void> {
+    const chunk = IMPORT_CONFIG.MEMBER_IMPORT_WRITE_CHUNK
+    for (let i = 0; i < rows.length; i += chunk) {
+      await tx.memberEnrollment.createMany({ data: rows.slice(i, i + chunk) })
+    }
   }
 }

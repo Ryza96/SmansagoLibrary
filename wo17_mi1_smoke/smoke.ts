@@ -5,6 +5,7 @@ import { MemberRepository } from '../src/main/repositories/member.repository'
 import { NumberGeneratorService } from '../src/main/services/number-generator.service'
 import { MemberDuplicateChecker } from '../src/main/services/member-duplicate-checker.service'
 import { MemberImportService } from '../src/main/services/member-import.service'
+import { EnrollmentRepository } from '../src/main/repositories/enrollment.repository'
 import { getPrisma } from '../src/main/repositories/base/prisma'
 import type { MemberImportRowInput, MemberImportScope } from '../src/shared/dto/member'
 
@@ -37,11 +38,13 @@ async function main(): Promise<void> {
   const prisma = getPrisma()
   const classResolver = new MemberClassResolver(new AcademicYearRepository(), new ClassRepository())
   const memberRepo = new MemberRepository()
+  const enrollmentRepo = new EnrollmentRepository()
   const memberImportService = new MemberImportService(
     new MemberDuplicateChecker(memberRepo),
     classResolver,
     new NumberGeneratorService(memberRepo),
-    memberRepo
+    memberRepo,
+    enrollmentRepo
   )
 
   console.log('--- STEP 0: seed master (fresh DB) ---')
@@ -123,26 +126,34 @@ async function main(): Promise<void> {
   expectEqual('preview invalid (classNotFound)', p2.valid, false)
   expectEqual('preview error classNotFound', p2.errors[0]?.messageKey, 'memberImport.classNotFound')
 
-  console.log('--- STEP 9: import dengan scope menulis classId dari skop pilihan ---')
+  console.log('--- STEP 9: import dengan scope -> resolusi kelas (MI-2: via enrollment, Member.classId tidak ditulis) ---')
   const i1 = await memberImportService.import([row(1, 'X A', '2001')], { scope: { academicYearId: yearA.id, curriculumId: k1.id } })
   expectEqual('import k1 success', i1.success, true)
   expectEqual('import k1 created 1', i1.created, 1)
   const m1 = await prisma.member.findFirst({ where: { nisn: '2001' } })
-  expectEqual('member.classId == classA (bukan classC)', m1?.classId, classA.id)
+  expectEqual('member.classId TIDAK ditulis (null)', m1?.classId, null)
   expectEqual('member.status INACTIVE', m1?.status, 'INACTIVE')
   expectEqual('member.memberNumber ter-generate', m1?.memberNumber, 'S-000001')
+  const en1 = await enrollmentRepo.findActiveByMember(m1!.id)
+  check('enrollment.classId == classA (resolusi skop k1)', en1?.classId === classA.id)
+  check('enrollment academicYearId == yearA', en1?.academicYearId === yearA.id)
 
   console.log('--- STEP 10: import backward-compat tanpa scope -> tahun aktif ---')
   const i2 = await memberImportService.import([row(2, 'X B', '2002')])
   expectEqual('import tanpa scope success', i2.success, true)
   const m2 = await prisma.member.findFirst({ where: { nisn: '2002' } })
-  expectEqual('tanpa scope -> classB (tahun aktif, X B unik)', m2?.classId, classB.id)
+  expectEqual('member.classId null (tanpa scope)', m2?.classId, null)
+  const en2 = await enrollmentRepo.findActiveByMember(m2!.id)
+  check('tanpa scope -> enrollment.classId == classB (tahun aktif, X B unik)', en2?.classId === classB.id)
+  check('enrollment2 academicYearId == yearA (tahun aktif)', en2?.academicYearId === yearA.id)
 
-  console.log('--- STEP 11: import scope kurikulum lain menulis kelas kurikulum itu ---')
+  console.log('--- STEP 11: import scope kurikulum lain -> enrollment kelas kurikulum itu ---')
   const i3 = await memberImportService.import([row(3, 'X A', '2003')], { scope: { academicYearId: yearA.id, curriculumId: k2.id } })
   expectEqual('import k2 success', i3.success, true)
   const m3 = await prisma.member.findFirst({ where: { nisn: '2003' } })
-  expectEqual('scope k2 -> classC', m3?.classId, classC.id)
+  expectEqual('member.classId null (scope k2)', m3?.classId, null)
+  const en3 = await enrollmentRepo.findActiveByMember(m3!.id)
+  check('scope k2 -> enrollment.classId == classC', en3?.classId === classC.id)
 
   console.log('--- STEP 12: import dengan classNotFound -> result success:false, 0 created ---')
   const i4 = await memberImportService.import([row(4, 'XI C', '2004')], { scope: { academicYearId: yearA.id, curriculumId: k1.id } })

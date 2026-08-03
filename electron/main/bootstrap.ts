@@ -115,7 +115,8 @@ export function createContainer(): Container {
     memberDuplicateChecker,
     memberClassResolver,
     numberGeneratorService,
-    newMemberRepository
+    newMemberRepository,
+    enrollmentRepository
   )
 
   const matchingEngine = new MatchingEngineService(createProductionStrategies())

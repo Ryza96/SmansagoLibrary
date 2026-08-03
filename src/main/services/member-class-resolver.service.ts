@@ -45,6 +45,11 @@ export interface MemberClassResolutionIssue {
 export interface MemberClassResolutionResult {
   items: MemberClassResolutionItem[]
   errors: MemberClassResolutionIssue[]
+  // WO-18 MI-2 — tahun ajaran yang AKHIRNYA dipakai resolver (termasuk hasil
+  // fallback ke tahun aktif saat academicYearId null). Konsumen write-phase
+  // memakai nilai ini untuk MemberEnrollment.academicYearId agar tahun
+  // enrollment SELALU sama dengan tahun resolusi kelas (SSOT resolusi).
+  academicYearId: string | null
 }
 
 function normalizeParallel(value: string): string {
@@ -89,7 +94,8 @@ export class MemberClassResolver {
           rowNumber: row.rowNumber,
           className: row.className,
           messageKey: MEMBER_CLASS_NOT_FOUND_MESSAGE_KEY
-        }))
+        })),
+        academicYearId: null
       }
     }
 
@@ -132,6 +138,6 @@ export class MemberClassResolver {
       items.push({ rowNumber: row.rowNumber, className, classId: candidates[0].id })
     }
 
-    return { items, errors }
+    return { items, errors, academicYearId: yearId }
   }
 }
