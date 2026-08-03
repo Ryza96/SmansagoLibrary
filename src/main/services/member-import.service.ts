@@ -3,7 +3,8 @@ import type {
   MemberImportPreviewIssue,
   MemberImportProgressEvent,
   MemberImportResultDTO,
-  MemberImportRowInput
+  MemberImportRowInput,
+  MemberImportScope
 } from '../../shared/dto/member'
 import type { Prisma } from '@prisma/client'
 import { MemberDuplicateChecker } from './member-duplicate-checker.service'
@@ -67,8 +68,11 @@ export class MemberImportService {
     return this.importRunning
   }
 
-  async previewCheck(rows: MemberImportRowInput[]): Promise<MemberImportPreviewDTO> {
-    const preflight = await this.preflight(normalizeMemberImportRows(rows))
+  // WO-17 MI-1: scope (academicYearId + curriculumId) opsional — bila tidak diberikan
+  // (UI import lama), resolver memakai tahun ajaran aktif tanpa filter kurikulum
+  // (backward-compat). UI MI-2 akan selalu mengirim scope eksplisit.
+  async previewCheck(rows: MemberImportRowInput[], scope?: MemberImportScope): Promise<MemberImportPreviewDTO> {
+    const preflight = await this.preflight(normalizeMemberImportRows(rows), scope)
     return {
       valid: preflight.errors.length === 0,
       errorCount: preflight.errors.length,
@@ -80,7 +84,7 @@ export class MemberImportService {
 
   async import(
     rows: MemberImportRowInput[],
-    options?: { onProgress?: (event: MemberImportProgressEvent) => void }
+    options?: { onProgress?: (event: MemberImportProgressEvent) => void; scope?: MemberImportScope }
   ): Promise<MemberImportResultDTO> {
     const startedAt = Date.now()
     const normalized = normalizeMemberImportRows(rows)
@@ -96,7 +100,7 @@ export class MemberImportService {
     try {
       options?.onProgress?.({ stage: 'preparing', current: 0, total: normalized.length })
 
-      preflight = await this.preflight(normalized, options?.onProgress)
+      preflight = await this.preflight(normalized, options?.scope, options?.onProgress)
 
       if (preflight.errors.length > 0) {
         return {
@@ -148,6 +152,7 @@ export class MemberImportService {
 
   private async preflight(
     rows: readonly MemberImportRowInput[],
+    scope?: MemberImportScope,
     onProgress?: (event: MemberImportProgressEvent) => void
   ): Promise<MemberImportPreflight> {
     const total = rows.length
@@ -157,7 +162,11 @@ export class MemberImportService {
     onProgress?.({ stage: 'checking-duplicate', current: total, total })
 
     onProgress?.({ stage: 'resolving-class', current: 0, total })
-    const classResult = await this.classResolver.resolve(rows)
+    const classResult = await this.classResolver.resolve(
+      rows,
+      scope?.academicYearId ?? null,
+      scope?.curriculumId ?? null
+    )
     onProgress?.({ stage: 'resolving-class', current: total, total })
 
     const errors: MemberImportPreviewIssue[] = []

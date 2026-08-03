@@ -3,7 +3,7 @@ import fs from 'fs'
 import path from 'path'
 import type { MemberService } from '../../src/main/services/member.service'
 import type { MemberImportService } from '../../src/main/services/member-import.service'
-import type { CreateMemberDTO, MemberImportRowInput, UpdateMemberDTO } from '../../src/shared/dto/member'
+import type { CreateMemberDTO, MemberImportRowInput, MemberImportScope, UpdateMemberDTO } from '../../src/shared/dto/member'
 import type { DownloadTemplateResult } from '../../src/types/import'
 
 const TEMPLATE_FILE_NAME = 'Template_Import_Anggota_v1.0.xlsx'
@@ -69,12 +69,13 @@ export function registerMemberHandlers(memberService: MemberService, memberImpor
 
   ipcMain.handle('members:downloadTemplate', (event) => downloadTemplate(event))
 
-  ipcMain.handle('members:previewCheck', async (_event, rows: MemberImportRowInput[]) =>
-    memberImportService.previewCheck(rows)
+  ipcMain.handle('members:previewCheck', async (_event, rows: MemberImportRowInput[], scope?: MemberImportScope) =>
+    memberImportService.previewCheck(rows, scope)
   )
 
-  ipcMain.handle('members:import', async (event, rows: MemberImportRowInput[]) =>
+  ipcMain.handle('members:import', async (event, rows: MemberImportRowInput[], scope?: MemberImportScope) =>
     memberImportService.import(rows, {
+      scope,
       onProgress: (progress) => event.sender.send('members:importProgress', progress)
     })
   )

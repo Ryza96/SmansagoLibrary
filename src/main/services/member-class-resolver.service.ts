@@ -5,7 +5,7 @@ import type { MemberImportRowInput } from '../../shared/dto/member'
 import { EDUCATION_LEVELS } from '../../shared/config/education-level'
 
 /*
- * Class Resolver untuk import anggota (RFC v2 §6).
+ * Class Resolver untuk import anggota (RFC v2 §6, §12.1; WBS WO-17 MI-1).
  *
  * Aturan (keputusan PO #5):
  *   - DILARANG auto-create kelas. Data master (AcademicYear, Curriculum,
@@ -13,18 +13,18 @@ import { EDUCATION_LEVELS } from '../../shared/config/education-level'
  *   - Kelas tidak ditemukan / ambigu  -> BLOCKER -> import gagal.
  *   - Error WAJIB memuat nama kelas (className) yang gagal dicari.
  *
+ * Skop eksplisit (RFC §12.1 step 4 — MI-1):
+ *   - resolve(rows, academicYearId, curriculumId) hanya mencari Class pada
+ *     KOMBINASI AcademicYear + Curriculum.
+ *   - academicYearId null  -> fallback tahun ajaran AKTIF (jalur backward-compat
+ *     UI import lama yang belum memilih scope; UI MI-2 selalu mengirim tahun).
+ *   - curriculumId null    -> filter tahun saja (tanpa kurikulum); bila satu nama
+ *     kelas ada di beberapa kurikulum tahun yang sama -> classAmbiguous (BLOCKER).
+ *
  * Strategi batch (RFC §6.3):
- *   - findActive (1 query) -> tahun ajaran aktif, null -> semua baris
- *     classNotFound.
- *   - findByAcademicYear (1 query) -> SELURUH kelas tahun aktif, lalu
- *     bangun Map<key, Class[]> di memori.
+ *   - 1 query kelas tahun+kurikulum -> Map<key, Class[]> di memori.
  *   - Per baris: lookup map -> 1 kelas = classId; 0 kelas = classNotFound;
- *     >1 kelas = classAmbiguous.
- *
- * Tidak ada query per baris. Tidak ada tulis.
- *
- * API publik ini dipakai oleh P4 (MemberImportService / preflight) —
- * P4 belum dikerjakan.
+ *     >1 kelas = classAmbiguous. Tidak ada query per baris. Tidak ada tulis.
  */
 
 export const MEMBER_CLASS_NOT_FOUND_MESSAGE_KEY = 'memberImport.classNotFound'
@@ -75,15 +75,25 @@ export class MemberClassResolver {
     private classRepository: ClassRepository
   ) {}
 
-  async resolve(rows: readonly MemberImportRowInput[]): Promise<MemberClassResolutionResult> {
-    const items: MemberClassResolutionItem[] = []
-    const errors: MemberClassResolutionIssue[] = []
+  async resolve(
+    rows: readonly MemberImportRowInput[],
+    academicYearId: string | null,
+    curriculumId: string | null
+  ): Promise<MemberClassResolutionResult> {
+    const yearId = academicYearId ?? (await this.academicYearRepository.findActive())?.id ?? null
 
-    const activeYear = await this.academicYearRepository.findActive()
+    if (yearId === null) {
+      return {
+        items: rows.map((row) => ({ rowNumber: row.rowNumber, className: row.className, classId: null })),
+        errors: rows.map((row) => ({
+          rowNumber: row.rowNumber,
+          className: row.className,
+          messageKey: MEMBER_CLASS_NOT_FOUND_MESSAGE_KEY
+        }))
+      }
+    }
 
-    const classes: Class[] = activeYear
-      ? await this.classRepository.findByAcademicYear(activeYear.id)
-      : []
+    const classes = await this.classRepository.findByAcademicYearAndCurriculum(yearId, curriculumId)
     const classMap = new Map<string, Class[]>()
     for (const klass of classes) {
       const key = classKey(klass.educationLevel, klass.parallel)
@@ -92,11 +102,14 @@ export class MemberClassResolver {
       else classMap.set(key, [klass])
     }
 
+    const items: MemberClassResolutionItem[] = []
+    const errors: MemberClassResolutionIssue[] = []
+
     for (const row of rows) {
       const className = row.className
       const parsed = parseClassName(className)
 
-      if (!parsed || !activeYear) {
+      if (!parsed) {
         errors.push({ rowNumber: row.rowNumber, className, messageKey: MEMBER_CLASS_NOT_FOUND_MESSAGE_KEY })
         items.push({ rowNumber: row.rowNumber, className, classId: null })
         continue

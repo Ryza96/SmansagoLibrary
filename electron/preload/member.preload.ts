@@ -1,5 +1,5 @@
 import { ipcRenderer } from 'electron'
-import type { MemberImportProgressEvent, MemberImportRowInput } from '../../src/shared/dto/member'
+import type { MemberImportProgressEvent, MemberImportRowInput, MemberImportScope } from '../../src/shared/dto/member'
 
 export const memberAPI = {
   members: {
@@ -16,10 +16,10 @@ export const memberAPI = {
   },
   memberImport: {
     downloadTemplate: () => ipcRenderer.invoke('members:downloadTemplate'),
-    previewCheck: (rows: MemberImportRowInput[]) =>
-      ipcRenderer.invoke('members:previewCheck', rows),
-    import: (rows: MemberImportRowInput[]) =>
-      ipcRenderer.invoke('members:import', rows),
+    previewCheck: (rows: MemberImportRowInput[], scope?: MemberImportScope) =>
+      ipcRenderer.invoke('members:previewCheck', rows, scope),
+    import: (rows: MemberImportRowInput[], scope?: MemberImportScope) =>
+      ipcRenderer.invoke('members:import', rows, scope),
     onProgress: (callback: (event: MemberImportProgressEvent) => void) => {
       const listener = (_event: Electron.IpcRendererEvent, progress: MemberImportProgressEvent) =>
         callback(progress)
