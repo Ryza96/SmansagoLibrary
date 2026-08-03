@@ -94,7 +94,12 @@ export interface MemberImportPreviewDTO {
 export interface MemberImportResultDTO {
   success: boolean
   totalRows: number
+  // Jumlah MemberEnrollment(ACTIVE) yang DIBUAT (baris yang diproses) —
+  // impor kini berorientasi enrollment (MI-2/MI-3).
   created: number
+  // WO-19 MI-3 — jumlah baris DILEWATI karena member sudah memiliki
+  // enrollment ACTIVE di tahun target (strategi Skip & flag, RFC §12.2).
+  skipped: number
   failed: number
   warnings: number
   durationMs: number

@@ -45,6 +45,18 @@ export class EnrollmentRepository extends BaseRepository {
     })
   }
 
+  // WO-19 MI-3 — batch lookup "sudah ACTIVE di tahun target" untuk BANYAK
+  // member sekaligus (mengikuti aturan performa: dilarang query per baris).
+  // Mengembalikan Set<memberId> yang sudah ACTIVE di tahun tsb.
+  async findMemberIdsActiveInYear(memberIds: string[], academicYearId: string): Promise<Set<string>> {
+    if (memberIds.length === 0) return new Set()
+    const rows = await this.prisma.memberEnrollment.findMany({
+      where: { memberId: { in: memberIds }, academicYearId, status: ACADEMIC_STATUS.active, leftAt: null },
+      select: { memberId: true }
+    })
+    return new Set(rows.map((row) => row.memberId))
+  }
+
   // WO-16 E-4 — riwayat enrollment per member, terbaru terlebih dahulu.
   // "Label historis tak berubah walau rename tahun lain": setiap baris men-join
   // academicYear miliknya sendiri (bukan tahun aktif), sehingga rename tahun lain

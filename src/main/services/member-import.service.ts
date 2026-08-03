@@ -61,6 +61,15 @@ export const MEMBER_IMPORT_CREATE_FAILED_MESSAGE_KEY = 'memberImport.createFaile
 
 const NON_ROW_NUMBER = -1
 
+// WO-19 MI-3 — routing per baris import (RFC §12.1 step 3 + §12.2).
+//   create-member    : member BELUM ada   -> buat Member + Enrollment(ACTIVE).
+//   enrollment-only  : member SUDAH ada, TANPA ACTIVE di tahun target
+//                      -> HANYA buat Enrollment(ACTIVE) (PO #5; impor tahunan).
+//   skip             : member SUDAH ada DAN sudah ACTIVE di tahun target
+//                      -> Strategi A "Skip & flag" (RFC §12.2): baris dilewati,
+//                      histori utuh, tidak ada dua ACTIVE.
+type RowRouting = 'create-member' | 'enrollment-only' | 'skip'
+
 interface MemberImportPreflight {
   errors: MemberImportPreviewIssue[]
   warnings: MemberImportPreviewIssue[]
@@ -68,6 +77,9 @@ interface MemberImportPreflight {
   // WO-18 MI-2 — tahun ajaran efektif hasil resolusi (termasuk fallback tahun
   // aktif). Dipakai writePhase untuk MemberEnrollment.academicYearId.
   academicYearId: string | null
+  // WO-19 MI-3 — routing per baris + id member existing (untuk enrollment-only).
+  routingByRow: Map<number, RowRouting>
+  existingMemberIdByRow: Map<number, string>
 }
 
 export class MemberImportService {
@@ -124,6 +136,7 @@ export class MemberImportService {
           success: false,
           totalRows: normalized.length,
           created: 0,
+          skipped: 0,
           failed: normalized.length,
           warnings: preflight.warnings.length,
           durationMs: Date.now() - startedAt,
@@ -136,8 +149,10 @@ export class MemberImportService {
       // (EnrollmentRepository, ACTIVE) DI DALAM tx yang sama.
       // Commit sekali di akhir oleh prisma.$transaction.
       options?.onProgress?.({ stage: 'generating-number', current: 0, total: normalized.length })
-      const created = await this.writePhase(
+      const writeResult = await this.writePhase(
         normalized,
+        preflight.routingByRow,
+        preflight.existingMemberIdByRow,
         preflight.classIdByRow,
         preflight.academicYearId,
         options?.onProgress
@@ -147,8 +162,9 @@ export class MemberImportService {
       return {
         success: true,
         totalRows: normalized.length,
-        created,
-        failed: normalized.length - created,
+        created: writeResult.created,
+        skipped: writeResult.skipped,
+        failed: normalized.length - writeResult.created - writeResult.skipped,
         warnings: preflight.warnings.length,
         durationMs: Date.now() - startedAt,
         errors: []
@@ -161,6 +177,7 @@ export class MemberImportService {
           success: false,
           totalRows: normalized.length,
           created: 0,
+          skipped: 0,
           failed: normalized.length,
           warnings: preflight?.warnings.length ?? 0,
           durationMs: Date.now() - startedAt,
@@ -195,6 +212,8 @@ export class MemberImportService {
     const errors: MemberImportPreviewIssue[] = []
     const warnings: MemberImportPreviewIssue[] = []
     const classIdByRow = new Map<number, string>()
+    const routingByRow = new Map<number, RowRouting>()
+    const existingMemberIdByRow = new Map<number, string>()
 
     for (const issue of duplicateResult.errors) {
       errors.push({
@@ -218,20 +237,76 @@ export class MemberImportService {
       if (item.classId !== null) classIdByRow.set(item.rowNumber, item.classId)
     }
 
-    return { errors, warnings, classIdByRow, academicYearId: classResult.academicYearId }
+    // WO-19 MI-3 — routing per baris (RFC §12.1 step 3 + §12.2, strategi A).
+    // Urutan: baris dengan error klas tidak dirouting (gagal). Baris dengan
+    // NISN existing -> enrollment-only / skip (cek ACTIVE di tahun target);
+    // selainnya -> create-member.
+    const blockRows = new Set<number>()
+    for (const err of errors) {
+      if (err.rowNumber !== NON_ROW_NUMBER) blockRows.add(err.rowNumber)
+    }
+
+    // Batch lookup: id member existing yang sudah ACTIVE di tahun target
+    // (sekali query, bukan per baris).
+    const existingMemberIds = Array.from(
+      new Set(Array.from(duplicateResult.existingByRow.values(), (info) => info.id))
+    )
+    const activeMemberIds =
+      classResult.academicYearId !== null
+        ? await this.enrollmentRepository.findMemberIdsActiveInYear(existingMemberIds, classResult.academicYearId)
+        : new Set<string>()
+
+    for (const row of rows) {
+      if (blockRows.has(row.rowNumber)) continue
+
+      const existing = duplicateResult.existingByRow.get(row.rowNumber)
+      if (existing) {
+        if (classResult.academicYearId !== null && activeMemberIds.has(existing.id)) {
+          // Strategi A — Skip & flag (RFC §12.2): sudah terdaftar tahun itu.
+          routingByRow.set(row.rowNumber, 'skip')
+        } else if (classResult.academicYearId !== null) {
+          // PO #5 — impor tahunan: member lama masuk tahun baru -> hanya
+          // enrollment (tanpa membuat Member baru, tanpa dua ACTIVE).
+          routingByRow.set(row.rowNumber, 'enrollment-only')
+          existingMemberIdByRow.set(row.rowNumber, existing.id)
+        } else {
+          // NISN existing TAPI tahun tidak tersedia -> classResult.academicYearId
+          // null hanya bila semua baris classNotFound; baris yang error kelas
+          // sudah diblokir di atas, jadi jalur ini praktis tak tercapai.
+          // Defensif: jangan tulis enrollment tanpa tahun.
+          routingByRow.set(row.rowNumber, 'skip')
+        }
+      } else {
+        routingByRow.set(row.rowNumber, 'create-member')
+      }
+    }
+
+    return {
+      errors,
+      warnings,
+      classIdByRow,
+      academicYearId: classResult.academicYearId,
+      routingByRow,
+      existingMemberIdByRow
+    }
   }
 
-  // Fase tulis (P4C + WO-18 MI-2): SATU $transaction. Alokasi nomor
-  // (NumberGeneratorService), createMany Member (tanpa classId) dan
-  // createMany MemberEnrollment(ACTIVE) memakai objek tx yang sama; commit
-  // sekali di akhir. Exception apa pun -> Prisma ROLLBACK otomatis
-  // (all-or-nothing) -> TIDAK ada Member tanpa Enrollment.
+  // Fase tulis (P4C + WO-18 MI-2 + WO-19 MI-3): SATU $transaction.
+  //   - create-member    : allocateMemberNumbers + createMany Member (tanpa
+  //     classId) + createMany MemberEnrollment(ACTIVE).
+  //   - enrollment-only  : TANPA Member baru; HANYA createMany Enrollment
+  //     (memberId dari routing existingMemberIdByRow).
+  //   - skip             : tidak ditulis (sudah ACTIVE di tahun target).
+  // Commit sekali di akhir oleh prisma.$transaction; exception apa pun ->
+  // Prisma ROLLBACK otomatis (all-or-nothing) -> tidak ada data parsial.
   private async writePhase(
     rows: MemberImportRowInput[],
+    routingByRow: Map<number, RowRouting>,
+    existingMemberIdByRow: Map<number, string>,
     classIdByRow: Map<number, string>,
     academicYearId: string | null,
     _onProgress?: (event: MemberImportProgressEvent) => void
-  ): Promise<number> {
+  ): Promise<{ created: number; skipped: number }> {
     if (academicYearId === null) {
       // Tidak mungkin terjadi saat preflight.errors kosong (tanpa tahun semua
       // baris classNotFound). Guard defensif: jangan tulis Member tanpa tahun.
@@ -239,22 +314,50 @@ export class MemberImportService {
     }
 
     return runTransaction(getPrisma(), async (tx) => {
-      const numbers = await this.numberGenerator.allocateMemberNumbers(tx, rows.length, MEMBER_TYPES.student.code)
-      const memberPayload = this.buildMemberPayload(rows, numbers)
-      await this.memberRepository.createManyWithTx(tx, memberPayload)
+      const createRows = rows.filter((row) => routingByRow.get(row.rowNumber) === 'create-member')
+      const enrollmentOnlyRows = rows.filter((row) => routingByRow.get(row.rowNumber) === 'enrollment-only')
+      const skipCount = rows.length - createRows.length - enrollmentOnlyRows.length
 
-      const createdMembers = await tx.member.findMany({
-        where: { memberNumber: { in: numbers } },
-        select: { id: true, memberNumber: true }
-      })
-      const idByNumber = new Map(createdMembers.map((member) => [member.memberNumber, member.id]))
+      let memberNumbers: string[] = []
+      let createdIdByNumber = new Map<string, string>()
 
-      const enrollments = rows.map((row, index) => {
-        const memberNumber = numbers[index]
-        const memberId = memberNumber === undefined ? undefined : idByNumber.get(memberNumber)
+      if (createRows.length > 0) {
+        memberNumbers = await this.numberGenerator.allocateMemberNumbers(
+          tx,
+          createRows.length,
+          MEMBER_TYPES.student.code
+        )
+        const memberPayload = this.buildMemberPayload(createRows, memberNumbers)
+        await this.memberRepository.createManyWithTx(tx, memberPayload)
+
+        const createdMembers = await tx.member.findMany({
+          where: { memberNumber: { in: memberNumbers } },
+          select: { id: true, memberNumber: true }
+        })
+        createdIdByNumber = new Map(createdMembers.map((member) => [member.memberNumber, member.id]))
+      }
+
+      // memberId per baris yang AKAN dibuatkan enrollment:
+      //   create-member   -> id hasil lookup member baru.
+      //   enrollment-only -> id member existing (dari checker).
+      const enrollmentRows: Array<{ memberId: string; row: MemberImportRowInput }> = []
+      for (const row of createRows) {
+        const memberNumber = memberNumbers[enrollmentRows.length]
+        const memberId = memberNumber === undefined ? undefined : createdIdByNumber.get(memberNumber)
         if (memberNumber === undefined || memberId === undefined) {
           throw new Error('MemberImportService: enrollment member lookup mismatch')
         }
+        enrollmentRows.push({ memberId, row })
+      }
+      for (const row of enrollmentOnlyRows) {
+        const memberId = existingMemberIdByRow.get(row.rowNumber)
+        if (memberId === undefined) {
+          throw new Error('MemberImportService: enrollment existing member lookup mismatch')
+        }
+        enrollmentRows.push({ memberId, row })
+      }
+
+      const enrollments = enrollmentRows.map(({ memberId, row }) => {
         const classId = classIdByRow.get(row.rowNumber)
         if (classId === undefined) {
           throw new Error('MemberImportService: enrollment class lookup mismatch')
@@ -268,8 +371,10 @@ export class MemberImportService {
         }
       })
 
-      await this.enrollmentRepository.createManyWithTx(tx, enrollments)
-      return enrollments.length
+      if (enrollments.length > 0) {
+        await this.enrollmentRepository.createManyWithTx(tx, enrollments)
+      }
+      return { created: enrollments.length, skipped: skipCount }
     })
   }
 
@@ -317,6 +422,7 @@ export class MemberImportService {
       success: false,
       totalRows: rows.length,
       created: 0,
+      skipped: 0,
       failed: rows.length,
       warnings: 0,
       durationMs: Date.now() - startedAt,

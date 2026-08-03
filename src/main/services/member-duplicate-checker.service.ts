@@ -2,23 +2,25 @@ import { MemberRepository } from '../repositories/member.repository'
 import type { MemberImportRowInput } from '../../shared/dto/member'
 
 /*
- * Deteksi duplikat terhadap DATABASE (Tahap 2 — RFC v2 §5.2).
+ * Deteksi identitas terhadap DATABASE (Tahap 2 — RFC v2 §5.2; WO-19 MI-3).
  *
  * Scope WO-5 P2: HANYA Database Duplicate Detection.
  *   - Duplikat dalam file (Tahap 1) TIDAK disentuh — ditangani lapisan lain
  *     (MemberPreviewService di renderer) dan tetap seperti sekarang.
- *   - NISN  -> sudah ada di DB        -> BLOCKER.
- *   - Email -> bila terisi, sudah ada -> BLOCKER; bila kosong -> dilewati.
+ *
+ * WO-19 MI-3 (strategi member sudah ada — RFC §12.1 step 3, §12.2):
+ *   - NISN  -> sudah ada di DB -> BUKAN error. Member dianggap "sudah ada"
+ *     (routing ke jalur enrollment-only / skip di MemberImportService).
+ *     Checker mengembalikan existingByRow agar service bisa memutuskan.
+ *   - Email -> hanya BLOCKER untuk baris dengan NISN BARU (member baru):
+ *     email sudah dipakai member lain -> error. Untuk baris NISN existing
+ *     tidak ada member baru yang dibuat, jadi tidak ada konflik email.
  *
  * Aturan performa (keputusan PO):
  *   - DILARANG query per baris. Semua nilai unik dikumpulkan dulu, lalu
- *     batch lookup `WHERE nisn IN (...)` dan `WHERE email IN (...)` ter-chunk
- *     (`IMPORT_CONFIG.MEMBER_IMPORT_LOOKUP_CHUNK`), kemudian dicocokkan
- *     di memori.
+ *     batch lookup `WHERE nisn IN (...)` dan `WHERE email IN (...)`
+ *     ter-chunk (`IMPORT_CONFIG.MEMBER_IMPORT_LOOKUP_CHUNK`).
  *   - Seluruh query read-only; tidak ada tulis.
- *
- * API publik ini dipakai oleh P4 (MemberImportService / preflight) —
- * P4 belum dikerjakan.
  */
 
 export const MEMBER_DUPLICATE_NISN_IN_DB_MESSAGE_KEY = 'memberImport.duplicateNisnInDb'
@@ -34,7 +36,16 @@ export interface MemberDuplicateDatabaseIssue {
   messageKey: string
 }
 
+export interface ExistingMemberInfo {
+  id: string
+  memberNumber: string
+  fullName: string
+}
+
 export interface MemberDuplicateDatabaseResult {
+  // Member yang SUDAH ADA per baris (ditemukan via NISN) — routing MI-3.
+  existingByRow: Map<number, ExistingMemberInfo>
+  // Hanya konflik email untuk baris member BARU (NISN tidak ada di DB).
   errors: MemberDuplicateDatabaseIssue[]
 }
 
@@ -69,38 +80,39 @@ export class MemberDuplicateChecker {
     const nisnToMember = new Map(nisnMembers.map((m) => [m.nisn, m] as const))
     const emailToMember = new Map(emailMembers.map((m) => [m.email, m] as const))
 
+    const existingByRow = new Map<number, ExistingMemberInfo>()
     const errors: MemberDuplicateDatabaseIssue[] = []
 
     for (const row of rows) {
       const nisn = normalizeNisn(row.nisn)
-      if (nisn !== '') {
-        const existing = nisnToMember.get(nisn)
-        if (existing) {
-          errors.push({
-            rowNumber: row.rowNumber,
-            field: 'nisn',
-            existingMemberNumber: existing.memberNumber,
-            existingMemberName: existing.fullName,
-            messageKey: MEMBER_DUPLICATE_NISN_IN_DB_MESSAGE_KEY
-          })
-        }
+      const existing = nisn !== '' ? nisnToMember.get(nisn) : undefined
+
+      if (existing) {
+        // MI-3: NISN sudah ada -> routing "member sudah ada", bukan error.
+        existingByRow.set(row.rowNumber, {
+          id: existing.id,
+          memberNumber: existing.memberNumber,
+          fullName: existing.fullName
+        })
+        continue
       }
 
+      // Baris member BARU: email yang sudah dipakai member lain = BLOCKER.
       const email = normalizeEmail(row.email)
       if (email !== '') {
-        const existing = emailToMember.get(email)
-        if (existing) {
+        const emailOwner = emailToMember.get(email)
+        if (emailOwner) {
           errors.push({
             rowNumber: row.rowNumber,
             field: 'email',
-            existingMemberNumber: existing.memberNumber,
-            existingMemberName: existing.fullName,
+            existingMemberNumber: emailOwner.memberNumber,
+            existingMemberName: emailOwner.fullName,
             messageKey: MEMBER_DUPLICATE_EMAIL_IN_DB_MESSAGE_KEY
           })
         }
       }
     }
 
-    return { errors }
+    return { existingByRow, errors }
   }
 }
