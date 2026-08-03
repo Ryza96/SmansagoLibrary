@@ -1,9 +1,13 @@
 import { MemberRepository } from '../repositories/member.repository'
+import { EnrollmentRepository } from '../repositories/enrollment.repository'
 import { NumberGeneratorService } from './number-generator.service'
 import type { MemberDTO, CreateMemberDTO, UpdateMemberDTO } from '../../shared/dto/member'
 import { AppError } from '../../../electron/main/errorHandler'
 
-function toDTO(member: NonNullable<Awaited<ReturnType<MemberRepository['findById']>>>): MemberDTO {
+function toDTO(
+  member: NonNullable<Awaited<ReturnType<MemberRepository['findById']>>>,
+  enrollment: Awaited<ReturnType<EnrollmentRepository['findActiveByMember']>>
+): MemberDTO {
   return {
     id: member.id,
     memberNumber: member.memberNumber,
@@ -20,16 +24,16 @@ function toDTO(member: NonNullable<Awaited<ReturnType<MemberRepository['findById
     phone: member.phone,
     email: member.email,
     classId: member.classId,
-    classInfo: member.class
+    classInfo: enrollment
       ? {
-          id: member.class.id,
-          educationLevel: member.class.educationLevel,
-          parallel: member.class.parallel,
-          academicYear: member.class.academicYear
-            ? { id: member.class.academicYear.id, name: member.class.academicYear.name, isActive: member.class.academicYear.isActive }
+          id: enrollment.classId,
+          educationLevel: enrollment.class.educationLevel,
+          parallel: enrollment.class.parallel,
+          academicYear: enrollment.academicYear
+            ? { id: enrollment.academicYear.id, name: enrollment.academicYear.name, isActive: enrollment.academicYear.isActive }
             : null,
-          curriculum: member.class.curriculum
-            ? { id: member.class.curriculum.id, name: member.class.curriculum.name }
+          curriculum: enrollment.class.curriculum
+            ? { id: enrollment.class.curriculum.id, name: enrollment.class.curriculum.name }
             : null
         }
       : null,
@@ -42,7 +46,8 @@ function toDTO(member: NonNullable<Awaited<ReturnType<MemberRepository['findById
 export class MemberService {
   constructor(
     private memberRepository: MemberRepository,
-    private numberGeneratorService: NumberGeneratorService
+    private numberGeneratorService: NumberGeneratorService,
+    private enrollmentRepository: EnrollmentRepository
   ) {}
 
   async findMany(search?: string, page?: number, limit?: number, memberType?: string) {
@@ -78,7 +83,8 @@ export class MemberService {
     if (!member) {
       throw new AppError(404, 'Not Found', `Member ${id} tidak ditemukan`)
     }
-    return toDTO(member)
+    const enrollment = await this.enrollmentRepository.findActiveByMember(id)
+    return toDTO(member, enrollment)
   }
 
   async create(input: CreateMemberDTO): Promise<MemberDTO> {
@@ -100,7 +106,6 @@ export class MemberService {
       address: input.address,
       phone: input.phone,
       email: input.email,
-      classId: input.classId,
       status: 'INACTIVE'
     })
 
@@ -128,7 +133,6 @@ export class MemberService {
       address: input.address,
       phone: input.phone,
       email: input.email,
-      classId: input.classId,
       status: input.status
     })
 

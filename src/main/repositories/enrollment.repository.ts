@@ -15,7 +15,11 @@ type CloseEnrollmentData = {
 
 const enrollmentInclude = {
   member: true,
-  class: true,
+  class: {
+    include: {
+      curriculum: true
+    }
+  },
   academicYear: true
 } as const
 
@@ -43,6 +47,12 @@ export class EnrollmentRepository extends BaseRepository {
   async countActiveByMember(memberId: string): Promise<number> {
     return this.prisma.memberEnrollment.count({
       where: { memberId, status: ACADEMIC_STATUS.active, leftAt: null }
+    })
+  }
+
+  async countByClass(classId: string): Promise<number> {
+    return this.prisma.memberEnrollment.count({
+      where: { classId, status: ACADEMIC_STATUS.active, leftAt: null }
     })
   }
 

@@ -1,7 +1,7 @@
 import { ClassRepository } from '../repositories/class.repository'
 import { AcademicYearRepository } from '../repositories/academic-year.repository'
 import { CurriculumRepository } from '../repositories/curriculum.repository'
-import { MemberRepository } from '../repositories/member.repository'
+import { EnrollmentRepository } from '../repositories/enrollment.repository'
 import type { ClassDTO, CreateClassDTO, UpdateClassDTO, CloneClassResult } from '../../shared/dto/academic'
 import { EDUCATION_LEVELS } from '../../shared/config/education-level'
 import { getPrisma } from '../repositories/base/prisma'
@@ -28,7 +28,7 @@ export class ClassService {
     private repository: ClassRepository,
     private academicYearRepository: AcademicYearRepository,
     private curriculumRepository: CurriculumRepository,
-    private memberRepository: MemberRepository
+    private enrollmentRepository: EnrollmentRepository
   ) {}
 
   async findMany(search?: string, page?: number, limit?: number) {
@@ -134,7 +134,7 @@ export class ClassService {
       throw new AppError(404, 'Not Found', `Kelas ${id} tidak ditemukan`)
     }
 
-    const memberCount = await this.memberRepository.countByClass(id)
+    const memberCount = await this.enrollmentRepository.countByClass(id)
     if (memberCount > 0) {
       throw new AppError(400, 'Conflict', `Kelas ${existing.educationLevel} ${existing.parallel} tidak dapat dihapus karena masih memiliki ${memberCount} anggota`)
     }

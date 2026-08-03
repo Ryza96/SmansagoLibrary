@@ -2,6 +2,7 @@ import { BorrowRepository } from '../repositories/borrow.repository'
 import { BorrowDetailRepository } from '../repositories/borrow-detail.repository'
 import { MemberRepository } from '../repositories/member.repository'
 import { BookCopyRepository } from '../repositories/book-copy.repository'
+import { EnrollmentService } from './enrollment.service'
 import type { BorrowingDTO, BorrowingItemDetailDTO, CreateBorrowingInput } from '../../shared/dto/borrowing'
 import { AppError } from '../../../electron/main/errorHandler'
 
@@ -94,7 +95,8 @@ export class BorrowService {
     private borrowRepository: BorrowRepository,
     private borrowDetailRepository: BorrowDetailRepository,
     private memberRepository: MemberRepository,
-    private bookCopyRepository: BookCopyRepository
+    private bookCopyRepository: BookCopyRepository,
+    private enrollmentService: EnrollmentService
   ) {}
 
   async findMany(search?: string, page?: number, limit?: number) {
@@ -167,9 +169,8 @@ export class BorrowService {
     const lastNumber = await this.borrowRepository.getLastBorrowNumber()
     const borrowNumber = generateBorrowNumber(lastNumber)
 
-    const className = member.class
-      ? `${member.class.educationLevel} ${member.class.parallel}`
-      : undefined
+    const enrollment = await this.enrollmentService.findActiveByMember(input.memberId)
+    const className = enrollment?.className
 
     const created = await this.borrowRepository.createWithItems(
       {
