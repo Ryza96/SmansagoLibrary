@@ -44,12 +44,20 @@ export class AcademicYearService {
       throw new AppError(400, 'Conflict', `Tahun Ajaran "${name}" sudah digunakan`)
     }
 
-    const record = await this.repository.create({
-      name,
-      startDate: new Date(input.startDate),
-      endDate: new Date(input.endDate),
-      isActive: input.isActive
-    })
+    const record =
+      input.isActive === true
+        ? await this.repository.createExclusiveActive({
+            name,
+            startDate: new Date(input.startDate),
+            endDate: new Date(input.endDate),
+            isActive: true
+          })
+        : await this.repository.create({
+            name,
+            startDate: new Date(input.startDate),
+            endDate: new Date(input.endDate),
+            isActive: input.isActive
+          })
 
     return toDTO(record)
   }
@@ -68,12 +76,20 @@ export class AcademicYearService {
       }
     }
 
-    const updated = await this.repository.update(id, {
-      name,
-      startDate: input.startDate ? new Date(input.startDate) : undefined,
-      endDate: input.endDate ? new Date(input.endDate) : undefined,
-      isActive: input.isActive
-    })
+    const updated =
+      input.isActive === true
+        ? await this.repository.updateExclusiveActive(id, {
+            name,
+            startDate: input.startDate ? new Date(input.startDate) : undefined,
+            endDate: input.endDate ? new Date(input.endDate) : undefined,
+            isActive: true
+          })
+        : await this.repository.update(id, {
+            name,
+            startDate: input.startDate ? new Date(input.startDate) : undefined,
+            endDate: input.endDate ? new Date(input.endDate) : undefined,
+            isActive: input.isActive
+          })
 
     return toDTO(updated)
   }

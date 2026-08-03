@@ -18,6 +18,22 @@ export class AcademicYearRepository extends BaseRepository {
     return this.prisma.academicYear.update({ where: { id }, data })
   }
 
+  // WO-4 AY-1a: guard exclusive-active. Menonaktifkan seluruh tahun aktif lain
+  // lalu membuat/update target sebagai SATU-SATUNYA tahun aktif dalam satu transaksi.
+  async createExclusiveActive(data: CreateAcademicYearData & { isActive: true }): Promise<AcademicYear> {
+    return this.prisma.$transaction(async (tx) => {
+      await tx.academicYear.updateMany({ where: { isActive: true }, data: { isActive: false } })
+      return tx.academicYear.create({ data })
+    })
+  }
+
+  async updateExclusiveActive(id: string, data: UpdateAcademicYearData & { isActive: true }): Promise<AcademicYear> {
+    return this.prisma.$transaction(async (tx) => {
+      await tx.academicYear.updateMany({ where: { isActive: true }, data: { isActive: false } })
+      return tx.academicYear.update({ where: { id }, data })
+    })
+  }
+
   async delete(id: string): Promise<void> {
     await this.prisma.academicYear.delete({ where: { id } })
   }

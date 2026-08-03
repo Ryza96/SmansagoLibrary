@@ -372,3 +372,21 @@ Audit menyeluruh terhadap Borrowing Module: Prisma schema, Repository, Service, 
 - **Raw SQL tabel `Member` wajib kolom fisik `number`/`birthplace`** (bukan `memberNumber`/`birthPlace`) karena `@map` (pelajaran WO-006B). Error `table Member has no column named memberNumber` = petunjuk kolom ter-map.
 - **Prisma SQLite satu koneksi:** `$executeRawUnsafe('PRAGMA ...')` memengaruhi query berikutnya pada instance yang sama (bukan pooled terpisah).
 - **Script one-time di `scripts/`**: TS + `PrismaClient` langsung, tanpa tsx/ts-node — compile `npx tsc --module commonjs ... --outDir <temp>` lalu `node` dengan `DATABASE_URL` + `NODE_PATH`. `require.main === module` untuk CLI guard agar fungsi bisa di-import smoke.
+
+---
+
+## WO-4 (AY-1a): AcademicYear exclusive-active guard (COMPLETE — READY review PO)
+
+### Ringkasan
+- Source of Truth: `MASTER_DATA_AKADEMIK_ARCHITECTURE_RFC.md` (LOCKED, §2.4/§17) + `MASTER_DATA_AKADEMIK_WBS.md` (LOCKED, WO-4 AY-1a) + `WO4_DISCOVERY_REPORT.md` (READY FOR IMPLEMENTATION). Scope: **guard service + repo transaksional + smoke + docs**. **TIDAK** mengubah schema/migration/IPC/Preload/UI/DTO; repo sudah ada (WBS Repo/UI = N/A).
+- **Deliverable (2 file source + 1 smoke):** `src/main/repositories/academic-year.repository.ts` +2 metode transaksional `createExclusiveActive`/`updateExclusiveActive` (`$transaction`: `updateMany(isActive:true→false)` lalu create/update target `isActive:true`); `src/main/services/academic-year.service.ts` guard decision — `isActive===true` → metode exclusive-active, selainnya `create`/`update` biasa (perilaku lama); `wo4_ay1a_smoke/smoke.ts` **21/21 PASS** pada fresh DB.
+- **Logika:** deaktivasi **semua** tahun aktif (tanpa exclude target) lalu target di-set aktif dalam satu transaksi — net "hanya target aktif"; gagalnya create/update target → rollback deaktivasi (tidak ada window "nol aktif").
+- **Validation 3/3 PASS:** (1) fresh DB deploy (4 migrations) + smoke 21/21 (create B aktif nonaktifkan A, update A aktif nonaktifkan B&C, create/update nonaktif tak menyentuh tahun aktif, count `isActive=true`===1 di tiap langkah, duplikat/404 tetap ditolak); (2) `npm run lint`; (3) `npm run build` (main 1,776.61 kB · preload 7.68 kB · renderer 940.40 kB).
+- **Laporan:** `WORK_ORDER_4_AY1A_IMPLEMENTATION_REPORT.md`, `WO4_FINAL_REVIEW.md`, `WO4_RELEASE_REPORT.md`. Status: **DONE — menunggu review PO** (tidak lanjut WO berikutnya, AY-1b).
+
+### Pelajaran (retain)
+- **Guard = keputusan bisnis di Service, eksekusi atomik di Repository** — pola `$transaction` meniru `borrow.repository.createWithItems`/`processReturn`. Guard mengikat jalur service saja; caller yang memanggil repository langsung bisa bypass (konsisten RFC: guard hidup di service).
+- **Deaktivasi menyeluruh tanpa exclude target** lebih sederhana daripada `where: { id: { not: targetId } }` — target langsung di-set aktif di operasi berikutnya dalam transaksi yang sama.
+- **Rollback otomatis** melindungi invarian "tepat satu aktif": bila create/update target gagal, deaktivasi ikut dibatalkan.
+- Smoke WO-4 memakai fresh DB temp (`file:C:/Users/hp/AppData/Local/Temp/opencode/...`) dan dibersihkan setelah run — DB live dev tidak pernah disentuh.
+- Nama laporan WO-4 wajib suffix `_AY1A_` (`WORK_ORDER_4_IMPLEMENTATION_REPORT.md` sudah dipakai laporan sprint lama — jangan ditimpa).
