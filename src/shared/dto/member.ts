@@ -1,3 +1,5 @@
+import type { MemberTypeCode } from '../config/member-type'
+
 export interface MemberDTO {
   id: string
   memberNumber: string
@@ -28,7 +30,7 @@ export interface MemberDTO {
 
 export interface CreateMemberDTO {
   fullName: string
-  memberType?: string
+  memberType?: MemberTypeCode
   gender?: string
   nisn?: string
   nip?: string
@@ -44,7 +46,7 @@ export interface CreateMemberDTO {
 
 export interface UpdateMemberDTO {
   fullName?: string
-  memberType?: string
+  memberType?: MemberTypeCode
   gender?: string
   nisn?: string
   nip?: string

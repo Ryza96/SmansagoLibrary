@@ -3,15 +3,10 @@ import { useNavigate } from 'react-router-dom'
 import { Plus, Search, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react'
 import type { MemberDTO } from '../shared/dto/member'
 import { LABELS } from '../utils/labels'
+import { memberTypeLabel } from '../shared/config/member-type'
 import { ROUTES, memberEditPath } from '../utils/navigation'
 
 const api = window.electronAPI
-
-const MEMBER_TYPE_LABEL: Record<string, string> = {
-  student: 'Siswa',
-  teacher: 'Guru',
-  general: 'Umum'
-}
 
 export default function MembersPage() {
   const navigate = useNavigate()
@@ -119,7 +114,7 @@ export default function MembersPage() {
                           : '-'}
                       </td>
                       <td className="py-3 text-slate-600">
-                        {MEMBER_TYPE_LABEL[m.memberType ?? ''] ?? m.memberType ?? '-'}
+                        {memberTypeLabel(m.memberType) ?? m.memberType ?? '-'}
                       </td>
                       <td className="py-3">
                         <div className="flex items-center gap-2">

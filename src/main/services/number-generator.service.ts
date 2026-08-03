@@ -1,5 +1,6 @@
 import type { Prisma } from '@prisma/client'
 import { MemberRepository } from '../repositories/member.repository'
+import { memberNumberPrefix } from '../../shared/config/member-type'
 
 /*
  * Number generator untuk nomor anggota.
@@ -28,18 +29,10 @@ import { MemberRepository } from '../repositories/member.repository'
  *     Nomor baru baru resmi setelah COMMIT berhasil.
  */
 
-const MEMBER_TYPE_PREFIX: Record<string, string> = {
-  student: 'S',
-  teacher: 'G',
-  general: 'U'
-}
-
-const DEFAULT_PREFIX = 'S'
 const MEMBER_NUMBER_PAD_WIDTH = 6
 
 export function resolveMemberNumberPrefix(memberType?: string): string {
-  if (!memberType) return DEFAULT_PREFIX
-  return MEMBER_TYPE_PREFIX[memberType] ?? DEFAULT_PREFIX
+  return memberNumberPrefix(memberType)
 }
 
 export function parseMemberNumberSuffix(memberNumber: string, prefix: string): number {

@@ -4,6 +4,7 @@ import { ArrowLeft, Pencil, Printer, CheckCircle, BookOpen, BookX, Clock, User, 
 import { LABELS } from '../utils/labels'
 import { memberEditPath } from '../utils/navigation'
 import type { MemberDTO } from '../shared/dto/member'
+import { memberTypeLabel, memberBorrowRights, type MemberBorrowRights } from '../shared/config/member-type'
 
 const api = window.electronAPI
 
@@ -17,18 +18,10 @@ const TAB_OPTIONS: { id: TabId; label: string }[] = [
   { id: 'activity', label: LABELS.MEMBER_TAB.ACTIVITY },
 ]
 
-const MEMBER_TYPE_LABEL: Record<string, string> = {
-  student: 'Siswa',
-  teacher: 'Guru',
-  general: 'Umum'
-}
-
 const GENDER_LABEL: Record<string, string> = {
   male: 'Laki-laki',
   female: 'Perempuan'
 }
-
-type MemberTypeKey = keyof typeof LABELS.MEMBER_RIGHTS
 
 interface MemberView {
   id: string
@@ -57,12 +50,6 @@ interface BorrowingRow {
   totalItems: number
 }
 
-interface Rights {
-  maxBooks: number
-  maxDays: number
-  extensions: string
-}
-
 function formatDate(value: string | null | undefined): string {
   return value ? new Date(value).toLocaleDateString('id-ID') : '-'
 }
@@ -74,7 +61,7 @@ function toView(member: MemberDTO): MemberView {
     name: member.fullName,
     number: member.memberNumber,
     memberType: member.memberType ?? '',
-    memberTypeLabel: MEMBER_TYPE_LABEL[member.memberType ?? ''] ?? member.memberType ?? '-',
+    memberTypeLabel: memberTypeLabel(member.memberType) ?? member.memberType ?? '-',
     genderLabel: GENDER_LABEL[member.gender ?? ''] ?? member.gender ?? '-',
     birthplace: member.birthPlace ?? '-',
     birthDate: formatDate(member.birthDate),
@@ -138,10 +125,7 @@ export default function MemberDetailPage() {
     return <NotFoundState onBack={() => navigate(-1)} />
   }
 
-  const rights: Rights | null =
-    member.memberType && member.memberType in LABELS.MEMBER_RIGHTS
-      ? (LABELS.MEMBER_RIGHTS[member.memberType as MemberTypeKey] as Rights)
-      : null
+  const rights: MemberBorrowRights | null = memberBorrowRights(member.memberType)
 
   return (
     <div>
@@ -433,7 +417,7 @@ function StatusCard({ member }: { member: MemberView }) {
   )
 }
 
-function RightsCard({ rights }: { rights: Rights | null }) {
+function RightsCard({ rights }: { rights: MemberBorrowRights | null }) {
   return (
     <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-5">
       <h2 className="text-sm font-semibold text-slate-800 mb-4">{LABELS.MEMBER_SECTION.RIGHTS}</h2>

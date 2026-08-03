@@ -4,15 +4,10 @@ import { Plus, Search, RefreshCw, ChevronLeft, ChevronRight, FileUp } from 'luci
 import type { MemberDTO } from '../shared/dto/member'
 import { LABELS } from '../utils/labels'
 import { memberEditPath } from '../utils/navigation'
+import { memberTypeLabel, MEMBER_TYPES } from '../shared/config/member-type'
 import MemberImportDialog from '../components/members/MemberImportDialog'
 
 const api = window.electronAPI
-
-const MEMBER_TYPE_LABEL: Record<string, string> = {
-  student: 'Siswa',
-  teacher: 'Guru',
-  general: 'Umum'
-}
 
 interface MemberListPageProps {
   memberType: string
@@ -79,7 +74,7 @@ export default function MemberListPage({ memberType, title, newButtonLabel }: Me
             >
               <RefreshCw size={16} className="text-slate-500" />
             </button>
-            {memberType === 'student' && (
+            {memberType === MEMBER_TYPES.student.code && (
               <button
                 onClick={() => {
                   setImportOpen(true)
@@ -138,7 +133,7 @@ export default function MemberListPage({ memberType, title, newButtonLabel }: Me
                           : '-'}
                       </td>
                       <td className="py-3 text-slate-600">
-                        {MEMBER_TYPE_LABEL[m.memberType ?? ''] ?? m.memberType ?? '-'}
+                        {memberTypeLabel(m.memberType) ?? m.memberType ?? '-'}
                       </td>
                       <td className="py-3">
                         <div className="flex items-center gap-2">

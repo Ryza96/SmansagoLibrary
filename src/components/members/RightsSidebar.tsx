@@ -1,14 +1,9 @@
 import { LABELS } from '../../utils/labels'
+import type { MemberBorrowRights } from '../../shared/config/member-type'
 import Card from './Card'
 
-interface RightsData {
-  maxBooks: number
-  maxDays: number
-  extensions: string
-}
-
 interface RightsSidebarProps {
-  rights: RightsData | null
+  rights: MemberBorrowRights | null
 }
 
 function RightRow({ label, value }: { label: string; value: string }) {

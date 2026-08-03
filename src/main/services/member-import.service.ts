@@ -13,6 +13,7 @@ import { MemberRepository } from '../repositories/member.repository'
 import { getPrisma } from '../repositories/base/prisma'
 import { runTransaction } from '../repositories/base/transaction'
 import { normalizeMemberImportRows } from '../../shared/utils/member-import-normalization'
+import { MEMBER_TYPES } from '../../shared/config/member-type'
 
 /*
  * Orchestrator import anggota (WO-5 P4C — Transaction & Database Write).
@@ -197,7 +198,7 @@ export class MemberImportService {
     _onProgress?: (event: MemberImportProgressEvent) => void
   ): Promise<number> {
     return runTransaction(getPrisma(), async (tx) => {
-      const numbers = await this.numberGenerator.allocateMemberNumbers(tx, rows.length, 'student')
+      const numbers = await this.numberGenerator.allocateMemberNumbers(tx, rows.length, MEMBER_TYPES.student.code)
       const payload = this.buildPayload(rows, classIdByRow, numbers)
       await this.memberRepository.createManyWithTx(tx, payload)
       return payload.length
@@ -216,7 +217,7 @@ export class MemberImportService {
       }
       return {
         memberNumber,
-        memberType: 'student',
+        memberType: MEMBER_TYPES.student.code,
         fullName: row.fullName,
         gender: row.gender,
         nisn: row.nisn,

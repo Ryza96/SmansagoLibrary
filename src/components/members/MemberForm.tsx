@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { CreateMemberDTO, UpdateMemberDTO } from '../../shared/dto/member'
 import { LABELS } from '../../utils/labels'
+import { memberBorrowRights, isMemberTypeCode } from '../../shared/config/member-type'
 import PersonalSection from './PersonalSection'
 import MembershipSection from './MembershipSection'
 import AddressSection from './AddressSection'
@@ -17,9 +18,6 @@ function todayISO() {
   const d = new Date()
   return d.toISOString().slice(0, 10)
 }
-
-const MEMBER_TYPES = ['student', 'teacher', 'general'] as const
-type MemberType = (typeof MEMBER_TYPES)[number]
 
 interface FormData {
   memberNumber?: string
@@ -92,6 +90,8 @@ export default function MemberForm({ mode = 'create', initialData, memberId, def
     return Object.keys(e).length === 0
   }
 
+  const memberTypeCode = isMemberTypeCode(memberType) ? memberType : undefined
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!validate()) return
@@ -99,7 +99,7 @@ export default function MemberForm({ mode = 'create', initialData, memberId, def
     if (isEditMode) {
       const payload: UpdateMemberDTO = {
         fullName,
-        memberType: memberType || undefined,
+        memberType: memberTypeCode,
         gender: gender || undefined,
         birthPlace: birthplace || undefined,
         birthDate: birthDate || undefined,
@@ -112,7 +112,7 @@ export default function MemberForm({ mode = 'create', initialData, memberId, def
     } else {
       const payload: CreateMemberDTO = {
         fullName,
-        memberType: memberType || undefined,
+        memberType: memberTypeCode,
         gender: gender || undefined,
         birthPlace: birthplace || undefined,
         birthDate: birthDate || undefined,
@@ -125,9 +125,7 @@ export default function MemberForm({ mode = 'create', initialData, memberId, def
     navigate(-1)
   }
 
-  const rights = MEMBER_TYPES.includes(memberType as MemberType)
-    ? LABELS.MEMBER_RIGHTS[memberType as MemberType]
-    : null
+  const rights = memberBorrowRights(memberType)
 
   const addressPreview = [address, village, district, city, postalCode].filter(Boolean).join(', ')
 

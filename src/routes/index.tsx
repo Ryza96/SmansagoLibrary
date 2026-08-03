@@ -1,4 +1,5 @@
 import { createHashRouter, Navigate, Outlet } from 'react-router-dom'
+import { MEMBER_TYPES } from '../shared/config/member-type'
 import AppLayout from '../components/layout/AppLayout'
 import { BookImportProvider } from '../contexts/BookImportContext'
 import DashboardPage from '../pages/DashboardPage'
@@ -50,9 +51,9 @@ export const router = createHashRouter([
       { path: 'books/:id/edit', element: <BookFormPage /> },
       { path: 'books/:id/labels-preview', element: <LabelPreviewPage /> },
       { path: 'members', element: <Navigate to="/members/students" replace /> },
-      { path: 'members/students', element: <MemberListPage memberType="student" title="Daftar Siswa" newButtonLabel="Tambah Siswa" /> },
-      { path: 'members/teachers', element: <MemberListPage memberType="teacher" title="Daftar Guru" newButtonLabel="Tambah Guru" /> },
-      { path: 'members/general', element: <MemberListPage memberType="general" title="Daftar Anggota Umum" newButtonLabel="Tambah Anggota Umum" /> },
+      { path: 'members/students', element: <MemberListPage memberType={MEMBER_TYPES.student.code} title="Daftar Siswa" newButtonLabel="Tambah Siswa" /> },
+      { path: 'members/teachers', element: <MemberListPage memberType={MEMBER_TYPES.teacher.code} title="Daftar Guru" newButtonLabel="Tambah Guru" /> },
+      { path: 'members/general', element: <MemberListPage memberType={MEMBER_TYPES.general.code} title="Daftar Anggota Umum" newButtonLabel="Tambah Anggota Umum" /> },
       { path: 'members/new', element: <MemberCreatePage /> },
       { path: 'members/:id', element: <MemberDetailPage /> },
       { path: 'members/:id/edit', element: <MemberEditPage /> },

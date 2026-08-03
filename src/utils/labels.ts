@@ -1,3 +1,19 @@
+import {
+  MEMBER_TYPES as MEMBER_TYPE_DEFINITIONS,
+  MEMBER_TYPE_CODES,
+  type MemberBorrowRights,
+  type MemberTypeCode
+} from '../shared/config/member-type'
+
+const MEMBER_TYPE_OPTIONS: { value: MemberTypeCode; label: string }[] = MEMBER_TYPE_CODES.map((code) => ({
+  value: code,
+  label: MEMBER_TYPE_DEFINITIONS[code].label
+}))
+
+const MEMBER_RIGHTS_LOOKUP = Object.fromEntries(
+  MEMBER_TYPE_CODES.map((code) => [code, MEMBER_TYPE_DEFINITIONS[code].borrowRights])
+) as Record<MemberTypeCode, MemberBorrowRights>
+
 export const LABELS = {
   MASTER: {
     TITLE: 'Master Data',
@@ -215,20 +231,12 @@ export const LABELS = {
     { value: 'male', label: 'Laki-laki' },
     { value: 'female', label: 'Perempuan' },
   ],
-  MEMBER_TYPES: [
-    { value: 'student', label: 'Siswa' },
-    { value: 'teacher', label: 'Guru' },
-    { value: 'general', label: 'Umum' },
-  ],
+  MEMBER_TYPES: MEMBER_TYPE_OPTIONS,
   MEMBER_STATUSES: [
     { value: 'active', label: 'Aktif' },
     { value: 'inactive', label: 'Nonaktif' },
   ],
-  MEMBER_RIGHTS: {
-    student: { maxBooks: 2, maxDays: 7, extensions: '1x' },
-    teacher: { maxBooks: 5, maxDays: 30, extensions: '3x' },
-    general: { maxBooks: 10, maxDays: 90, extensions: 'Tidak Terbatas' },
-  },
+  MEMBER_RIGHTS: MEMBER_RIGHTS_LOOKUP,
   ACQUISITION_SOURCES: [
     { value: 'PEMBELIAN', label: 'Pembelian' },
     { value: 'DONASI', label: 'Donasi' },

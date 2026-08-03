@@ -2,6 +2,7 @@ import type { Class } from '@prisma/client'
 import { AcademicYearRepository } from '../repositories/academic-year.repository'
 import { ClassRepository } from '../repositories/class.repository'
 import type { MemberImportRowInput } from '../../shared/dto/member'
+import { EDUCATION_LEVELS } from '../../shared/config/education-level'
 
 /*
  * Class Resolver untuk import anggota (RFC v2 §6).
@@ -28,8 +29,6 @@ import type { MemberImportRowInput } from '../../shared/dto/member'
 
 export const MEMBER_CLASS_NOT_FOUND_MESSAGE_KEY = 'memberImport.classNotFound'
 export const MEMBER_CLASS_AMBIGUOUS_MESSAGE_KEY = 'memberImport.classAmbiguous'
-
-const EDUCATION_LEVELS = new Set(['X', 'XI', 'XII'])
 
 export interface MemberClassResolutionItem {
   rowNumber: number
