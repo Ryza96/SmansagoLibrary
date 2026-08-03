@@ -3,6 +3,7 @@ import { AcademicYearRepository } from '../repositories/academic-year.repository
 import { CurriculumRepository } from '../repositories/curriculum.repository'
 import { MemberRepository } from '../repositories/member.repository'
 import type { ClassDTO, CreateClassDTO, UpdateClassDTO } from '../../shared/dto/academic'
+import { EDUCATION_LEVELS } from '../../shared/config/education-level'
 import { AppError } from '../../../electron/main/errorHandler'
 
 function toDTO(record: NonNullable<Awaited<ReturnType<ClassRepository['findById']>>>): ClassDTO {
@@ -45,6 +46,11 @@ export class ClassService {
   }
 
   async create(input: CreateClassDTO): Promise<ClassDTO> {
+    const educationLevel = input.educationLevel.trim().toUpperCase()
+    if (!EDUCATION_LEVELS.has(educationLevel)) {
+      throw new AppError(400, 'Conflict', `Tingkat pendidikan ${input.educationLevel} tidak valid (X/XI/XII)`)
+    }
+
     const ayExists = await this.academicYearRepository.existsById(input.academicYearId)
     if (!ayExists) {
       throw new AppError(400, 'Conflict', `Tahun Ajaran ${input.academicYearId} tidak ditemukan`)
@@ -58,17 +64,17 @@ export class ClassService {
     const dup = await this.repository.findDuplicate(
       input.academicYearId,
       input.curriculumId,
-      input.educationLevel,
+      educationLevel,
       input.parallel
     )
     if (dup) {
-      throw new AppError(400, 'Conflict', `Kelas ${input.educationLevel} ${input.parallel} sudah ada di tahun ajaran dan kurikulum yang sama`)
+      throw new AppError(400, 'Conflict', `Kelas ${educationLevel} ${input.parallel} sudah ada di tahun ajaran dan kurikulum yang sama`)
     }
 
     const record = await this.repository.create({
       academicYearId: input.academicYearId,
       curriculumId: input.curriculumId,
-      educationLevel: input.educationLevel,
+      educationLevel,
       parallel: input.parallel,
       homeroomTeacher: input.homeroomTeacher,
       isActive: input.isActive
@@ -83,14 +89,15 @@ export class ClassService {
       throw new AppError(404, 'Not Found', `Kelas ${id} tidak ditemukan`)
     }
 
+    if (input.educationLevel !== undefined || input.parallel !== undefined) {
+      throw new AppError(400, 'Conflict', `Kelas ${existing.educationLevel} ${existing.parallel} tidak dapat diubah (educationLevel/parallel immutable — buat kelas baru untuk rename)`)
+    }
+
     const academicYearId = input.academicYearId ?? existing.academicYearId
     const curriculumId = input.curriculumId ?? existing.curriculumId
-    const educationLevel = input.educationLevel ?? existing.educationLevel
-    const parallel = input.parallel ?? existing.parallel
 
     const comboChanged =
-      input.academicYearId !== undefined || input.curriculumId !== undefined ||
-      input.educationLevel !== undefined || input.parallel !== undefined
+      input.academicYearId !== undefined || input.curriculumId !== undefined
 
     if (comboChanged) {
       if (input.academicYearId) {
@@ -103,17 +110,15 @@ export class ClassService {
         if (!curExists) throw new AppError(400, 'Conflict', `Kurikulum ${input.curriculumId} tidak ditemukan`)
       }
 
-      const dup = await this.repository.findDuplicate(academicYearId, curriculumId, educationLevel, parallel, id)
+      const dup = await this.repository.findDuplicate(academicYearId, curriculumId, existing.educationLevel, existing.parallel, id)
       if (dup) {
-        throw new AppError(400, 'Conflict', `Kelas ${educationLevel} ${parallel} sudah ada di tahun ajaran dan kurikulum yang sama`)
+        throw new AppError(400, 'Conflict', `Kelas ${existing.educationLevel} ${existing.parallel} sudah ada di tahun ajaran dan kurikulum yang sama`)
       }
     }
 
     const updated = await this.repository.update(id, {
       academicYearId: input.academicYearId,
       curriculumId: input.curriculumId,
-      educationLevel: input.educationLevel,
-      parallel: input.parallel,
       homeroomTeacher: input.homeroomTeacher,
       isActive: input.isActive
     })

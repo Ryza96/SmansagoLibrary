@@ -426,3 +426,21 @@ Audit menyeluruh terhadap Borrowing Module: Prisma schema, Repository, Service, 
 - **Delete Guard service (400, `countByCurriculum`)** — UI cukup menampilkan `err.message`; tidak ada redirect/loading error UI.
 - **`findMany(search)` paginated** (`{data,total,...}`) — list memakai `.data` (server-side search), `total` utk verifikasi; pola sama WO-5.
 - Smoke WO-6 memakai fresh DB temp dan dibersihkan; DB live dev tidak pernah disentuh.
+
+---
+
+## WO-7 (CL-1): Class Immutability Guard (COMPLETE — READY review PO)
+
+### Ringkasan
+- Source of Truth: `MASTER_DATA_AKADEMIK_ARCHITECTURE_RFC.md` (LOCKED, §13) + `MASTER_DATA_AKADEMIK_WBS.md` (LOCKED, WO-8 CL-1) + `WO7_DISCOVERY_REPORT.md` (APPROVED). Keputusan PO: **WBS-strict** — hanya `educationLevel` + `parallel` immutable; `academicYearId`/`curriculumId` tetap bisa diubah. Scope: ClassService + Smoke + Docs saja.
+- **Modifikasi (1 file source):** `src/main/services/class.service.ts` — `create` normalisasi `educationLevel` (`trim().toUpperCase()`) + validasi via F1 `EDUCATION_LEVELS` (X/XI/XII) → AppError 400 bila invalid; nilai ternormalisasi dipakai untuk `findDuplicate` & persist; `update` **blokir** `educationLevel`/`parallel` (AppError 400 "immutable — buat kelas baru untuk rename"), payload `repository.update` kini hanya `academicYearId`/`curriculumId`/`homeroomTeacher`/`isActive`; `comboChanged` (AY/curriculum) tetap ada.
+- **TIDAK diubah:** Repository, IPC, Preload, UI, DTO (`UpdateClassDTO` masih punya `educationLevel`/`parallel` — sengaja dibiarkan, ditolak di service), Schema, Migration, Bootstrap, env.d.ts, resolver; delete guard tetap `Member.classId` legacy (pindah ke enrollment di E-2).
+- **Validation PASS:** (1) `npm run lint`; (2) `npm run build` (main 1,776.84 kB · preload 7.68 kB · renderer 959.90 kB — renderer tidak berubah); (3) smoke `wo7_cl1_smoke/smoke.ts` **16/16 PASS** (create valid, level IX/kosong ditolak 400, lowercase `" xi "`→XI, duplikat komposit 400, update educationLevel ditolak 400 + tetap X, update parallel ditolak 400 + tetap, regression: homeroomTeacher/isActive sukses, findById, findMany list/search, delete tanpa anggota sukses, delete beranggota 400); (4) grep bundle main (`educationLevel/parallel immutable`, `Tingkat pendidikan`) = True.
+- **Laporan:** `WO7_DISCOVERY_REPORT.md`, `WORK_ORDER_7_IMPLEMENTATION_REPORT.md`, `WO7_FINAL_REVIEW.md`, `WO7_RELEASE_REPORT.md`. Status: **DONE — menunggu review PO** (tidak lanjut CL-2a).
+
+### Pelajaran (retain)
+- **Guard immutability = Service layer, DTO tidak diubah.** `UpdateClassDTO` tetap menyertakan `educationLevel`/`parallel`; service menolak (AppError 400). Ini mencegah breaking change kontrak sebelum CL-2a dibangun.
+- **Normalisasi level wajib sebelum validasi & persist** (`trim().toUpperCase()`): mencegah `"x"` vs `"X"` jadi 2 row komposit → yang membuat `MemberClassResolver` (key uppercase) mendeteksi `classAmbiguous`. Nilai ternormalisasi harus dipakai konsisten di `findDuplicate` DAN `repository.create`.
+- **Delete guard kelas masih `memberRepository.countByClass` (legacy `Member.classId`)** — per RFC F2, cutover ke `enrollment.count` adalah WO E-2, bukan CL-1. Jangan "perbaiki" di WO yang salah scope.
+- Smoke seed Member wajib `memberNumber`/`fullName` (bukan `number`/`name`) — pelajaran WO-006B (`@map`).
+- Pola `expectRejected(fn, messagePart)` memeriksa `e.message.includes` — AppError message adalah kontrak smoke (bukan `.statusCode`).
