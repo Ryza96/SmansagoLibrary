@@ -88,3 +88,48 @@ export interface AutomaticPromotionPreviewInput {
   toYearId: string
   fromClassId?: string
 }
+
+// ===========================================================================
+// WO P-2 (PROMOTION EXECUTE) — kontrak eksekusi + audit run.
+// Sumber kebenaran: RFC §7A (eksekusi satu transaksi) + RFC §2.2 (audit).
+// ===========================================================================
+
+// Input eksekusi Mode A — P-2. fromClassId opsional (seluruh kelas tahun sumber
+// bila tidak diisi); runBy = identitas pelaksana (audit, RFC §9).
+export interface AutomaticPromotionExecuteInput {
+  mode: 'AUTOMATIC'
+  fromYearId: string
+  toYearId: string
+  fromClassId?: string
+  runBy?: string
+}
+
+// PromotionRun.status (RFC §2.2, schema.prisma l.89).
+// P-2 selalu SUCCESS (rollback penuh bila ada kegagalan); PARTIAL/FAILED untuk
+// mode lain / WO berikutnya (P-4 retry strategy).
+export type PromotionRunStatus = 'SUCCESS' | 'PARTIAL' | 'FAILED'
+
+// Satu baris audit eksekusi — mirror PromotionRunItem (RFC §2.2).
+export interface PromotionRunItemDTO {
+  id: string
+  promotionRunId: string
+  memberId: string
+  sourceClassId: string
+  targetClassId: string | null
+  outcome: PromotionOutcome
+  message: string | null
+}
+
+// Audit penuh sebuah run (RFC §9). summary = counts agregat (mirror preview).
+export interface PromotionRunDTO {
+  id: string
+  fromYearId: string
+  toYearId: string
+  mode: PromotionPreviewMode
+  runBy: string | null
+  status: PromotionRunStatus
+  summary: PromotionPreviewCounts | null
+  startedAt: string
+  finishedAt: string | null
+  items: PromotionRunItemDTO[]
+}

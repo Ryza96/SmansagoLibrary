@@ -102,8 +102,27 @@ export class EnrollmentRepository extends BaseRepository {
       class: { id: string; educationLevel: string; parallel: string; curriculumId: string }
     }>
   > {
+    return this.findActiveByClassesWithTx(this.prisma, classIds, academicYearId)
+  }
+
+  // WO P-2 — varian findActiveByClasses yang menerima TransactionClient untuk
+  // re-validasi state TERBARU di dalam transaksi eksekusi (RFC §7.1/§8 re-validate:
+  // hanya enrollment ACTIVE yang diproses; keputusan basi tidak pernah dieksekusi).
+  async findActiveByClassesWithTx(
+    tx: Prisma.TransactionClient,
+    classIds: string[],
+    academicYearId: string
+  ): Promise<
+    Array<{
+      id: string
+      memberId: string
+      classId: string
+      member: { fullName: string }
+      class: { id: string; educationLevel: string; parallel: string; curriculumId: string }
+    }>
+  > {
     if (classIds.length === 0) return []
-    return this.prisma.memberEnrollment.findMany({
+    return tx.memberEnrollment.findMany({
       where: {
         academicYearId,
         classId: { in: classIds },
@@ -118,6 +137,33 @@ export class EnrollmentRepository extends BaseRepository {
         class: { select: { id: true, educationLevel: true, parallel: true, curriculumId: true } }
       },
       orderBy: [{ class: { educationLevel: 'asc' } }, { class: { parallel: 'asc' } }, { member: { fullName: 'asc' } }]
+    })
+  }
+
+  // WO P-2 — tutup enrollment (terminal status + leftAt) DI DALAM transaksi
+  // eksekusi promosi. Tidak pernah DELETE (RFC §6.2).
+  async closeWithTx(tx: Prisma.TransactionClient, enrollmentId: string, status: string, note: string): Promise<void> {
+    await tx.memberEnrollment.update({
+      where: { id: enrollmentId },
+      data: { status, leftAt: new Date(), note }
+    })
+  }
+
+  // WO P-2 — buka enrollment ACTIVE baru DI DALAM transaksi eksekusi promosi
+  // (member pindah ke kelas target tahun target; invarian satu-ACTIVE dijaga
+  // karena sumber ditutup pada transaksi yang sama).
+  async createActiveWithTx(
+    tx: Prisma.TransactionClient,
+    data: { memberId: string; classId: string; academicYearId: string; note?: string }
+  ): Promise<void> {
+    await tx.memberEnrollment.create({
+      data: {
+        memberId: data.memberId,
+        classId: data.classId,
+        academicYearId: data.academicYearId,
+        status: ACADEMIC_STATUS.active,
+        note: data.note
+      }
     })
   }
 }

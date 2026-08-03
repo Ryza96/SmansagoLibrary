@@ -1,7 +1,7 @@
 import { BaseRepository } from './base/base.repository'
 import { getPaginationParams, toPaginatedResult } from './base/pagination'
 import type { FindOptions } from './base/repository.types'
-import type { Class } from '@prisma/client'
+import type { Class, Prisma } from '@prisma/client'
 
 type CreateClassData = Pick<Class, 'academicYearId' | 'curriculumId' | 'educationLevel' | 'parallel'> & {
   homeroomTeacher?: string
@@ -49,6 +49,16 @@ export class ClassRepository extends BaseRepository {
 
   async findByAcademicYear(academicYearId: string): Promise<Class[]> {
     return this.prisma.class.findMany({
+      where: { academicYearId },
+      orderBy: { parallel: 'asc' }
+    })
+  }
+
+  // WO P-2 — varian findByAcademicYear yang menerima TransactionClient untuk
+  // baca kelas kandidat target TERBARU di dalam transaksi eksekusi promosi
+  // (RFC §7.1/§8 re-validate).
+  async findByAcademicYearWithTx(tx: Prisma.TransactionClient, academicYearId: string): Promise<Class[]> {
+    return tx.class.findMany({
       where: { academicYearId },
       orderBy: { parallel: 'asc' }
     })

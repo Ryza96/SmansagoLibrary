@@ -150,6 +150,13 @@ export class MemberRepository extends BaseRepository {
     }
   }
 
+  // WO P-2 — sinkronisasi Member.status (RFC §4.3) DI DALAM transaksi eksekusi
+  // promosi: PROMOTED/REPEATED → ACTIVE; GRADUATED → INACTIVE (nilai dihitung
+  // service via memberStatusForTerminalAcademic).
+  async updateStatusWithTx(tx: Prisma.TransactionClient, memberId: string, status: 'ACTIVE' | 'INACTIVE'): Promise<void> {
+    await tx.member.update({ where: { id: memberId }, data: { status } })
+  }
+
   async countBorrows(memberId: string): Promise<number> {
     return this.prisma.borrow.count({ where: { memberId } })
   }
