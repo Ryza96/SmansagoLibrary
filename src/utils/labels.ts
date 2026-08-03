@@ -56,6 +56,17 @@ export const LABELS = {
     CREATED: 'Tahun ajaran berhasil ditambahkan.',
     UPDATED: 'Tahun ajaran berhasil diperbarui.',
   },
+  CURRICULUM: {
+    TITLE: 'Kurikulum',
+    NEW: 'Tambah Kurikulum',
+    EDIT: 'Edit Kurikulum',
+    SEARCH: 'Cari kurikulum...',
+    NAME: 'Nama',
+    CONFIRM_DELETE: 'Apakah Anda yakin ingin menghapus kurikulum ini?',
+    DELETED: 'Kurikulum berhasil dihapus.',
+    CREATED: 'Kurikulum berhasil ditambahkan.',
+    UPDATED: 'Kurikulum berhasil diperbarui.',
+  },
   BOOK: {
     TITLE: 'Buku',
     SUBTITLE: 'Modul Buku sedang dalam pengembangan.',

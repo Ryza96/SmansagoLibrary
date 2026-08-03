@@ -408,3 +408,21 @@ Audit menyeluruh terhadap Borrowing Module: Prisma schema, Repository, Service, 
 - **Guard 1-aktif tampil sebagai UX**: toggle aktif menampilkan `ACTIVATE_WARNING` ("Mengaktifkan akan menonaktifkan tahun ajaran lain") — ekspektasi user dijaga sebelum submit.
 - **Delete Guard (service) mengembalikan AppError 400** saat tahun dipakai kelas — List page menampilkan `err.message` via `alert`, tanpa redirect/loading error UI.
 - Smoke WO-5 memakai fresh DB temp dan dibersihkan; DB live dev tidak pernah disentuh (ulang pola WO-4).
+
+---
+
+## WO-6 (C-1): Curriculum Master UI (COMPLETE — READY review PO)
+
+### Ringkasan
+- Source of Truth: `MASTER_DATA_AKADEMIK_ARCHITECTURE_RFC.md` (LOCKED) + `MASTER_DATA_AKADEMIK_WBS.md` (LOCKED, WO-7 C-1) + `WO6_DISCOVERY_REPORT.md` (APPROVED). Scope: **renderer-only Curriculum CRUD UI**. **TIDAK** mengubah Repository/Service/IPC/Preload/Schema/Migration; AcademicYear/Class/Enrollment/Promotion tidak disentuh.
+- **Deliverable (3 file baru + 4 file UI):** `src/pages/master/CurriculumListPage.tsx` (list + search `.data` + delete), `src/pages/master/CurriculumFormPage.tsx` (create/edit), `src/components/master/CurriculumForm.tsx` (satu field nama — `CurriculumDTO` hanya `name`); modified: `src/routes/index.tsx` (+3 route `master/curricula[...]`), `src/components/layout/Sidebar.tsx` (+item "Kurikulum"), `src/utils/labels.ts` (blok `CURRICULUM`), `src/utils/navigation.ts` (+`ROUTES.MASTER_CURRICULUM_*` + `curriculumEditPath`).
+- **Backend sudah lengkap sejak WO-005** termasuk delete guard `countByCurriculum > 0`; C-1 hanya konsumen preload `curricula.*` (WBS C-1: Dependency `—`, Flow Preload→UI→Testing→PO Review, LOW).
+- **Validation PASS:** (1) `npm run lint`; (2) `npm run build` (main 1,776.61 kB · preload 7.68 kB · renderer 959.90 kB); (3) UAT smoke `wo6_c1_smoke/smoke.ts` **10/10 PASS** (create, duplikat nama ditolak 400, edit + rename-ke-nama-sendiri no-op, rename-ke-nama-lain ditolak, delete berkelas ditolak 400, delete tanpa kelas sukses, list + search); (4) grep bundle renderer (`Kurikulum`, `master/curricula`) ter-render.
+- **Laporan:** `WORK_ORDER_6_IMPLEMENTATION_REPORT.md`, `WO6_FINAL_REVIEW.md`, `WO6_RELEASE_REPORT.md`. Status: **DONE — menunggu review PO** (tidak lanjut WO berikutnya, CL-1).
+
+### Pelajaran (retain)
+- **Master satu-field (Curriculum) mengikuti persis pola `AuthorForm`** — tidak perlu grid tanggal/toggle; reuse `MasterTable` + `confirm` + `alert(err.message)` untuk guard service.
+- **Guard duplikat nama dua jalur di service:** create & update sama-sama cek `existsByName`; update mengecualikan nama sendiri (`name !== existing.name`) sehingga rename-ke-nama-sendiri no-op — smoke memastikan tidak error.
+- **Delete Guard service (400, `countByCurriculum`)** — UI cukup menampilkan `err.message`; tidak ada redirect/loading error UI.
+- **`findMany(search)` paginated** (`{data,total,...}`) — list memakai `.data` (server-side search), `total` utk verifikasi; pola sama WO-5.
+- Smoke WO-6 memakai fresh DB temp dan dibersihkan; DB live dev tidak pernah disentuh.
