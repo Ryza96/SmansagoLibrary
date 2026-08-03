@@ -2,7 +2,7 @@ import { EnrollmentRepository } from '../repositories/enrollment.repository'
 import { MemberRepository } from '../repositories/member.repository'
 import { ClassRepository } from '../repositories/class.repository'
 import type { EnrollmentDTO, CreateEnrollmentDTO, CloseEnrollmentDTO, RepointEnrollmentDTO } from '../../shared/dto/enrollment'
-import { ACADEMIC_STATUS, isTerminalAcademicStatus } from '../../shared/config/academic-status'
+import { ACADEMIC_STATUS, isTerminalAcademicStatus, memberStatusForTerminalAcademic } from '../../shared/config/academic-status'
 import { getMemberType } from '../../shared/config/member-type'
 import { getPrisma } from '../repositories/base/prisma'
 import { runTransaction } from '../repositories/base/transaction'
@@ -74,6 +74,8 @@ export class EnrollmentService {
 
   // RFC §6.2 — close(enrollmentId, status, note).
   // Hanya untuk enrollment ACTIVE; status harus terminal; tidak pernah DELETE.
+  // RFC §4.3 / WBS WO-15 E-3 — sinkronisasi Member.status dalam SATU transaksi:
+  // GRADUATED/TRANSFERRED/DROPPED → member INACTIVE; PROMOTED/REPEATED/REDISTRIBUTED → member tetap ACTIVE.
   async close(enrollmentId: string, input: CloseEnrollmentDTO): Promise<EnrollmentDTO> {
     const existing = await this.repository.findById(enrollmentId)
     if (!existing) {
@@ -90,13 +92,35 @@ export class EnrollmentService {
       )
     }
 
-    const record = await this.repository.close(enrollmentId, {
-      status: input.status,
-      leftAt: new Date(),
-      note: input.note
+    const syncedMemberStatus = memberStatusForTerminalAcademic(input.status)
+
+    const record = await runTransaction(getPrisma(), async (tx) => {
+      const closed = await tx.memberEnrollment.update({
+        where: { id: enrollmentId },
+        data: { status: input.status, leftAt: new Date(), note: input.note }
+      })
+
+      if (syncedMemberStatus) {
+        const member = await tx.member.findUnique({
+          where: { id: existing.memberId },
+          select: { status: true }
+        })
+        if (member && member.status !== syncedMemberStatus) {
+          await tx.member.update({
+            where: { id: existing.memberId },
+            data: { status: syncedMemberStatus }
+          })
+        }
+      }
+
+      return closed
     })
 
-    return toDTO(record)
+    const full = await this.repository.findById(record.id)
+    if (!full) {
+      throw new AppError(500, 'Internal', `Enrollment ${enrollmentId} tidak ditemukan setelah close`)
+    }
+    return toDTO(full)
   }
 
   // RFC §4.1 REPOINT (mutasi tengah tahun) — close(REDISTRIBUTED) + enroll di kelas target,

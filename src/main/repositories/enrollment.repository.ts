@@ -7,12 +7,6 @@ type CreateEnrollmentData = Pick<import('@prisma/client').MemberEnrollment, 'mem
   note?: string
 }
 
-type CloseEnrollmentData = {
-  status: string
-  leftAt: Date
-  note?: string
-}
-
 const enrollmentInclude = {
   member: true,
   class: {
@@ -54,9 +48,5 @@ export class EnrollmentRepository extends BaseRepository {
     return this.prisma.memberEnrollment.count({
       where: { classId, status: ACADEMIC_STATUS.active, leftAt: null }
     })
-  }
-
-  async close(id: string, data: CloseEnrollmentData): Promise<EnrollmentWithRelations> {
-    return this.prisma.memberEnrollment.update({ where: { id }, data, include: enrollmentInclude })
   }
 }
