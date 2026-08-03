@@ -29,6 +29,8 @@ import AcademicYearListPage from '../pages/master/AcademicYearListPage'
 import AcademicYearFormPage from '../pages/master/AcademicYearFormPage'
 import CurriculumListPage from '../pages/master/CurriculumListPage'
 import CurriculumFormPage from '../pages/master/CurriculumFormPage'
+import ClassListPage from '../pages/master/ClassListPage'
+import ClassFormPage from '../pages/master/ClassFormPage'
 
 export const router = createHashRouter([
   {
@@ -81,7 +83,10 @@ export const router = createHashRouter([
       { path: 'master/academic-years/:id/edit', element: <AcademicYearFormPage /> },
       { path: 'master/curricula', element: <CurriculumListPage /> },
       { path: 'master/curricula/new', element: <CurriculumFormPage /> },
-      { path: 'master/curricula/:id/edit', element: <CurriculumFormPage /> }
+      { path: 'master/curricula/:id/edit', element: <CurriculumFormPage /> },
+      { path: 'master/classes', element: <ClassListPage /> },
+      { path: 'master/classes/new', element: <ClassFormPage /> },
+      { path: 'master/classes/:id/edit', element: <ClassFormPage /> }
     ]
   }
 ])

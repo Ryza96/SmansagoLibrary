@@ -35,6 +35,9 @@ export const ROUTES = {
   MASTER_CURRICULA: '/master/curricula',
   MASTER_CURRICULUM_NEW: '/master/curricula/new',
   MASTER_CURRICULUM_EDIT: '/master/curricula/:id/edit',
+  MASTER_CLASSES: '/master/classes',
+  MASTER_CLASS_NEW: '/master/classes/new',
+  MASTER_CLASS_EDIT: '/master/classes/:id/edit',
 } as const
 
 export function bookDetailPath(id: string) {
@@ -75,6 +78,10 @@ export function academicYearEditPath(id: string) {
 
 export function curriculumEditPath(id: string) {
   return `/master/curricula/${id}/edit`
+}
+
+export function classEditPath(id: string) {
+  return `/master/classes/${id}/edit`
 }
 
 export function inventoryDetailPath(id: string) {

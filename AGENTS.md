@@ -444,3 +444,21 @@ Audit menyeluruh terhadap Borrowing Module: Prisma schema, Repository, Service, 
 - **Delete guard kelas masih `memberRepository.countByClass` (legacy `Member.classId`)** — per RFC F2, cutover ke `enrollment.count` adalah WO E-2, bukan CL-1. Jangan "perbaiki" di WO yang salah scope.
 - Smoke seed Member wajib `memberNumber`/`fullName` (bukan `number`/`name`) — pelajaran WO-006B (`@map`).
 - Pola `expectRejected(fn, messagePart)` memeriksa `e.message.includes` — AppError message adalah kontrak smoke (bukan `.statusCode`).
+
+---
+
+## WO-8 (CL-2a): Class Master UI (COMPLETE — READY review PO)
+
+### Ringkasan
+- Source of Truth: `MASTER_DATA_AKADEMIK_ARCHITECTURE_RFC.md` (LOCKED) + `MASTER_DATA_AKADEMIK_WBS.md` (LOCKED, WO-9 CL-2a) + `WO8_DISCOVERY_REPORT.md` (APPROVED). Keputusan PO: **fetch-all + client-side filtering**. Scope: **renderer-only Class CRUD UI**; backend `classes:*` (sudah ada sejak WO-005 + CL-1) TIDAK diubah.
+- **Deliverable (3 file baru + 4 file UI):** `src/pages/master/ClassListPage.tsx` (fetch paralel AY+kurikulum+classes, fetch-all loop `limit 100`, **filter client-side** tahun+kurikulum+search, kolom lookup nama AY/kurikulum via Map, delete), `src/pages/master/ClassFormPage.tsx` (create/edit; **payload update TANPA educationLevel/parallel** — immutable CL-1), `src/components/master/ClassForm.tsx` (dropdown Tahun/Kurikulum/Tingkat X/XI/XII via `EDUCATION_LEVELS`, input Paralel + Guru Kelas, checkbox Aktif; **Tingkat/Paralel disabled saat edit** + hint immutable); modified: `src/routes/index.tsx` (+3 route `master/classes[...]`), `src/components/layout/Sidebar.tsx` (+item "Kelas"), `src/utils/labels.ts` (blok `CLASS`), `src/utils/navigation.ts` (+`ROUTES.MASTER_CLASS*` + `classEditPath`).
+- **Keputusan teknis R1:** `classes.findMany` tidak punya filter Tahun/Kurikulum & IPC dilarang diubah → UI fetch-all (`findMany(undefined, page, 100)` loop sampai `total`) lalu filter client-side; acceptable untuk data master kelas.
+- **Validation PASS:** (1) `npm run lint`; (2) `npm run build` (main 1,776.84 kB · preload 7.68 kB · renderer **978.36 kB** — main/preload tidak berubah = bukti backend N/A); (3) smoke `wo8_cl2a_smoke/smoke.ts` **16/16 PASS** (create payload UI, fetch-all, filter client-side tahun/kurikulum/search, update guru+isActive, immutable regresi CL-1, duplicate guard, delete beranggota 400, delete sukses); (4) grep bundle renderer (`Kelas`, `master/classes`, `Tambah Kelas`, `classEditPath`) = True.
+- **Laporan:** `WO8_DISCOVERY_REPORT.md`, `WORK_ORDER_8_IMPLEMENTATION_REPORT.md`, `WO8_FINAL_REVIEW.md`, `WO8_RELEASE_REPORT.md`. Status: **DONE — menunggu review PO** (tidak lanjut CL-2b).
+
+### Pelajaran (retain)
+- **`CreateClassDTO.homeroomTeacher` = `string | undefined` (bukan `null`)** — form mengirim `string | null | undefined`; saat create harus di-map `?? undefined` (`ClassFormPage`), update menerima `null` (clear field). Tipe strict tsconfig.web menjebak bila kirim `null` ke create.
+- **Fetch-all pattern:** `findMany(undefined, page, 100)` di-loop `while (all.length < result.total) page++` karena `limit` max 100 (`getPaginationParams` `Math.min(100, ...)`) dan IPC tak boleh diubah.
+- **Client-side filter:** renderer memegang `yearFilter`/`curriculumFilter`/`search` + `useMemo` filter pada dataset; lookup nama AY/kurikulum via `Map<id,name>` dibangun dari fetch paralel `Promise.all([academicYears, curricula, classes])`.
+- **Immutable CL-1 di UI:** field Tingkat/Paralel `disabled` saat edit (hint amber) + payload update tidak mengirim keduanya → double-layer dengan guard service (WO-7).
+- Smoke wo8 memakai fresh DB temp dan dibersihkan; DB live dev tidak pernah disentuh.
