@@ -5,6 +5,7 @@ export interface EnrollmentDTO {
   memberName: string
   classId: string
   className: string
+  curriculumName: string | null
   academicYearId: string
   academicYearName: string
   status: string

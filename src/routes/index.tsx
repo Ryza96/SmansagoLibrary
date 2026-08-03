@@ -13,6 +13,7 @@ import MemberListPage from '../pages/MemberListPage'
 import MemberCreatePage from '../pages/MemberCreatePage'
 import MemberEditPage from '../pages/MemberEditPage'
 import MemberDetailPage from '../pages/MemberDetailPage'
+import EnrollmentHistoryPage from '../pages/EnrollmentHistoryPage'
 import BorrowingsPage from '../pages/BorrowingsPage'
 import ReturnsPage from '../pages/ReturnsPage'
 import InventoryPage from '../pages/InventoryPage'
@@ -63,6 +64,7 @@ export const router = createHashRouter([
       { path: 'members/new', element: <MemberCreatePage /> },
       { path: 'members/:id', element: <MemberDetailPage /> },
       { path: 'members/:id/edit', element: <MemberEditPage /> },
+      { path: 'members/:id/enrollments', element: <EnrollmentHistoryPage /> },
       { path: 'borrowings', element: <BorrowingsPage /> },
       { path: 'returns', element: <ReturnsPage /> },
       { path: 'inventory', element: <InventoryPage /> },

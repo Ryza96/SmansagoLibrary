@@ -14,6 +14,7 @@ export const ROUTES = {
   MEMBERS_NEW: '/members/new',
   MEMBER_DETAIL: '/members/:id',
   MEMBERS_EDIT: '/members/:id/edit',
+  MEMBER_ENROLLMENT_HISTORY: '/members/:id/enrollments',
   BORROWINGS: '/borrowings',
   RETURNS: '/returns',
   INVENTORY: '/inventory',
@@ -58,6 +59,10 @@ export function memberDetailPath(id: string) {
 
 export function memberEditPath(id: string) {
   return `/members/${id}/edit`
+}
+
+export function enrollmentHistoryPath(id: string) {
+  return `/members/${id}/enrollments`
 }
 
 export function authorEditPath(id: string) {

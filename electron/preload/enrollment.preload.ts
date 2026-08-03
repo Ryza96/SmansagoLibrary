@@ -9,6 +9,8 @@ export const enrollmentAPI = {
     repoint: (enrollmentId: string, input: Record<string, unknown>) =>
       ipcRenderer.invoke('enrollments:repoint', enrollmentId, input),
     findActiveByMember: (memberId: string) =>
-      ipcRenderer.invoke('enrollments:findActiveByMember', memberId)
+      ipcRenderer.invoke('enrollments:findActiveByMember', memberId),
+    historyByMember: (memberId: string) =>
+      ipcRenderer.invoke('enrollments:historyByMember', memberId)
   }
 }

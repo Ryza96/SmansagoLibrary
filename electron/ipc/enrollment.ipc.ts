@@ -15,4 +15,7 @@ export function registerEnrollmentHandlers(service: EnrollmentService): void {
   ipcMain.handle('enrollments:findActiveByMember', async (_event, memberId: string) =>
     service.findActiveByMember(memberId)
   )
+  ipcMain.handle('enrollments:historyByMember', async (_event, memberId: string) =>
+    service.historyByMember(memberId)
+  )
 }

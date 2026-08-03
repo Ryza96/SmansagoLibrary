@@ -16,6 +16,7 @@ function toDTO(record: NonNullable<Awaited<ReturnType<EnrollmentRepository['find
     memberName: record.member.fullName,
     classId: record.classId,
     className: `${record.class.educationLevel} ${record.class.parallel}`,
+    curriculumName: record.class.curriculum?.name ?? null,
     academicYearId: record.academicYearId,
     academicYearName: record.academicYear.name,
     status: record.status,
@@ -172,5 +173,16 @@ export class EnrollmentService {
   async findActiveByMember(memberId: string): Promise<EnrollmentDTO | null> {
     const record = await this.repository.findActiveByMember(memberId)
     return record ? toDTO(record) : null
+  }
+
+  // WO-16 E-4 — riwayat enrollment per member, terbaru terlebih dahulu (read-only).
+  // Business rule (status, invariant, ordering) tetap di backend; UI hanya consumer.
+  async historyByMember(memberId: string): Promise<EnrollmentDTO[]> {
+    const member = await this.memberRepository.findById(memberId)
+    if (!member) {
+      throw new AppError(404, 'Not Found', `Member ${memberId} tidak ditemukan`)
+    }
+    const records = await this.repository.findManyByMember(memberId)
+    return records.map(toDTO)
   }
 }

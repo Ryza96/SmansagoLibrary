@@ -44,6 +44,18 @@ export class EnrollmentRepository extends BaseRepository {
     })
   }
 
+  // WO-16 E-4 — riwayat enrollment per member, terbaru terlebih dahulu.
+  // "Label historis tak berubah walau rename tahun lain": setiap baris men-join
+  // academicYear miliknya sendiri (bukan tahun aktif), sehingga rename tahun lain
+  // tidak mengubah label baris mana pun.
+  async findManyByMember(memberId: string): Promise<EnrollmentWithRelations[]> {
+    return this.prisma.memberEnrollment.findMany({
+      where: { memberId },
+      include: enrollmentInclude,
+      orderBy: [{ enrolledAt: 'desc' }, { createdAt: 'desc' }]
+    })
+  }
+
   async countByClass(classId: string): Promise<number> {
     return this.prisma.memberEnrollment.count({
       where: { classId, status: ACADEMIC_STATUS.active, leftAt: null }

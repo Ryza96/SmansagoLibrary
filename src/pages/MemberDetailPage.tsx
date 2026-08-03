@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Pencil, Printer, CheckCircle, BookOpen, BookX, Clock, User, type LucideIcon } from 'lucide-react'
+import { ArrowLeft, Pencil, Printer, CheckCircle, BookOpen, BookX, Clock, User, GraduationCap, type LucideIcon } from 'lucide-react'
 import { LABELS } from '../utils/labels'
-import { memberEditPath } from '../utils/navigation'
+import { memberEditPath, enrollmentHistoryPath } from '../utils/navigation'
 import type { MemberDTO } from '../shared/dto/member'
 import { memberTypeLabel, memberBorrowRights, type MemberBorrowRights } from '../shared/config/member-type'
 
@@ -129,7 +129,7 @@ export default function MemberDetailPage() {
 
   return (
     <div>
-      <Header member={member} onEdit={() => navigate(memberEditPath(member.id))} onBack={() => navigate(-1)} />
+      <Header member={member} onEdit={() => navigate(memberEditPath(member.id))} onBack={() => navigate(-1)} onHistory={() => navigate(enrollmentHistoryPath(member.id))} />
       <ProfileSection member={member} />
       <div className="flex gap-6">
         <div className="flex-1 min-w-0">
@@ -171,7 +171,7 @@ function NotFoundState({ onBack }: { onBack: () => void }) {
   )
 }
 
-function Header({ member, onEdit, onBack }: { member: MemberView; onEdit: () => void; onBack: () => void }) {
+function Header({ member, onEdit, onBack, onHistory }: { member: MemberView; onEdit: () => void; onBack: () => void; onHistory: () => void }) {
   return (
     <div className="flex items-start gap-4 mb-6">
       <button
@@ -190,6 +190,14 @@ function Header({ member, onEdit, onBack }: { member: MemberView; onEdit: () => 
         <p className="text-sm text-slate-500 mt-0.5">{`${LABELS.FIELD.MEMBER_NUMBER}: ${member.number}`}</p>
       </div>
       <div className="flex items-center gap-2 flex-shrink-0">
+        <button
+          type="button"
+          onClick={onHistory}
+          className="flex items-center gap-1.5 px-4 py-2 border border-slate-300 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors"
+        >
+          <GraduationCap size={16} />
+          {LABELS.ENROLLMENT_HISTORY.NEW}
+        </button>
         <button
           type="button"
           onClick={() => alert('Fitur Cetak Kartu belum tersedia.')}
