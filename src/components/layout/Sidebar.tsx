@@ -31,6 +31,7 @@ const memberSubItems = [
 ]
 
 const masterSubItems = [
+  { to: '/master/academic-years', label: 'Tahun Ajaran' },
   { to: '/master/authors', label: 'Penulis' },
   { to: '/master/publishers', label: 'Penerbit' },
   { to: '/master/categories', label: 'Kategori' }

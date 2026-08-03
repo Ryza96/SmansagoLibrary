@@ -29,6 +29,9 @@ export const ROUTES = {
   MASTER_CATEGORIES: '/master/categories',
   MASTER_CATEGORY_NEW: '/master/categories/new',
   MASTER_CATEGORY_EDIT: '/master/categories/:id/edit',
+  MASTER_ACADEMIC_YEARS: '/master/academic-years',
+  MASTER_ACADEMIC_YEAR_NEW: '/master/academic-years/new',
+  MASTER_ACADEMIC_YEAR_EDIT: '/master/academic-years/:id/edit',
 } as const
 
 export function bookDetailPath(id: string) {
@@ -61,6 +64,10 @@ export function publisherEditPath(id: string) {
 
 export function categoryEditPath(id: string) {
   return `/master/categories/${id}/edit`
+}
+
+export function academicYearEditPath(id: string) {
+  return `/master/academic-years/${id}/edit`
 }
 
 export function inventoryDetailPath(id: string) {

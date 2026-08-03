@@ -390,3 +390,21 @@ Audit menyeluruh terhadap Borrowing Module: Prisma schema, Repository, Service, 
 - **Rollback otomatis** melindungi invarian "tepat satu aktif": bila create/update target gagal, deaktivasi ikut dibatalkan.
 - Smoke WO-4 memakai fresh DB temp (`file:C:/Users/hp/AppData/Local/Temp/opencode/...`) dan dibersihkan setelah run — DB live dev tidak pernah disentuh.
 - Nama laporan WO-4 wajib suffix `_AY1A_` (`WORK_ORDER_4_IMPLEMENTATION_REPORT.md` sudah dipakai laporan sprint lama — jangan ditimpa).
+
+---
+
+## WO-5 (AY-2): Academic Year Master UI (COMPLETE — READY review PO)
+
+### Ringkasan
+- Source of Truth: `MASTER_DATA_AKADEMIK_ARCHITECTURE_RFC.md` (LOCKED) + `MASTER_DATA_AKADEMIK_WBS.md` (LOCKED) + `WO5_DISCOVERY_REPORT.md` (APPROVED). Scope: **renderer-only Academic Year CRUD UI**. **TIDAK** mengubah Repository/Service/IPC/Preload/Schema/Migration; Curriculum/Class/Enrollment/Promotion tidak disentuh.
+- **Deliverable (3 file baru + 4 file UI):** `src/pages/master/AcademicYearListPage.tsx` (list + search `.data` dari paginated `findMany` + delete + badge status), `src/pages/master/AcademicYearFormPage.tsx` (create/edit via `findById`/`create`/`update`), `src/components/master/AcademicYearForm.tsx` (nama + date mulai/selesai + toggle aktif + warning guard + validasi tanggal); modified: `src/routes/index.tsx` (+3 route `master/academic-years[...]`), `src/components/layout/Sidebar.tsx` (+item "Tahun Ajaran" di grup Master Data), `src/utils/labels.ts` (blok `ACADEMIC_YEAR`), `src/utils/navigation.ts` (+`ROUTES.MASTER_ACADEMIC_YEAR*` + `academicYearEditPath`).
+- **Catatan sequencing:** WBS menaruh AY-1b (Buka/Tutup) sebelum AY-2, tapi AY-2 hanya mengonsumsi API yang sudah ada (Flow AY-2: Preload→UI→Testing; Repo/Service/IPC = N/A) — "tandai aktif" via `update(isActive:true)` sudah ter-guard AY-1a; AY-1b tetap WO terpisah.
+- **Validation PASS:** (1) `npm run lint`; (2) `npm run build` (main 1,776.61 kB · preload 7.68 kB · renderer 952.31 kB); (3) UAT smoke `wo5_ay2_smoke/smoke.ts` **14/14 PASS** pada fresh DB (create nonaktif, create aktif → nonaktifkan tahun lain, edit + toggle aktif → guard tetap, delete tahun berkelas ditolak 400, delete tanpa kelas sukses, findMany list, duplikat nama ditolak); (4) grep bundle renderer (`Tahun Ajaran`, `master/academic-years`) ter-render.
+- **Laporan:** `WORK_ORDER_5_IMPLEMENTATION_REPORT.md`, `WO5_FINAL_REVIEW.md`, `WO5_RELEASE_REPORT.md`. Status: **DONE — menunggu review PO** (tidak lanjut WO berikutnya, C-1).
+
+### Pelajaran (retain)
+- **Renderer tidak perlu pagination manual** untuk list master — `academicYears.findMany(search)` mengembalikan paginated `{data, total, ...}`; List page memakai `.data` (server-side search, pola eksisting), total dipakai utk verifikasi.
+- **Input `type="date"` memberi `YYYY-MM-DD`** — konversi ke ISO (`new Date(v).toISOString()`) saat submit; value input di-backfill dari ISO via `iso.slice(0,10)`.
+- **Guard 1-aktif tampil sebagai UX**: toggle aktif menampilkan `ACTIVATE_WARNING` ("Mengaktifkan akan menonaktifkan tahun ajaran lain") — ekspektasi user dijaga sebelum submit.
+- **Delete Guard (service) mengembalikan AppError 400** saat tahun dipakai kelas — List page menampilkan `err.message` via `alert`, tanpa redirect/loading error UI.
+- Smoke WO-5 memakai fresh DB temp dan dibersihkan; DB live dev tidak pernah disentuh (ulang pola WO-4).

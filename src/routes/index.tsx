@@ -25,6 +25,8 @@ import PublisherListPage from '../pages/master/PublisherListPage'
 import PublisherFormPage from '../pages/master/PublisherFormPage'
 import CategoryListPage from '../pages/master/CategoryListPage'
 import CategoryFormPage from '../pages/master/CategoryFormPage'
+import AcademicYearListPage from '../pages/master/AcademicYearListPage'
+import AcademicYearFormPage from '../pages/master/AcademicYearFormPage'
 
 export const router = createHashRouter([
   {
@@ -71,7 +73,10 @@ export const router = createHashRouter([
       { path: 'master/publishers/:id/edit', element: <PublisherFormPage /> },
       { path: 'master/categories', element: <CategoryListPage /> },
       { path: 'master/categories/new', element: <CategoryFormPage /> },
-      { path: 'master/categories/:id/edit', element: <CategoryFormPage /> }
+      { path: 'master/categories/:id/edit', element: <CategoryFormPage /> },
+      { path: 'master/academic-years', element: <AcademicYearListPage /> },
+      { path: 'master/academic-years/new', element: <AcademicYearFormPage /> },
+      { path: 'master/academic-years/:id/edit', element: <AcademicYearFormPage /> }
     ]
   }
 ])
