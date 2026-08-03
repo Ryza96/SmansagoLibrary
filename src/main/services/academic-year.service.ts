@@ -68,6 +68,14 @@ export class AcademicYearService {
       throw new AppError(404, 'Not Found', `Tahun Ajaran ${id} tidak ditemukan`)
     }
 
+    if (input.isActive !== undefined && input.isActive !== existing.isActive) {
+      throw new AppError(
+        400,
+        'Conflict',
+        'Status aktif Tahun Ajaran hanya dapat diubah melalui operasi Buka/Tutup Tahun (activate/deactivate)'
+      )
+    }
+
     const name = input.name?.trim()
     if (name && name !== existing.name) {
       const taken = await this.repository.existsByName(name)
@@ -76,20 +84,46 @@ export class AcademicYearService {
       }
     }
 
-    const updated =
-      input.isActive === true
-        ? await this.repository.updateExclusiveActive(id, {
-            name,
-            startDate: input.startDate ? new Date(input.startDate) : undefined,
-            endDate: input.endDate ? new Date(input.endDate) : undefined,
-            isActive: true
-          })
-        : await this.repository.update(id, {
-            name,
-            startDate: input.startDate ? new Date(input.startDate) : undefined,
-            endDate: input.endDate ? new Date(input.endDate) : undefined,
-            isActive: input.isActive
-          })
+    const updated = await this.repository.update(id, {
+      name,
+      startDate: input.startDate ? new Date(input.startDate) : undefined,
+      endDate: input.endDate ? new Date(input.endDate) : undefined
+    })
+
+    return toDTO(updated)
+  }
+
+  async activate(id: string): Promise<AcademicYearDTO> {
+    const existing = await this.repository.findById(id)
+    if (!existing) {
+      throw new AppError(404, 'Not Found', `Tahun Ajaran ${id} tidak ditemukan`)
+    }
+
+    const updated = await this.repository.updateExclusiveActive(id, { isActive: true })
+
+    return toDTO(updated)
+  }
+
+  async deactivate(id: string): Promise<AcademicYearDTO> {
+    const existing = await this.repository.findById(id)
+    if (!existing) {
+      throw new AppError(404, 'Not Found', `Tahun Ajaran ${id} tidak ditemukan`)
+    }
+
+    if (!existing.isActive) {
+      throw new AppError(400, 'Conflict', `Tahun Ajaran "${existing.name}" sudah tidak aktif`)
+    }
+
+    const active = await this.repository.findActive()
+    if (!active || active.id === existing.id) {
+      throw new AppError(
+        400,
+        'Conflict',
+        `Tahun Ajaran "${existing.name}" adalah satu-satunya tahun aktif. Aktifkan tahun baru terlebih dahulu untuk perpindahan tahun`
+      )
+    }
+
+    const updated = await this.repository.update(id, { isActive: false })
 
     return toDTO(updated)
   }

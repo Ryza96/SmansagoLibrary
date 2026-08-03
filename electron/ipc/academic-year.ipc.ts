@@ -18,4 +18,10 @@ export function registerAcademicYearHandlers(service: AcademicYearService): void
   ipcMain.handle('academic-years:delete', async (_event, id: string) =>
     service.delete(id)
   )
+  ipcMain.handle('academic-years:activate', async (_event, id: string) =>
+    service.activate(id)
+  )
+  ipcMain.handle('academic-years:deactivate', async (_event, id: string) =>
+    service.deactivate(id)
+  )
 }
