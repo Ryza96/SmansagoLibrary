@@ -1,7 +1,7 @@
 import { BaseRepository } from './base/base.repository'
 import { getPaginationParams, toPaginatedResult } from './base/pagination'
 import type { FindOptions } from './base/repository.types'
-import type { Publisher } from '@prisma/client'
+import type { Publisher, Prisma } from '@prisma/client'
 
 type CreatePublisherData = Pick<Publisher, 'name'>
 type UpdatePublisherData = Partial<Pick<Publisher, 'name'>>
@@ -9,6 +9,10 @@ type UpdatePublisherData = Partial<Pick<Publisher, 'name'>>
 export class PublisherRepository extends BaseRepository {
   async create(data: CreatePublisherData): Promise<Publisher> {
     return this.prisma.publisher.create({ data })
+  }
+
+  async createWithTx(tx: Prisma.TransactionClient, data: CreatePublisherData): Promise<Publisher> {
+    return tx.publisher.create({ data })
   }
 
   async update(id: string, data: UpdatePublisherData): Promise<Publisher> {
@@ -45,6 +49,14 @@ export class PublisherRepository extends BaseRepository {
 
   async findExact(name: string): Promise<Publisher[]> {
     return this.prisma.publisher.findMany({
+      where: { name: { equals: name } },
+      take: 10,
+      orderBy: { name: 'asc' }
+    })
+  }
+
+  async findExactWithTx(tx: Prisma.TransactionClient, name: string): Promise<Publisher[]> {
+    return tx.publisher.findMany({
       where: { name: { equals: name } },
       take: 10,
       orderBy: { name: 'asc' }

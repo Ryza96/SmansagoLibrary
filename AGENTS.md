@@ -638,3 +638,24 @@ Audit menyeluruh terhadap Borrowing Module: Prisma schema, Repository, Service, 
 - **Immutability audit record**: cek kode (hanya `createRunWithTx`) DAN schema (tanpa `@updatedAt`, FK default RESTRICT → hapus Member/AcademicYear yang dirujuk run diblokir). Tidak ada update/delete path di layer mana pun.
 - **WO audit-readonly selesai tanpa fase implementation** → rilis = SATU FINAL COMMIT dokumentasi (laporan + AGENTS.md saja), TIDAK menyentuh source. Ini menjaga riwayat git bersih per WO.
 - **Penutupan milestone**: P-5 menutup rantai P-1..P-5 (Mode A). WO masa depan untuk Mode B/C (MAPPING/BULK_EDIT) + single-flight guard tercatat sebagai backlog, bukan bagian milestone ini.
+
+---
+
+## WO-21 (B1/B2 Import Fix): Import Buku — Per-Baris Atomic + Hasil Per-Baris (COMPLETE - READY review PO)
+
+### Ringkasan
+- Keputusan user: perbaiki bug UAT `SPRINT10_WO3_UAT_REPORT.md` — **B1** (baris gagal tidak tampil ke user) & **B2** (orphan AutoCreate: entitas dibuat walau baris import gagal).
+- **B2 fix — atomic per baris:** `AutoCreateService.apply()` + cache `created` **dihapus**; API baru `resolveRow(row, tx)` menerima `Prisma.TransactionClient` (candidate cocok dipakai; entity baru dibuat dlm tx; race `P2002` → fallback `findExactWithTx`; SKIPPED/AMBIGUOUS → `resolvedEntity = null`). `BookImportService.createBookWithCopies()` = SATU `runTransaction` per baris: `resolveRow` → `book.createWithTx` → `InventoryAllocator.allocate(tx, copyCount)` → `createManyWithTx` (barcode=inventoryNumber; shelfLocation/acquisitionSource/acquisitionDate/acquisitionCost dipertahankan). Baris gagal → rollback → **0 tulisan DB** → tidak ada orphan.
+- **B1 fix — hasil per-baris:** `imports:match` kini mengembalikan **`ImportResultDTO`** `{totalRows, importedBooks, importedCopies, failedRows: {rowNumber, messageKey}[]}`; renderer me-render langsung dari DTO. Guard baru: AMBIGUOUS, `titleMissing`, `isbnDuplicate` (pre-check `existsByISBN`), `copyCreateFailed` (copyCount non-integer/<1/>100, default 1), `entityMissing`, `createFailed`. Retry `P2002` inventory 3× (retry transaksi baris penuh).
+- **File:** `src/types/import.ts` (+DTO), `auto-create.service.ts` (rewrite), `book-import.service.ts` (rewrite), `author/publisher/category.repository.ts` (+`createWithTx`/`findExactWithTx`), `electron/ipc/book-import.ipc.ts` (handler 2 arg: matchingEngine, bookImportService), `electron/ipc/index.ts`, `electron/main/bootstrap.ts` (`new BookImportService(..., autoCreateService)`), `src/renderer/env.d.ts`, `BookImportPreviewPage.tsx`, `utils/bookImport.ts` (`computeImportResultSummary` dihapus).
+- **TIDAK diubah:** schema, migration, `InventoryAllocator`, matching/validation engine, import UI dialog flow, member import.
+- **Validation PASS:** lint; build (main 1,818.41 kB · preload 9.02 kB · renderer 1,044.59 kB); smoke `wo21_import_b1b2_smoke/smoke.ts` **48/48 PASS** fresh DB (S1 copyCount 2, S5b/s5 isbnDuplicate tanpa orphan, S7 entityMissing, S6 titleMissing, S10 reuse+baru, default copy 1, invariant `sum importedBooks==DB books` & `sum importedCopies==DB copies`, semua failedRows punya rowNumber); `prisma migrate diff` = "No difference detected"; grep `.apply(`/`computeImportResultSummary`/cache `created` di src+electron = 0.
+- **Laporan:** `WORK_ORDER_WO21_B1B2_IMPORT_FIX_REPORT.md`, `WO21_FINAL_REVIEW.md`, `WO21_RELEASE_REPORT.md`. Status: **DONE — menunggu review PO** (tidak lanjut WO berikutnya).
+
+### Pelajaran (retain)
+- **Orphan AutoCreate = penulisan entity di luar transaksi baris.** Solusi: seluruh AutoCreate/Book/BookCopy dalam SATU `runTransaction` per baris; API `resolveRow(row, tx)` menggantikan `apply()`; **jangan cache `created` antar-baris** — pembacaan transaksi terkini (commit per baris) mencegah duplikasi entity.
+- **`imports:match` TIDAK pernah throw utk kegagalan baris** — kembali dikonfirmasi; kini DTO memuat `failedRows` per-baris (`rowNumber` selalu non-null; error ber-rowNumber null diabaikan di aggregasi).
+- **Guard `copyCount` pindah ke service** (1..100, default 1, error `copyCreateFailed`) — renderer tidak menghitung business logic; DTO `importedCopies` = jumlah copy DB yang benar-benar dibuat (bukan baris × count).
+- **Retry P2002 inventory** = retry SELURUH transaksi baris (bukan hanya `allocate`); non-P2002 → throw → baris gagal (bukan crash seluruh import).
+- **Pola `createWithTx`/`findExactWithTx`** (repo menerima `tx`) = perluasan dari `createManyWithTx`/`createRunWithTx` (P-2) — Service memegang orkestrasi transaksi, repo hanya eksekusi per-kolom tx.
+- Smoke wo21 memakai fresh DB temp + `prisma migrate deploy` (workdir `prisma/`) dan dibersihkan; DB live dev tidak pernah disentuh.

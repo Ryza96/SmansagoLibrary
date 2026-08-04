@@ -139,7 +139,7 @@ export function createContainer(): Container {
 
   const matchingEngine = new MatchingEngineService(createProductionStrategies())
   const autoCreateService = new AutoCreateService(new NewAuthorRepository(), new NewPublisherRepository(), new NewCategoryRepository())
-  const bookImportService = new BookImportService(new NewBookRepository(), new NewBookCopyRepository())
+  const bookImportService = new BookImportService(new NewBookRepository(), new NewBookCopyRepository(), autoCreateService)
 
   return {
     bookService,

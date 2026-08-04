@@ -127,6 +127,18 @@ export interface MatchedWorkbook {
   matchingResult: MatchingResult
 }
 
+export interface ImportFailedRow {
+  rowNumber: number
+  messageKey: string
+}
+
+export interface ImportResultDTO {
+  totalRows: number
+  importedBooks: number
+  importedCopies: number
+  failedRows: ImportFailedRow[]
+}
+
 export type DownloadTemplateResult =
   | { status: 'saved'; filePath: string }
   | { status: 'cancelled' }

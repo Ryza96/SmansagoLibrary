@@ -3,9 +3,9 @@ import { useNavigate } from 'react-router-dom'
 import { AlertTriangle, ArrowLeft, CheckCircle2, FileSpreadsheet, FileUp, Hourglass, XCircle } from 'lucide-react'
 import { LABELS } from '../utils/labels'
 import { ROUTES } from '../utils/navigation'
-import { getImportErrorMessage, getImportResultMessage, computeImportResultSummary, getValidationIssueMessage } from '../utils/bookImport'
+import { getImportErrorMessage, getImportResultMessage, getValidationIssueMessage } from '../utils/bookImport'
 import { useBookImport } from '../contexts/BookImportContext'
-import type { ImportCellValue, MatchedWorkbook, RowResult, ValidationIssue } from '../types/import'
+import type { ImportCellValue, ImportResultDTO, RowResult, ValidationIssue } from '../types/import'
 import { getColumnCount } from '../types/import'
 
 const PREVIEW_ROW_LIMIT = 50
@@ -36,9 +36,9 @@ function Stat({ label, value }: { label: string; value: string }) {
   )
 }
 
-function ImportResultSummary({ result }: { result: MatchedWorkbook }) {
-  const errors = result.matchingResult.errors
-  const { booksCreated, copiesCreated, failedRows: failedCount } = computeImportResultSummary(result)
+function ImportResultSummary({ result }: { result: ImportResultDTO }) {
+  const failedRows = result.failedRows
+  const failedCount = failedRows.length
 
   return (
     <div
@@ -61,20 +61,20 @@ function ImportResultSummary({ result }: { result: MatchedWorkbook }) {
         <p className="text-sm text-emerald-600 mb-4">{LABELS.IMPORT.RESULT_ALL_OK}</p>
       ) : (
         <ul className="mb-4 space-y-1">
-          {errors.map((error, i) => (
+          {failedRows.map((failure, i) => (
             <li key={i} className="text-sm">
               <span className="font-medium text-slate-700">
-                {LABELS.IMPORT.VALIDATION_ROW} {error.rowNumber ?? '-'}
+                {LABELS.IMPORT.VALIDATION_ROW} {failure.rowNumber}
               </span>
-              <span className="text-slate-600">: {getImportResultMessage(error.messageKey)}</span>
+              <span className="text-slate-600">: {getImportResultMessage(failure.messageKey)}</span>
             </li>
           ))}
         </ul>
       )}
 
       <div className="grid grid-cols-3 gap-4">
-        <Stat label={LABELS.IMPORT.RESULT_BOOKS_CREATED} value={String(booksCreated)} />
-        <Stat label={LABELS.IMPORT.RESULT_COPIES_CREATED} value={String(copiesCreated)} />
+        <Stat label={LABELS.IMPORT.RESULT_BOOKS_CREATED} value={String(result.importedBooks)} />
+        <Stat label={LABELS.IMPORT.RESULT_COPIES_CREATED} value={String(result.importedCopies)} />
         <Stat label={LABELS.IMPORT.RESULT_FAILED_ROWS} value={String(failedCount)} />
       </div>
     </div>
@@ -219,7 +219,7 @@ export default function BookImportPreviewPage() {
   const [committing, setCommitting] = useState(false)
   const [importError, setImportError] = useState<string | null>(null)
   const [importSuccess, setImportSuccess] = useState(false)
-  const [importResult, setImportResult] = useState<MatchedWorkbook | null>(null)
+  const [importResult, setImportResult] = useState<ImportResultDTO | null>(null)
 
   useEffect(() => {
     if (!file || (!parsing && !validatedWorkbook && !errorCode)) {

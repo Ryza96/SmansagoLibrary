@@ -1,7 +1,7 @@
 import { BaseRepository } from './base/base.repository'
 import { getPaginationParams, toPaginatedResult } from './base/pagination'
 import type { FindOptions } from './base/repository.types'
-import type { Category } from '@prisma/client'
+import type { Category, Prisma } from '@prisma/client'
 
 type CreateCategoryData = Pick<Category, 'name' | 'code'>
 type UpdateCategoryData = Partial<Pick<Category, 'name' | 'code'>>
@@ -9,6 +9,10 @@ type UpdateCategoryData = Partial<Pick<Category, 'name' | 'code'>>
 export class CategoryRepository extends BaseRepository {
   async create(data: CreateCategoryData): Promise<Category> {
     return this.prisma.category.create({ data })
+  }
+
+  async createWithTx(tx: Prisma.TransactionClient, data: CreateCategoryData): Promise<Category> {
+    return tx.category.create({ data })
   }
 
   async update(id: string, data: UpdateCategoryData): Promise<Category> {
@@ -45,6 +49,14 @@ export class CategoryRepository extends BaseRepository {
 
   async findExact(name: string): Promise<Category[]> {
     return this.prisma.category.findMany({
+      where: { name: { equals: name } },
+      take: 10,
+      orderBy: { name: 'asc' }
+    })
+  }
+
+  async findExactWithTx(tx: Prisma.TransactionClient, name: string): Promise<Category[]> {
+    return tx.category.findMany({
       where: { name: { equals: name } },
       take: 10,
       orderBy: { name: 'asc' }

@@ -223,7 +223,7 @@ interface ElectronAPI {
     }>>
   }
   imports: {
-    match: (canonicalRows: import('../types/import').CanonicalRow[]) => Promise<import('../types/import').MatchedWorkbook>,
+    match: (canonicalRows: import('../types/import').CanonicalRow[]) => Promise<import('../types/import').ImportResultDTO>,
     downloadTemplate: () => Promise<import('../types/import').DownloadTemplateResult>,
   }
   settings: {

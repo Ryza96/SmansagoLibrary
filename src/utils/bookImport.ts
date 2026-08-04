@@ -1,6 +1,6 @@
 import { IMPORT_CONFIG } from '../config/import.config'
 import { LABELS } from './labels'
-import type { ImportErrorCode, MatchedWorkbook } from '../types/import'
+import type { ImportErrorCode } from '../types/import'
 
 export function formatFileSize(bytes: number): string {
   if (!Number.isFinite(bytes) || bytes < 0) return '0 B'
@@ -74,29 +74,3 @@ export function getImportResultMessage(messageKey: string): string {
   return IMPORT_RESULT_MESSAGES[messageKey] ?? LABELS.IMPORT.ERROR_UNKNOWN
 }
 
-export interface ImportResultSummaryData {
-  booksCreated: number
-  copiesCreated: number
-  failedRows: number
-}
-
-export function computeImportResultSummary(result: MatchedWorkbook): ImportResultSummaryData {
-  const failedRowNumbers = new Set(
-    result.matchingResult.errors.filter((e) => e.rowNumber !== null).map((e) => e.rowNumber)
-  )
-  const failedRows = failedRowNumbers.size
-
-  let copiesCreated = 0
-  for (const row of result.matchedRows) {
-    if (failedRowNumbers.has(row.rowNumber)) continue
-    const raw = row.canonicalRow.values['copyCount']
-    const num = typeof raw === 'number' ? raw : raw !== null && raw !== undefined ? Number(String(raw).trim()) : NaN
-    copiesCreated += Number.isFinite(num) && num >= 1 ? num : 1
-  }
-
-  return {
-    booksCreated: result.matchedRows.length - failedRows,
-    copiesCreated,
-    failedRows,
-  }
-}

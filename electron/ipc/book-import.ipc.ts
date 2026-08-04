@@ -2,7 +2,6 @@ import { app, BrowserWindow, dialog, ipcMain, type IpcMainInvokeEvent } from 'el
 import fs from 'fs'
 import path from 'path'
 import type { MatchingEngineService } from '../../src/services/MatchingEngineService'
-import type { AutoCreateService } from '../../src/main/services/auto-create.service'
 import type { BookImportService } from '../../src/main/services/book-import.service'
 import type { CanonicalRow, DownloadTemplateResult, ValidatedWorkbook } from '../../src/types/import'
 
@@ -58,12 +57,10 @@ async function downloadTemplate(event: IpcMainInvokeEvent): Promise<DownloadTemp
 
 export function registerBookImportHandlers(
   matchingEngine: MatchingEngineService,
-  autoCreateService: AutoCreateService,
   bookImportService: BookImportService
 ): void {
   ipcMain.handle('imports:match', async (_event, canonicalRows: CanonicalRow[]) => {
     const matchedWorkbook = await matchingEngine.match(toValidatedWorkbook(canonicalRows))
-    await autoCreateService.apply(matchedWorkbook)
     return bookImportService.importBooks(matchedWorkbook)
   })
 

@@ -1,8 +1,9 @@
-import type { ImportCellValue, MatchedWorkbook, MatchedRow, MatchingIssue } from '../../types/import'
+import type { ImportCellValue, ImportResultDTO, MatchedWorkbook, MatchedRow, MatchingIssue } from '../../types/import'
 import { BookRepository } from '../repositories/book.repository'
 import { BookCopyRepository } from '../repositories/book-copy.repository'
 import { getPrisma } from '../repositories/base/prisma'
 import { runTransaction } from '../repositories/base/transaction'
+import { AutoCreateService } from './auto-create.service'
 import { InventoryAllocator } from './inventory-allocator'
 
 const BOOK_AMBIGUOUS_MESSAGE_KEY = 'bookImport.ambiguous'
@@ -14,14 +15,21 @@ const BOOK_COPY_CREATE_FAILED_MESSAGE_KEY = 'bookImport.copyCreateFailed'
 
 const INVENTORY_CREATE_RETRIES = 3
 
+class ImportRowBlockedError extends Error {
+  constructor(readonly messageKey: string) {
+    super(messageKey)
+  }
+}
+
 export class BookImportService {
   constructor(
     private readonly bookRepository: BookRepository,
     private readonly bookCopyRepository: BookCopyRepository,
+    private readonly autoCreateService: AutoCreateService,
     private readonly inventoryAllocator: InventoryAllocator = new InventoryAllocator()
   ) {}
 
-  async importBooks(workbook: MatchedWorkbook): Promise<MatchedWorkbook> {
+  async importBooks(workbook: MatchedWorkbook): Promise<ImportResultDTO> {
     const errors: MatchingIssue[] = []
 
     for (const row of workbook.matchedRows) {
@@ -31,7 +39,29 @@ export class BookImportService {
     }
 
     workbook.matchingResult.errors.push(...errors)
-    return workbook
+    return this.toImportResult(workbook)
+  }
+
+  private toImportResult(workbook: MatchedWorkbook): ImportResultDTO {
+    const failures = new Map<number, string>()
+    for (const error of workbook.matchingResult.errors) {
+      if (error.rowNumber === null || failures.has(error.rowNumber)) continue
+      failures.set(error.rowNumber, error.messageKey)
+    }
+
+    let importedCopies = 0
+    for (const row of workbook.matchedRows) {
+      if (failures.has(row.rowNumber)) continue
+      const copyCount = this.valueToInteger(row.canonicalRow.values['copyCount']) ?? 1
+      importedCopies += copyCount >= 1 ? copyCount : 1
+    }
+
+    return {
+      totalRows: workbook.matchedRows.length,
+      importedBooks: workbook.matchedRows.length - failures.size,
+      importedCopies,
+      failedRows: Array.from(failures, ([rowNumber, messageKey]) => ({ rowNumber, messageKey })),
+    }
   }
 
   private async importRow(row: MatchedRow): Promise<MatchingIssue[]> {
@@ -51,14 +81,6 @@ export class BookImportService {
       return issues
     }
 
-    const authorId = this.resolvedId(row, 'authors')
-    const publisherId = this.resolvedId(row, 'publisher')
-    const categoryId = this.resolvedId(row, 'category')
-    if (!authorId || !publisherId || !categoryId) {
-      issue(BOOK_ENTITY_MISSING_MESSAGE_KEY)
-      return issues
-    }
-
     const isbnValue = row.canonicalRow.values['isbn']
     const isbn = isbnValue === null || isbnValue === undefined ? null : String(isbnValue).trim() || null
 
@@ -67,30 +89,31 @@ export class BookImportService {
       return issues
     }
 
-    const publicationYear = this.valueToNumber(row.canonicalRow.values['year'])
-    const description = this.valueToString(row.canonicalRow.values['description']) || undefined
-
     const copyCount = this.valueToInteger(row.canonicalRow.values['copyCount']) ?? 1
     if (!Number.isInteger(copyCount) || copyCount < 1 || copyCount > 100) {
       issue(BOOK_COPY_CREATE_FAILED_MESSAGE_KEY)
       return issues
     }
 
+    const publicationYear = this.valueToNumber(row.canonicalRow.values['year'])
+    const description = this.valueToString(row.canonicalRow.values['description']) || undefined
+
     try {
       await this.createBookWithCopies(
         {
           title,
           isbn: isbn ?? undefined,
-          authorId,
-          publisherId,
-          categoryId,
           publicationYear,
           description,
         },
         copyCount,
-        row.canonicalRow.values
+        row
       )
     } catch (error) {
+      if (error instanceof ImportRowBlockedError) {
+        issue(error.messageKey)
+        return issues
+      }
       const code = (error as { code?: string })?.code
       if (code === 'P2002' && isbn && (await this.bookRepository.existsByISBN(isbn))) {
         issue(BOOK_ISBN_DUPLICATE_MESSAGE_KEY)
@@ -106,24 +129,30 @@ export class BookImportService {
     bookData: {
       title: string
       isbn?: string
-      authorId: string
-      publisherId: string
-      categoryId: string
       publicationYear?: number
       description?: string
     },
     copyCount: number,
-    values: Record<string, ImportCellValue>
+    row: MatchedRow
   ): Promise<void> {
-    const shelfLocation = this.valueToString(values['shelfLocation']) || ''
-    const acquisitionSource = this.valueToString(values['acquisitionSource']) || undefined
-    const acquisitionDate = this.valueToDate(values['acquisitionDate'])
-    const acquisitionCost = this.valueToNumber(values['acquisitionCost'])
+    const shelfLocation = this.valueToString(row.canonicalRow.values['shelfLocation']) || ''
+    const acquisitionSource = this.valueToString(row.canonicalRow.values['acquisitionSource']) || undefined
+    const acquisitionDate = this.valueToDate(row.canonicalRow.values['acquisitionDate'])
+    const acquisitionCost = this.valueToNumber(row.canonicalRow.values['acquisitionCost'])
 
     for (let attempt = 0; attempt < INVENTORY_CREATE_RETRIES; attempt++) {
       try {
         await runTransaction(getPrisma(), async (tx) => {
-          const book = await this.bookRepository.createWithTx(tx, bookData)
+          await this.autoCreateService.resolveRow(row, tx)
+
+          const authorId = this.resolvedId(row, 'authors')
+          const publisherId = this.resolvedId(row, 'publisher')
+          const categoryId = this.resolvedId(row, 'category')
+          if (!authorId || !publisherId || !categoryId) {
+            throw new ImportRowBlockedError(BOOK_ENTITY_MISSING_MESSAGE_KEY)
+          }
+
+          const book = await this.bookRepository.createWithTx(tx, { ...bookData, authorId, publisherId, categoryId })
           const inventoryNumbers = await this.inventoryAllocator.allocate(tx, copyCount)
           await this.bookCopyRepository.createManyWithTx(
             tx,
@@ -140,6 +169,9 @@ export class BookImportService {
         })
         return
       } catch (error) {
+        if (error instanceof ImportRowBlockedError) {
+          throw error
+        }
         const code = (error as { code?: string })?.code
         if (code === 'P2002' && attempt < INVENTORY_CREATE_RETRIES - 1) {
           continue

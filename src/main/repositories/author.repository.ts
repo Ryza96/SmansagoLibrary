@@ -1,7 +1,7 @@
 import { BaseRepository } from './base/base.repository'
 import { getPaginationParams, toPaginatedResult } from './base/pagination'
 import type { FindOptions } from './base/repository.types'
-import type { Author } from '@prisma/client'
+import type { Author, Prisma } from '@prisma/client'
 
 type CreateAuthorData = Pick<Author, 'name'>
 type UpdateAuthorData = Partial<Pick<Author, 'name'>>
@@ -9,6 +9,10 @@ type UpdateAuthorData = Partial<Pick<Author, 'name'>>
 export class AuthorRepository extends BaseRepository {
   async create(data: CreateAuthorData): Promise<Author> {
     return this.prisma.author.create({ data })
+  }
+
+  async createWithTx(tx: Prisma.TransactionClient, data: CreateAuthorData): Promise<Author> {
+    return tx.author.create({ data })
   }
 
   async update(id: string, data: UpdateAuthorData): Promise<Author> {
@@ -45,6 +49,14 @@ export class AuthorRepository extends BaseRepository {
 
   async findExact(name: string): Promise<Author[]> {
     return this.prisma.author.findMany({
+      where: { name: { equals: name } },
+      take: 10,
+      orderBy: { name: 'asc' }
+    })
+  }
+
+  async findExactWithTx(tx: Prisma.TransactionClient, name: string): Promise<Author[]> {
+    return tx.author.findMany({
       where: { name: { equals: name } },
       take: 10,
       orderBy: { name: 'asc' }
