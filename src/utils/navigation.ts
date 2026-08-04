@@ -7,6 +7,7 @@ export const ROUTES = {
   BOOK_DETAIL: '/books/:id',
   BOOK_EDIT: '/books/:id/edit',
   BOOK_LABEL_PREVIEW: '/books/:id/labels-preview',
+  BORROW_RECEIPT_PREVIEW: '/borrowings/:id/receipt-preview',
   MEMBERS: '/members',
   MEMBERS_STUDENTS: '/members/students',
   MEMBERS_TEACHERS: '/members/teachers',
@@ -54,6 +55,10 @@ export function bookEditPath(id: string) {
 
 export function bookLabelPreviewPath(id: string) {
   return `/books/${id}/labels-preview`
+}
+
+export function receiptPreviewPath(id: string) {
+  return `/borrowings/${id}/receipt-preview`
 }
 
 export function memberDetailPath(id: string) {

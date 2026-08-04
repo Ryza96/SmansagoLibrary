@@ -1,9 +1,38 @@
-import { BrowserWindow } from 'electron'
+import { BrowserWindow, app, dialog } from 'electron'
+import { readFile, writeFile } from 'fs/promises'
+import { join } from 'path'
 import { AppError } from '../errorHandler'
 import { BorrowRepository } from '../../../src/main/repositories/borrow.repository'
 import { SettingService } from './setting.service'
 import { generateLabelsHtml } from '../../../src/main/services/label.service'
+import { buildBorrowCardData, generateBorrowCardHtml } from '../../../src/main/services/borrow-card.service'
 import type { BorrowReceiptData, ReturnReceiptData, BookLabelData } from '../../../src/shared/dto/print'
+
+// WO-2 — nama file PDF Kartu Peminjaman (FINAL PREVIEW DESIGN DECISION F5).
+// Format: "Kartu Peminjaman - <borrowNumber> - <Nama Anggota>.pdf".
+// Murni (tanpa Electron) agar dapat diuji smoke; sanitasi aman Windows.
+export function buildBorrowCardPdfFilename(borrowing: { borrowNumber: string; memberName: string }): string {
+  const sanitize = (value: string): string =>
+    value
+      .replace(/[<>:"/\\|?*\u0000-\u001f]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+
+  const number = sanitize(borrowing.borrowNumber) || 'PEMINJAMAN'
+  const member = sanitize(borrowing.memberName).slice(0, 40) || 'Anggota'
+  return `Kartu Peminjaman - ${number} - ${member}.pdf`
+}
+
+const IMAGE_MIME: Record<string, string> = {
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.svg': 'image/svg+xml',
+  '.webp': 'image/webp',
+  '.bmp': 'image/bmp',
+  '.ico': 'image/x-icon'
+}
 
 export class PrintService {
   constructor(
@@ -18,6 +47,106 @@ export class PrintService {
   async printBookLabels(data: BookLabelData): Promise<void> {
     const html = generateLabelsHtml(data)
     await this.printHtml(html, { margins: { marginType: 'none' } })
+  }
+
+  // ---------------------------------------------------------------------------
+  // WO-2 — Kartu Peminjaman: Preview / Cetak / Simpan PDF (FINAL PREVIEW DESIGN
+  // DECISION). Seluruh aksi memakai SATU template (generateBorrowCardHtml) dan
+  // SATU assembler (buildBorrowCardData) dari BorrowCardService (WO-1) —
+  // BorrowCardService TIDAK dimodifikasi.
+  // ---------------------------------------------------------------------------
+
+  private async readFileAsDataUri(filePath: string): Promise<string | null> {
+    try {
+      const ext = filePath.toLowerCase().match(/\.[a-z0-9]+$/)?.[0] ?? ''
+      const mime = IMAGE_MIME[ext]
+      if (!mime) return null
+      const buffer = await readFile(filePath)
+      return `data:${mime};base64,${buffer.toString('base64')}`
+    } catch {
+      return null
+    }
+  }
+
+  async buildBorrowCardHtml(borrowingId: string): Promise<string> {
+    const [borrowing, settings] = await Promise.all([
+      this.borrowRepository.findById(borrowingId),
+      this.settingService.get()
+    ])
+    if (!borrowing) {
+      throw new AppError(404, 'Not Found', 'Data peminjaman tidak ditemukan.')
+    }
+    const data = await buildBorrowCardData(borrowing, settings, {
+      readFileAsDataUri: this.readFileAsDataUri.bind(this)
+    })
+    return generateBorrowCardHtml(data)
+  }
+
+  async getBorrowCardPreviewHtml(borrowingId: string): Promise<string> {
+    return this.buildBorrowCardHtml(borrowingId)
+  }
+
+  async printBorrowCard(borrowingId: string): Promise<void> {
+    const html = await this.buildBorrowCardHtml(borrowingId)
+    await this.printHtml(html, { margins: { marginType: 'none' } })
+  }
+
+  async saveBorrowCardPdf(borrowingId: string): Promise<{ saved: boolean; filePath?: string }> {
+    const [borrowing, html] = await Promise.all([
+      this.borrowRepository.findById(borrowingId),
+      this.buildBorrowCardHtml(borrowingId)
+    ])
+    if (!borrowing) {
+      throw new AppError(404, 'Not Found', 'Data peminjaman tidak ditemukan.')
+    }
+
+    const pdf = await this.renderPdf(html)
+    const filename = buildBorrowCardPdfFilename(borrowing)
+
+    const result = await dialog.showSaveDialog({
+      title: 'Simpan Kartu Peminjaman PDF',
+      defaultPath: join(app.getPath('documents'), filename),
+      filters: [{ name: 'PDF', extensions: ['pdf'] }]
+    })
+
+    if (result.canceled || !result.filePath) {
+      return { saved: false }
+    }
+
+    await writeFile(result.filePath, pdf)
+    return { saved: true, filePath: result.filePath }
+  }
+
+  private renderPdf(html: string): Promise<Buffer> {
+    return new Promise((resolve, reject) => {
+      const printWindow = new BrowserWindow({
+        width: 800,
+        height: 600,
+        show: false,
+        webPreferences: {
+          contextIsolation: true,
+          nodeIntegration: false
+        }
+      })
+
+      printWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`)
+
+      printWindow.webContents.on('did-finish-load', async () => {
+        try {
+          const pdf = await printWindow.webContents.printToPDF({ printBackground: true })
+          resolve(pdf)
+        } catch (error) {
+          reject(error)
+        } finally {
+          if (!printWindow.isDestroyed()) printWindow.close()
+        }
+      })
+
+      printWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription) => {
+        if (!printWindow.isDestroyed()) printWindow.close()
+        reject(new Error(`Gagal memuat halaman PDF: ${errorDescription}`))
+      })
+    })
   }
 
   async printBorrowReceipt(borrowingId: string): Promise<void> {

@@ -7,6 +7,7 @@ import BooksPage from '../pages/BooksPage'
 import BookDetailPage from '../pages/BookDetailPage'
 import BookFormPage from '../pages/BookFormPage'
 import LabelPreviewPage from '../pages/LabelPreviewPage'
+import BorrowReceiptPreviewPage from '../pages/BorrowReceiptPreviewPage'
 import BookImportPage from '../pages/BookImportPage'
 import BookImportPreviewPage from '../pages/BookImportPreviewPage'
 import MemberListPage from '../pages/MemberListPage'
@@ -69,6 +70,7 @@ export const router = createHashRouter([
       { path: 'members/:id/edit', element: <MemberEditPage /> },
       { path: 'members/:id/enrollments', element: <EnrollmentHistoryPage /> },
       { path: 'borrowings', element: <BorrowingsPage /> },
+      { path: 'borrowings/:id/receipt-preview', element: <BorrowReceiptPreviewPage /> },
       { path: 'returns', element: <ReturnsPage /> },
       { path: 'inventory', element: <InventoryPage /> },
       { path: 'inventory/:id', element: <InventoryDetailPage /> },

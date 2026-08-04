@@ -1,8 +1,10 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { X, BookmarkCheck, Printer } from 'lucide-react'
 import SearchableSelect from '../components/ui/SearchableSelect'
 import type { CreateBorrowingInput } from '../types/dtos/borrowing'
 import type { MemberDTO } from '../types/dtos/member'
+import { receiptPreviewPath } from '../utils/navigation'
 
 interface BookEntry {
   bookCopyId: string
@@ -23,6 +25,7 @@ function useDebounce<T extends (...args: any[]) => void>(fn: T, delay: number): 
 }
 
 export default function BorrowingPage() {
+  const navigate = useNavigate()
   const barcodeRef = useRef<HTMLInputElement>(null)
   const [barcode, setBarcode] = useState('')
   const [books, setBooks] = useState<BookEntry[]>([])
@@ -125,6 +128,7 @@ export default function BorrowingPage() {
       const result = await window.electronAPI.borrowings.create(input)
       setLastSuccessBorrowingId(result.id)
       alert('Transaksi berhasil disimpan.')
+      navigate(receiptPreviewPath(result.id))
       setBooks([])
       setSelectedMember(null)
       setMemberStats(null)

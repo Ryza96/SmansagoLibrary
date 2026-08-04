@@ -132,6 +132,9 @@ interface ElectronAPI {
     borrowReceipt: (borrowingId: string) => Promise<void>
     returnReceipt: (borrowingId: string) => Promise<void>
     bookLabels: (input: import('../../src/shared/dto/print').BookLabelData) => Promise<void>
+    borrowCardPreview: (borrowingId: string) => Promise<string>
+    borrowCard: (borrowingId: string) => Promise<void>
+    borrowCardPdf: (borrowingId: string) => Promise<{ saved: boolean; filePath?: string }>
   }
   academicYears: {
     findMany: (search?: string, page?: number, limit?: number) => Promise<{
