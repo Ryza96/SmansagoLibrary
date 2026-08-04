@@ -765,3 +765,22 @@ pm run build PASS (main 1,819.55 kB � preload 9.02 kB � renderer 1,044.75 kB
 - **`webContents.print` (non-silent) tidak bisa diuji headless** — smoke menguji preview HTML (string murni), filename generator, dan kontrak IPC/preload via grep bundle; `printBorrowCard`/`saveBorrowCardPdf` memerlukan runtime Electron.
 - **Template menampilkan judul dari RELASI `bookCopy.book.title`**, bukan snapshot `borrowDetail.bookTitle` (prioritas relasi > snapshot, WO-1). Smoke awal salah assert snapshot — ubah assertion, bukan kode.
 - **Smoke WO-2 import `bwip-js` transitif** (via `print.service` → `borrow-card.service` → `barcode.service`) → compile `--module node16 --moduleResolution node16` (pola WO-1); fresh DB `file:C:/...` + migrate deploy workdir `prisma/` + `NODE_PATH=<repo>\node_modules`.
+
+---
+
+## FINAL UAT — Borrow Card (COMPLETE - BUGFIX ONLY, FEATURE COMPLETED)
+
+### Ringkasan
+- Mode **UAT / bug-fix only** atas seluruh alur Borrow Card (WO-1 engine + WO-2 Preview/Print/PDF). TIDAK ada discovery/refactor/fitur baru/arsitektur.
+- **Hasil: BORROW CARD FEATURE COMPLETED — TIDAK ADA BUG source.**
+- **Smoke baru `borrow_card_uat_smoke/smoke.ts` 29/29 PASS** (fresh DB): alur penuh create→findById→preview (`BorrowService.create` DTO id+borrowingNumber → `PrintService.getBorrowCardPreviewHtml`), 1 buku→1 sheet, 20 buku→3 sheet (3+10+7, 20 baris, `Jumlah: 20`, LANJUTAN), badge AKTIF (`badge-active`), QR payload `borrowing.id` (dibuktikan `html.includes(generateQrCodeSvg(id))`), avatar placeholder inisial AU, logo fallback monogram SN tanpa `data:image` (logoPath kosong), nama file PDF F5 (`Kartu Peminjaman - PJ2026080001 - Anggota Umum.pdf`, tanpa `/`), 404 AppError.
+- **Regression Borrow 228/228 PASS** (fresh DB per suite): wo1 101 · eligibility 7 · it1 34 · e2 36 · wo2 21 · uat 29. lint PASS · build PASS (main 1,837.03 · preload 9.34 · renderer 1,059.12 kB) · `prisma migrate diff` no-drift.
+- **4 item UI memerlukan runtime Electron** (zoom/Fit Width/Ctrl+Wheel, dialog printer, dialog save PDF, navigasi balik) — diverifikasi code review + grep bundle (`addEventListener("wheel"`, `webContents.print`, `printToPDF`, `showSaveDialog`, `navigate(-1)`); konfirmasi visual manual PO direkomendasikan.
+- **2 FAIL awal pada smoke = kesalahan assertion fixture, BUKAN bug:** (1) QR payload di-encode ke path SVG, bukan teks UUID → bukti `generateQrCodeSvg(id)` substring; (2) `logo-img` yang muncul adalah selector CSS `.logo-img`, bukan `<img class="logo-img">`. Assertion dikoreksi, source TIDAK diubah.
+- **Laporan:** `BORROW_CARD_UAT_REPORT.md`, `BORROW_CARD_BUGFIX_REPORT.md`. Commit final + push. Status: **FEATURE COMPLETED** (berhenti, tidak buka WO baru).
+
+### Pelajaran (retain)
+- **Uji "QR payload benar" lewat kesetaraan blok**: `html.includes(generateQrCodeSvg(borrowing.id))` — QR value di-encode ke path SVG, jangan cari teks UUID literal di HTML.
+- **Grep string yang menjadi selector CSS bisa false-positive**: `.logo-img` ada di `<style>` walau tidak ada elemen `<img class="logo-img">`; assert dengan awalan elemen (`<img class="logo-img"`) atau negasi `data:image`.
+- **UAT service-level = tiru jalur IPC persis** (create→findById→preview) dengan service nyata + settings DB nyata; widget UI/dialog yang butuh Electron dibuktikan code review + grep bundle, bukan dijalankan headless.
+- **Mode bugfix**: 2 FAIL smoke dianalisis dulu — konfirmasi apakah assertion atau source yang salah; hanya source yang terbukti cacat yang diperbaiki.
