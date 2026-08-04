@@ -679,3 +679,21 @@ Audit menyeluruh terhadap Borrowing Module: Prisma schema, Repository, Service, 
 - **Cross-boundary import `AppError`** dari `electron/main/errorHandler` ke `src/main/repositories/borrow.repository.ts` — pola existing, bukan baru. `AppError` adalah class murni (tanpa import Electron) sehingga aman dijalankan di smoke node.
 - **Smoke atomic guard**: bypass pre-tx service check dengan memanggil `borrowRepository.createWithItems` langsung — satu-satunya cara menguji rollback all-or-nothing (pre-tx guard memblokir sebelum tx).
 - **Smoke no-resurrection**: simulasi legacy dirty data via `prisma.bookCopy.update({ status: REMOVED })` langsung pada copy yang punya active detail, lalu `returnBook` → status tetap REMOVED.
+
+---
+
+## IT-1 HOTFIX: Borrow Member Status Eligibility (COMPLETE - READY review PO)
+
+### Ringkasan
+- **Root Cause:** `BorrowService.create` memakai `member.status !== 'ACTIVE'` sebagai guard peminjaman, tetapi `Member.status` bukan sumber otoritas eligibility peminjaman — SISWA eligibility ditentukan oleh `MemberEnrollment.status=ACTIVE`.
+- **Business Rules (PO Approved):** SISWA → wajib punya Enrollment ACTIVE; GURU/UMUM → tidak butuh enrollment; Unknown MemberType → DITOLAK (Validation Error, bukan dianggap General).
+- **Modifikasi (2 source):** `src/main/services/borrow.service.ts` (ganti `member.status` check → `getMemberType()` + `enrollmentService.findActiveByMember()`; unknown type → AppError 400), `src/pages/BorrowingsPage.tsx` (`'active'` → `'ACTIVE'` badge fix).
+- **Regression Updated:** `wo14_e2_smoke/smoke.ts` (STEP 9: teacher dgn classId legacy; STEP 10: message baru), `it1_borrow_return_smoke/smoke.ts` (seed tambah enrollment untuk student).
+- **Validation PASS:** (1) smoke 7/7 (7 mandatory cases: ACTIVE/GRADUATED/TRANSFERRED/DROPPED/teacher/general/unknown); (2) regression wo14_e2 36/36 + it1 34/34 = **77 PASS total**; (3) lint PASS; (4) build PASS (main 1,819.55 kB · preload 9.02 kB · renderer 1,044.75 kB); (5) `prisma migrate diff` = "No difference detected".
+- **Laporan:** `IT1_BORROW_ELIGIBILITY_FINAL_REVIEW.md`, `IT1_BORROW_ELIGIBILITY_RELEASE_REPORT.md`. Status: **DONE — menunggu review PO**.
+
+### Pelajaran (retain)
+- **`Member.status` bukan otoritas eligibility peminjaman.** SISWA eligibility = `MemberEnrollment.status=ACTIVE` (enrollment-based). Guru/Umum tidak membutuhkan enrollment.
+- **Unknown `MemberType` harus ditolak eksplisit** — `getMemberType()` mengembalikan `null`; BorrowService menolak sebelum cek enrollment.
+- **Case-sensitive badge UI** — `BorrowingsPage.tsx` harus pakai `'ACTIVE'` (bukan `'active'`).
+- **Regression yang pakai `BorrowService` wajib seed enrollment untuk student** — dua regression smoke harus di-update.

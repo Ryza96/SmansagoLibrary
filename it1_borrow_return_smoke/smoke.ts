@@ -79,6 +79,21 @@ async function main(): Promise<void> {
   const copy6 = await makeCopy('INV-000006')
   check('seed: 2 member + 1 buku + 6 eksemplar AVAILABLE', m1.id !== '' && copy1 !== copy2)
 
+  console.log('--- SEED: enroll m1 dan m2 (syarat baru untuk siswa meminjam) ---')
+  const curriculum = await prisma.curriculum.create({ data: { name: 'MERDEKA' } })
+  const yearA = await prisma.academicYear.create({
+    data: { name: '2025/2026', startDate: new Date('2025-07-01'), endDate: new Date('2026-06-30'), isActive: true }
+  })
+  const classA = await prisma.class.create({
+    data: { academicYearId: yearA.id, curriculumId: curriculum.id, educationLevel: 'X', parallel: 'A', homeroomTeacher: null, isActive: true }
+  })
+  await prisma.memberEnrollment.create({
+    data: { memberId: m1.id, classId: classA.id, academicYearId: yearA.id, status: 'ACTIVE', enrolledAt: new Date(), leftAt: null }
+  })
+  await prisma.memberEnrollment.create({
+    data: { memberId: m2.id, classId: classA.id, academicYearId: yearA.id, status: 'ACTIVE', enrolledAt: new Date(), leftAt: null }
+  })
+
   console.log('--- STEP 1: double-borrow ditolak (service guard) ---')
   const borrow1 = await borrowService.create({ memberId: m1.id, dueDate: futureDate(), bookCopyIds: [copy1] })
   const copy1After = await prisma.bookCopy.findUnique({ where: { id: copy1 } })

@@ -4,6 +4,7 @@ import { MemberRepository } from '../repositories/member.repository'
 import { BookCopyRepository } from '../repositories/book-copy.repository'
 import { EnrollmentService } from './enrollment.service'
 import type { BorrowingDTO, BorrowingItemDetailDTO, CreateBorrowingInput } from '../../shared/dto/borrowing'
+import { getMemberType } from '../../shared/config/member-type'
 import { AppError } from '../../../electron/main/errorHandler'
 
 // TECHNICAL DEBT: MAX_BOOKS masih hardcoded.
@@ -130,8 +131,22 @@ export class BorrowService {
       throw new AppError(404, 'Not Found', `Member ${input.memberId} tidak ditemukan`)
     }
 
-    if (member.status !== 'ACTIVE') {
-      throw new AppError(400, 'Validation Error', `Member ${member.fullName} tidak aktif`)
+    // Business Rule baru (PO):
+    // - Tipe anggota WAJIB dikenal (student/teacher/general).
+    // - SISWA wajib punya Enrollment ACTIVE untuk meminjam.
+    // - GURU/UMUM tidak membutuhkan Enrollment — lolos tanpa pengecekan enrollment.
+    const memberType = getMemberType(member.memberType)
+    if (!memberType) {
+      throw new AppError(400, 'Validation Error', `Tipe anggota "${member.memberType}" tidak valid`)
+    }
+
+    const hasAcademicRecord = memberType.hasAcademicRecord === true
+    const enrollment = hasAcademicRecord
+      ? await this.enrollmentService.findActiveByMember(input.memberId)
+      : null
+
+    if (hasAcademicRecord && !enrollment) {
+      throw new AppError(400, 'Validation Error', `Member ${member.fullName} tidak memiliki enrollment aktif`)
     }
 
     const dueDate = new Date(input.dueDate)
@@ -169,7 +184,6 @@ export class BorrowService {
     const lastNumber = await this.borrowRepository.getLastBorrowNumber()
     const borrowNumber = generateBorrowNumber(lastNumber)
 
-    const enrollment = await this.enrollmentService.findActiveByMember(input.memberId)
     const className = enrollment?.className
 
     const created = await this.borrowRepository.createWithItems(

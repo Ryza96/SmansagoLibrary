@@ -153,18 +153,24 @@ async function main(): Promise<void> {
   check('borrow DTO memberName', borrow1.memberName === 'Siswa Tiga')
 
   console.log('--- STEP 9: Borrow snapshot MENGABAIKAN legacy classId ---')
-  const borrow2 = await borrowService.create({ memberId: student2.id, dueDate: futureDate(), bookCopyIds: [copy2.id] })
+  const teacherWithClassId = await prisma.member.create({
+    data: { memberNumber: 'G-000002', fullName: 'Guru Legacy', memberType: 'teacher', status: 'ACTIVE', classId: classA.id }
+  })
+  const copyForTeacher = await prisma.bookCopy.create({
+    data: { bookId: book.id, inventoryNumber: 'INV-000003', barcode: 'INV-000003', shelfLocation: 'R1', status: 'AVAILABLE' }
+  })
+  const borrow2 = await borrowService.create({ memberId: teacherWithClassId.id, dueDate: futureDate(), bookCopyIds: [copyForTeacher.id] })
   const borrow2Row = await prisma.borrow.findUnique({ where: { id: borrow2.id } })
-  expectEqual('borrow.className null (student2 ber-classId legacy, tanpa enrollment)', borrow2Row?.className, null)
+  expectEqual('borrow.className null (teacher punya classId legacy, tanpa enrollment)', borrow2Row?.className, null)
 
   console.log('--- STEP 10: Borrow regression guards ---')
   const inactiveMember = await prisma.member.create({
     data: { memberNumber: 'S-000009', fullName: 'Siswa Inaktif', memberType: 'student', status: 'INACTIVE' }
   })
   await expectRejected(
-    'borrow member tidak aktif ditolak',
+    'borrow siswa tanpa enrollment ditolak',
     () => borrowService.create({ memberId: inactiveMember.id, dueDate: futureDate(), bookCopyIds: [copy1.id] }),
-    'tidak aktif'
+    'tidak memiliki enrollment aktif'
   )
   const borrow1byId = await borrowService.findById(borrow1.id)
   expectEqual('borrow findById totalItems', borrow1byId.totalItems, 1)

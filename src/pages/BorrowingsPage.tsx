@@ -253,8 +253,8 @@ export default function BorrowingPage() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-500">Status</span>
-                  <span className={`font-medium ${selectedMember.status === 'active' ? 'text-green-600' : 'text-slate-400'}`}>
-                    {selectedMember.status === 'active' ? 'Aktif' : 'Nonaktif'}
+                  <span className={`font-medium ${selectedMember.status === 'ACTIVE' ? 'text-green-600' : 'text-slate-400'}`}>
+                    {selectedMember.status === 'ACTIVE' ? 'Aktif' : 'Nonaktif'}
                   </span>
                 </div>
                 <div className="flex justify-between">
