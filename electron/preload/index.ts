@@ -12,6 +12,7 @@ import { academicYearAPI } from './academic-year.preload'
 import { curriculumAPI } from './curriculum.preload'
 import { classAPI } from './class.preload'
 import { enrollmentAPI } from './enrollment.preload'
+import { promotionAPI } from './promotion.preload'
 import { inventoryAPI } from './inventory.preload'
 import { assetEventAPI } from './asset-event.preload'
 import { settingAPI } from './setting.preload'
@@ -31,6 +32,7 @@ const electronAPI = {
   ...curriculumAPI,
   ...classAPI,
   ...enrollmentAPI,
+  ...promotionAPI,
   ...inventoryAPI,
   ...assetEventAPI,
   ...settingAPI,

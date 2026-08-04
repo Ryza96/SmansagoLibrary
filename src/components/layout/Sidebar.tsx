@@ -8,6 +8,7 @@ import {
   Undo2,
   ClipboardList,
   BarChart3,
+  TrendingUp,
   Settings,
   Database,
   ChevronDown,
@@ -20,6 +21,7 @@ const menuItems = [
   { to: '/borrowings', label: 'Peminjaman', icon: BookmarkCheck },
   { to: '/returns', label: 'Pengembalian', icon: Undo2 },
   { to: '/inventory', label: 'Inventaris', icon: ClipboardList },
+  { to: '/promotions', label: 'Riwayat Promosi', icon: TrendingUp },
   { to: '/reports', label: 'Laporan', icon: BarChart3 },
   { to: '/settings', label: 'Pengaturan', icon: Settings }
 ]

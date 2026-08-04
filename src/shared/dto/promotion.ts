@@ -110,26 +110,70 @@ export interface AutomaticPromotionExecuteInput {
 export type PromotionRunStatus = 'SUCCESS' | 'PARTIAL' | 'FAILED'
 
 // Satu baris audit eksekusi — mirror PromotionRunItem (RFC §2.2).
+// memberName/sourceClassLabel/targetClassLabel = data display (bukan hitung
+// ulang; semata join untuk keterbacaan manusia di halaman history P-3).
 export interface PromotionRunItemDTO {
   id: string
   promotionRunId: string
   memberId: string
+  memberName: string
   sourceClassId: string
+  sourceClassLabel: string | null
   targetClassId: string | null
+  targetClassLabel: string | null
   outcome: PromotionOutcome
   message: string | null
 }
 
-// Audit penuh sebuah run (RFC §9). summary = counts agregat (mirror preview).
+// Audit penuh sebuah run (RFC §9). summary = counts agregat (mirror preview,
+// kontrak P-2, tetap dipertahankan); counts = versi history P-3 dengan kolom
+// status akademik tambahan (transferred/dropped — default 0 untuk run yang
+// tidak pernah memproduksi status tersebut). Semua nilai BERASAL dari kolom
+// summary (PromotionRun) — TIDAK ada perhitungan ulang via decide().
 export interface PromotionRunDTO {
   id: string
   fromYearId: string
   toYearId: string
+  fromYearName: string
+  toYearName: string
   mode: PromotionPreviewMode
   runBy: string | null
   status: PromotionRunStatus
   summary: PromotionPreviewCounts | null
+  counts: PromotionRunSummaryCounts
   startedAt: string
   finishedAt: string | null
   items: PromotionRunItemDTO[]
+}
+
+// Ringkasan agregat history promosi (WO P-3) — hasil pembacaan kolom summary
+// (PromotionRun). Delapan kolom sesuai Business Rule PO: Promoted, Graduated,
+// Repeated, Redistributed, Transferred, Dropped, No Target, Error.
+// transferred/dropped adalah status akademik (RFC §2.2) yang dapat muncul pada
+// mode promosi lain; untuk run AUTOMATIC (P-2) nilainya 0.
+export interface PromotionRunSummaryCounts {
+  promoted: number
+  repeated: number
+  graduated: number
+  redistributed: number
+  transferred: number
+  dropped: number
+  noTarget: number
+  error: number
+}
+
+// Satu baris daftar riwayat promosi (WO P-3) — ringkas, tanpa items.
+export interface PromotionRunListItemDTO {
+  id: string
+  fromYearId: string
+  toYearId: string
+  fromYearName: string
+  toYearName: string
+  mode: PromotionPreviewMode
+  runBy: string | null
+  status: PromotionRunStatus
+  counts: PromotionRunSummaryCounts
+  startedAt: string
+  finishedAt: string | null
+  itemCount: number
 }

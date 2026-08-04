@@ -16,6 +16,7 @@ import type { AcademicYearService } from '../../src/main/services/academic-year.
 import type { CurriculumService } from '../../src/main/services/curriculum.service'
 import type { ClassService } from '../../src/main/services/class.service'
 import type { EnrollmentService } from '../../src/main/services/enrollment.service'
+import type { PromotionRunService } from '../../src/main/services/promotion-run.service'
 import type { InventoryService } from '../main/services/inventory.service'
 import type { AssetEventService } from '../main/services/asset-event.service'
 import type { SettingService } from '../main/services/setting.service'
@@ -36,6 +37,7 @@ import { registerAcademicYearHandlers } from './academic-year.ipc'
 import { registerCurriculumHandlers } from './curriculum.ipc'
 import { registerClassHandlers } from './class.ipc'
 import { registerEnrollmentHandlers } from './enrollment.ipc'
+import { registerPromotionHandlers } from './promotion.ipc'
 import { registerInventoryHandlers } from './inventory.ipc'
 import { registerAssetEventHandlers } from './asset-event.ipc'
 import { registerSettingHandlers } from './setting.ipc'
@@ -55,6 +57,7 @@ export function registerAllHandlers(
     curriculumService: CurriculumService
     classService: ClassService
     enrollmentService: EnrollmentService
+    promotionRunService: PromotionRunService
     newBookCopyService: BookCopyService
     newReturnService: NewReturnService
     borrowDetailRepository: BorrowDetailRepository
@@ -82,6 +85,7 @@ export function registerAllHandlers(
   registerCurriculumHandlers(services.curriculumService)
   registerClassHandlers(services.classService)
   registerEnrollmentHandlers(services.enrollmentService)
+  registerPromotionHandlers(services.promotionRunService)
   registerInventoryHandlers(services.inventoryService)
   registerAssetEventHandlers(services.assetEventService)
   registerSettingHandlers(services.settingService)

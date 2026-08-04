@@ -36,6 +36,8 @@ import { ClassService } from '../../src/main/services/class.service'
 import { ClassRepository } from '../../src/main/repositories/class.repository'
 import { EnrollmentService } from '../../src/main/services/enrollment.service'
 import { EnrollmentRepository } from '../../src/main/repositories/enrollment.repository'
+import { PromotionRunService } from '../../src/main/services/promotion-run.service'
+import { PromotionRepository } from '../../src/main/repositories/promotion.repository'
 import { MatchingEngineService } from '../../src/services/MatchingEngineService'
 import { createProductionStrategies } from '../../src/main/strategies/index'
 import { AutoCreateService } from '../../src/main/services/auto-create.service'
@@ -59,6 +61,7 @@ export interface Container {
   curriculumService: CurriculumService
   classService: ClassService
   enrollmentService: EnrollmentService
+  promotionRunService: PromotionRunService
   newBookCopyService: NewBookCopyService
   newReturnService: NewReturnService
   borrowDetailRepository: BorrowDetailRepository
@@ -107,6 +110,8 @@ export function createContainer(): Container {
   const curriculumService = new CurriculumService(curriculumRepository, classRepository)
   const classService = new ClassService(classRepository, academicYearRepository, curriculumRepository, enrollmentRepository)
   const enrollmentService = new EnrollmentService(enrollmentRepository, newMemberRepository, classRepository)
+  const promotionRepository = new PromotionRepository()
+  const promotionRunService = new PromotionRunService(promotionRepository)
   const borrowService = new BorrowService(borrowRepository, borrowDetailRepository, newMemberRepository, newBookCopyRepository, enrollmentService)
 
   const memberDuplicateChecker = new MemberDuplicateChecker(newMemberRepository)
@@ -137,6 +142,7 @@ export function createContainer(): Container {
     curriculumService,
     classService,
     enrollmentService,
+    promotionRunService,
     newBookCopyService,
     newReturnService,
     borrowDetailRepository,

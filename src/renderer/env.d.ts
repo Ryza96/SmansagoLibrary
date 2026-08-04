@@ -182,6 +182,15 @@ interface ElectronAPI {
     findActiveByMember: (memberId: string) => Promise<import('../../src/shared/dto/enrollment').EnrollmentDTO | null>
     historyByMember: (memberId: string) => Promise<import('../../src/shared/dto/enrollment').EnrollmentDTO[]>
   }
+  promotions: {
+    findMany: (page?: number, limit?: number) => Promise<{
+      data: import('../../src/shared/dto/promotion').PromotionRunListItemDTO[]
+      total: number
+      page: number
+      limit: number
+    }>
+    findById: (id: string) => Promise<import('../../src/shared/dto/promotion').PromotionRunDTO>
+  }
   inventory: {
     findMany: (params: {
       page?: number

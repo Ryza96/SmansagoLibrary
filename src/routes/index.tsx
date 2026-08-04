@@ -32,6 +32,8 @@ import CurriculumListPage from '../pages/master/CurriculumListPage'
 import CurriculumFormPage from '../pages/master/CurriculumFormPage'
 import ClassListPage from '../pages/master/ClassListPage'
 import ClassFormPage from '../pages/master/ClassFormPage'
+import PromotionHistoryPage from '../pages/promotion/PromotionHistoryPage'
+import PromotionRunDetailPage from '../pages/promotion/PromotionRunDetailPage'
 
 export const router = createHashRouter([
   {
@@ -69,6 +71,8 @@ export const router = createHashRouter([
       { path: 'returns', element: <ReturnsPage /> },
       { path: 'inventory', element: <InventoryPage /> },
       { path: 'inventory/:id', element: <InventoryDetailPage /> },
+      { path: 'promotions', element: <PromotionHistoryPage /> },
+      { path: 'promotions/:id', element: <PromotionRunDetailPage /> },
       { path: 'reports', element: <ReportsPage /> },
       { path: 'settings', element: <SettingsPage /> },
       { path: 'master/authors', element: <AuthorListPage /> },

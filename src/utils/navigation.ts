@@ -39,6 +39,8 @@ export const ROUTES = {
   MASTER_CLASSES: '/master/classes',
   MASTER_CLASS_NEW: '/master/classes/new',
   MASTER_CLASS_EDIT: '/master/classes/:id/edit',
+  PROMOTIONS: '/promotions',
+  PROMOTION_DETAIL: '/promotions/:id',
 } as const
 
 export function bookDetailPath(id: string) {
@@ -87,6 +89,10 @@ export function curriculumEditPath(id: string) {
 
 export function classEditPath(id: string) {
   return `/master/classes/${id}/edit`
+}
+
+export function promotionDetailPath(id: string) {
+  return `/promotions/${id}`
 }
 
 export function inventoryDetailPath(id: string) {
