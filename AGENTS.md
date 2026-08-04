@@ -697,3 +697,30 @@ Audit menyeluruh terhadap Borrowing Module: Prisma schema, Repository, Service, 
 - **Unknown `MemberType` harus ditolak eksplisit** â€” `getMemberType()` mengembalikan `null`; BorrowService menolak sebelum cek enrollment.
 - **Case-sensitive badge UI** â€” `BorrowingsPage.tsx` harus pakai `'ACTIVE'` (bukan `'active'`).
 - **Regression yang pakai `BorrowService` wajib seed enrollment untuk student** â€” dua regression smoke harus di-update.
+
+---
+
+## WO 22A: Backfill Execution — Development Database (COMPLETE - READY review PO)
+
+### Ringkasan
+- **Eksekusi scripts/backfill-member-enrollment.ts pada Development Database** prisma/aplibrary.db (WO 3 F2b dibuat di commit 195cd5, ikut rilis Milestone A 521824, TIDAK PERNAH dijalankan). Menutup gap migrasi: 0 MemberEnrollment ? 395.
+- **Hasil PERSIS prediksi plan:** membersWithClassId 395, enrollmentsCreated **395**, skippedAlreadyActive **0**, orphanMembers **0**, totalEnrollments 395. Semua status='ACTIVE', leftAt=null, cademicYearId konsisten dengan kelas (tahun 2026/2027). Duplicate (ACTIVE>1 per member) = 0. Invarian satu-ACTIVE = 0 pelanggaran.
+- **Preflight:** app Electron/node repo di-stop (persetujuan PO); DATABASE_URL absolute ile:D:/.../prisma/aplibrary.db; preflight read-only 395/395 classId, 13/13 kelas resolve, 0 orphan, 0 enrollment.
+- **Backup:** ackup/backfill-20260804/aplibrary.db (integrity_check=ok; hanya .db — tanpa -wal/-shm karena app mati).
+- **Eksekusi:** compile 
+px tsc --module commonjs --target es2022 --moduleResolution node --esModuleInterop --skipLibCheck --outDir <tmp>/out scripts/backfill-member-enrollment.ts; run dgn DATABASE_URL + NODE_PATH=<repo>\node_modules; output created 395 / skipped 0 / orphan 0.
+- **Member.classId & Member.status TIDAK berubah** — fingerprint SHA-256 (id|classId|status) backup vs live IDENTIK (eb5392a…). Status tetap 395× INACTIVE (ekspektasi: Membership ? Academic; alignment = Architecture Backlog).
+- **Blocker teratasi:** S-000140 Finza kini enrollment XI Merdeka 4 / 2026/2027 (ACTIVE) ? guard borrow eligibility (IT-1) lolos.
+- **Validation PASS:** (1) data validation (395/0/0/0); (2) smoke regression 11 suite fresh temp DB = **488/488 PASS** (Borrow: it_borrow_eligibility 7 + it1_borrow_return 34 + wo14_e2 36; Promotion: p1 33 + p2 87 + p3 75 + p4 37; Import: wo19_mi3 38 + wo20_mi4 24; Enrollment: wo13_e1 39 + wo15_e3 78); (3) 
+pm run lint PASS; (4) 
+pm run build PASS (main 1,819.55 kB · preload 9.02 kB · renderer 1,044.75 kB — identik baseline IT-1, TANPA perubahan kode); (5) prisma migrate diff --from-migrations & --from-url (dev DB) = "No difference detected" (exit 0); (6) migrate status up to date (4 migrations).
+- **Laporan:** BACKFILL_EXECUTION_REPORT.md, BACKFILL_FINAL_REVIEW.md, BACKFILL_RELEASE_REPORT.md. AGENTS.md + .gitignore (+ackup/).
+- **Status: DONE — menunggu review PO.** Selanjutnya per PO: Validation ? ? Integration Test ? UAT ? kembali ke Member.status Alignment (backlog).
+
+### Pelajaran (retain)
+- **Eksekusi migrasi satu-kali ? rilis kode.** Script backfill sudah di-commit & dirilis sejak Milestone A, tetapi DB tidak pernah di-backfill (0 enrollment) sampai WO 22A. Rilis kode tidak menjamin data ter-migrasi.
+- **Eksekusi backfill:** 1) stop app; 2) preflight read-only (bandingkan dengan prediksi plan); 3) backup DB + PRAGMA integrity_check; 4) compile script (--outDir temp) + run SATU proses dengan DATABASE_URL absolute + NODE_PATH=<repo>\node_modules; 5) validasi dengan **fingerprint** tabel yang HARUS tidak berubah (backup vs live) — bukti definitif, bukan sekadar hitung ulang.
+- **Fingerprint field tak-terubah:** SHA-256 dari (id|classId|status) seluruh member, dihitung pada backup dan live, dibandingkan identik ? membuktikan backfill hanya menambah baris dan tidak menyentuh kolom yang dilarang.
+- **Smoke suite fresh DB per run:** compile batch --rootDir . --outDir <tmp>\out (struktur $out\<wo>_smoke\smoke.js), fresh DB per suite (Remove-Item *.db* ? prisma migrate deploy workdir prisma/), run dgn DATABASE_URL absolute + NODE_PATH.
+- **Backup DB berisi data personal** ? jangan commit; tambahkan ackup/ ke .gitignore.
+- **Verifikasi member "eligible" setelah backfill** via sampling service-level (enrollment ACTIVE ada), bukan hanya count baris.

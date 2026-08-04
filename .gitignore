@@ -29,6 +29,9 @@ npm-debug.log*
 .env.local
 .env.*.local
 
+# Operational backup (berisi data personal — jangan di-commit)
+backup/
+
 # TypeScript
 *.tsbuildinfo
 
