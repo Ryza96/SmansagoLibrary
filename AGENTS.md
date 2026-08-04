@@ -620,3 +620,21 @@ Audit menyeluruh terhadap Borrowing Module: Prisma schema, Repository, Service, 
 - **Class list filter client-side** (bukan keputusan akademik): `classes.findMany` fetch-all loop 100, filter `academicYearId === fromYearId` untuk dropdown; `fromClassId` di-omit saat "Semua Kelas" (kontrak service: opsional = seluruh kelas tahun sumber).
 - **Smoke P-4 seed berbeda dari P-3** (4 member, kelas src X/XI/XII/X9) → re-execute hanya sisa ACTIVE (sNoTarget NO_TARGET) = **1 item**; jangan copy ekspektasi P-3 (2 item) — pitfall serupa P-2 STEP 9 / P-3 STEP 5.
 - Grep bundle vs source: di bundle minified, properti API bisa berubah nama — gunakan **string channel** (`promotions:preview`), bukan bentuk `promotions.preview`; source grep tetap memakai bentuk properti.
+
+## P-5 (Promotion Finalization): Audit FINAL + Milestone Promotion DITUTUP (COMPLETE - APPROVED & RELEASED)
+
+### Ringkasan
+- WO P-5 = audit final **DISCOVERY ONLY / READ ONLY** atas seluruh Promotion Module (Mode A) — **tidak ada fase implementation**. `P5_DISCOVERY_REPORT.md` **disetujui Product Owner**; hasil menyatakan Mode A production-ready, tidak perlu implementasi tambahan.
+- **Verifikasi 6 mandat (semua PASS):** (1) **Single Decision Engine** — `decide()` didefinisikan persis 1× di `promotion-preview.service.ts:25`, dipakai preview (`:161`) & execute (`:115`, re-validate dlm `$transaction`); history (`PromotionRunService`) TIDAK memanggil decide — baca kolom `summary` (by-design RFC §8/§9); (2) **tanpa business rule di renderer** — grep simbol domain di `src/pages/promotion` = 1 komentar; (3) **tanpa akses Prisma langsung dari service Promosi** — 0 `\.prisma\.` di `src/main/services`; `getPrisma()` hanya utk `runTransaction`; (4) **tanpa duplicate decision logic** — satu-satunya komputasi outcome = `decide()` (`OUTCOME_COUNT_KEY` = pemetaan counts, bukan keputusan); (5) **PromotionRun/Item immutable audit** — satu-satunya tulis = `PromotionRepository.createRunWithTx` (create+createMany); 0 update/delete di source; FK RESTRICT tanpa `@updatedAt`; (6) **dependency P-1..P-4 terpenuhi** (regression 13 suite 602 PASS).
+- **Debt dicatat (bukan blokir):** single-flight guard eksekusi (RFC §9 #5) belum ada di IPC (UI sudah mencegah; SQLite serial); duplikasi agregasi counts (preview switch vs `OUTCOME_COUNT_KEY`); `DatabaseReconciliationService` akses Prisma langsung (pre-existing, luar module Promosi); Mode MAPPING/BULK_EDIT + UI mapping (WBS P-3/P-5b) = WO masa depan (saat ini ditolak AppError 400).
+- **Validation:** 13 suite fresh DB 602 PASS · lint PASS · build PASS (main 1,817.22 · preload 9.02 · renderer 1,045.33 kB) · `prisma migrate diff` no-drift · working tree bersih.
+- **Commit:** `<HEAD>` (SATU FINAL COMMIT dokumentasi — hanya AGENTS.md + P5 laporan; TANPA perubahan source), di-push.
+- **Laporan:** `P5_DISCOVERY_REPORT.md`, `P5_FINAL_REVIEW.md`, `P5_RELEASE_REPORT.md`.
+- **Status: APPROVED & RELEASED. Milestone Promotion (Mode A: P-1→P-2→P-3→P-4→P-5) DITUTUP.** Berpindah ke **Integration Testing**.
+
+### Pelajaran (retain)
+- **Audit final (P-5) = bukti silang mandat, bukan hanya smoke.** Verifikasi mandat memakai grep source (`decide(` = 1 implementasi; `\.prisma\.` = 0 di services; `promotionRun*.update/delete` = 0 di app source) + inspeksi alur (preview/execute share `decide()`; history baca `summary`) + regression. Grep membuktikan ketiadaan, bukan hanya kehadiran.
+- **History promosi TIDAK boleh memanggil `decide()`** — history = audit (baca `summary`/items yang ditulis execute). "Preview == Execute = engine tunggal" dibuktikan di P-2/P-4; P-3/P-5 hanya membuktikan angka BERASAL dari kolom audit.
+- **Immutability audit record**: cek kode (hanya `createRunWithTx`) DAN schema (tanpa `@updatedAt`, FK default RESTRICT → hapus Member/AcademicYear yang dirujuk run diblokir). Tidak ada update/delete path di layer mana pun.
+- **WO audit-readonly selesai tanpa fase implementation** → rilis = SATU FINAL COMMIT dokumentasi (laporan + AGENTS.md saja), TIDAK menyentuh source. Ini menjaga riwayat git bersih per WO.
+- **Penutupan milestone**: P-5 menutup rantai P-1..P-5 (Mode A). WO masa depan untuk Mode B/C (MAPPING/BULK_EDIT) + single-flight guard tercatat sebagai backlog, bukan bagian milestone ini.
