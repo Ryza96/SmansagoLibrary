@@ -24,6 +24,7 @@ import type { AssetEventService } from '../main/services/asset-event.service'
 import type { SettingService } from '../main/services/setting.service'
 import type { MatchingEngineService } from '../../src/services/MatchingEngineService'
 import type { BookImportService } from '../../src/main/services/book-import.service'
+import type { DashboardService } from '../../src/main/services/dashboard.service'
 import { registerAppHandlers } from './app.ipc'
 import { registerBookImportHandlers } from './book-import.ipc'
 import { registerBookHandlers } from './book.ipc'
@@ -42,6 +43,7 @@ import { registerPromotionHandlers } from './promotion.ipc'
 import { registerInventoryHandlers } from './inventory.ipc'
 import { registerAssetEventHandlers } from './asset-event.ipc'
 import { registerSettingHandlers } from './setting.ipc'
+import { registerDashboardHandlers } from './dashboard.ipc'
 
 export function registerAllHandlers(
   services: {
@@ -70,6 +72,7 @@ export function registerAllHandlers(
     settingService: SettingService
     matchingEngine: MatchingEngineService
     bookImportService: BookImportService
+    dashboardService: DashboardService
   },
   mainWindow: () => BrowserWindow | null
 ): void {
@@ -95,4 +98,5 @@ export function registerAllHandlers(
   registerInventoryHandlers(services.inventoryService)
   registerAssetEventHandlers(services.assetEventService)
   registerSettingHandlers(services.settingService)
+  registerDashboardHandlers(services.dashboardService)
 }

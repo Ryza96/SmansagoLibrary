@@ -18,6 +18,9 @@ interface ElectronAPI {
     maximize: () => Promise<void>
     close: () => Promise<void>
   }
+  dashboard: {
+    overview: () => Promise<import('../../src/shared/dto/dashboard').DashboardOverviewDTO>
+  }
   books: {
     findMany: () => Promise<import('../types/dtos/book').BookListItemDTO[]>
     findById: (id: string) => Promise<import('../types/dtos/book').BookDetailDTO | null>

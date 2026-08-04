@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { BookOpen, PackageSearch, Users, BookMarked, Clock, AlertCircle, Activity, ArrowRightLeft, Undo2, FileSpreadsheet, BookUp, BookDown, TriangleAlert, Hourglass } from 'lucide-react'
+import type { DashboardOverviewDTO } from '../shared/dto/dashboard'
 
 function useRealtimeClock() {
   const [clock, setClock] = useState(new Date())
@@ -17,6 +18,10 @@ function formatDate(date: Date) {
 
 function formatTime(date: Date) {
   return date.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+}
+
+function formatActivityTime(iso: string) {
+  return new Date(iso).toLocaleString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
 }
 
 interface TodayCardProps {
@@ -89,25 +94,13 @@ export default function DashboardPage() {
   const navigate = useNavigate()
   const clock = useRealtimeClock()
   const [loading, setLoading] = useState(true)
-  const [stats, setStats] = useState({
-    totalBooks: 0,
-    totalMembers: 0,
-    activeBorrowings: 0,
-  })
+  const [overview, setOverview] = useState<DashboardOverviewDTO | null>(null)
 
   useEffect(() => {
     async function load() {
       try {
-        const [books, members, borrowings] = await Promise.all([
-          window.electronAPI.books.findMany(),
-          window.electronAPI.members.findMany(undefined, 1, 1),
-          window.electronAPI.borrowings.findMany(undefined, 1, 1000),
-        ])
-        setStats({
-          totalBooks: books.length,
-          totalMembers: members.total,
-          activeBorrowings: borrowings.data.filter((b) => b.status === 'ACTIVE').length,
-        })
+        const data = await window.electronAPI.dashboard.overview()
+        setOverview(data)
       } catch {
         /* placeholder mode */
       } finally {
@@ -138,25 +131,25 @@ export default function DashboardPage() {
           <TodayCard
             icon={<BookDown size={20} />}
             label="Dipinjam Hari Ini"
-            value="—"
+            value={overview ? overview.today.borrowed : '—'}
             color="text-blue-600 bg-blue-50"
           />
           <TodayCard
             icon={<BookUp size={20} />}
             label="Dikembalikan Hari Ini"
-            value="—"
+            value={overview ? overview.today.returned : '—'}
             color="text-emerald-600 bg-emerald-50"
           />
           <TodayCard
             icon={<TriangleAlert size={20} />}
             label="Terlambat"
-            value="—"
+            value={overview ? overview.today.overdue : '—'}
             color="text-rose-600 bg-rose-50"
           />
           <TodayCard
             icon={<Hourglass size={20} />}
             label="Jatuh Tempo Hari Ini"
-            value="—"
+            value={overview ? overview.today.dueToday : '—'}
             color="text-amber-600 bg-amber-50"
           />
         </div>
@@ -238,11 +231,27 @@ export default function DashboardPage() {
             <Activity size={16} className="text-blue-500" />
             Aktivitas Terbaru
           </h2>
-          <div className="flex flex-col items-center justify-center py-10 text-slate-400">
-            <Activity size={32} className="text-slate-300 mb-3" />
-            <p className="text-sm">Belum ada aktivitas hari ini.</p>
-            <p className="text-xs text-slate-300 mt-1">Aktivitas akan muncul setelah transaksi dilakukan.</p>
-          </div>
+          {overview && overview.recentActivity.length > 0 ? (
+            <ul className="space-y-3">
+              {overview.recentActivity.map((item) => (
+                <li key={item.id} className="flex items-start gap-3">
+                  <span className={`mt-0.5 shrink-0 ${item.type === 'BORROW' ? 'text-blue-500' : 'text-emerald-500'}`}>
+                    {item.type === 'BORROW' ? <BookDown size={16} /> : <BookUp size={16} />}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-sm text-slate-700">{item.message}</p>
+                    <p className="text-xs text-slate-400 mt-0.5">{formatActivityTime(item.occurredAt)}</p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-10 text-slate-400">
+              <Activity size={32} className="text-slate-300 mb-3" />
+              <p className="text-sm">Belum ada aktivitas hari ini.</p>
+              <p className="text-xs text-slate-300 mt-1">Aktivitas akan muncul setelah transaksi dilakukan.</p>
+            </div>
+          )}
         </div>
 
         {/* SECTION 7: PERLU PERHATIAN */}
@@ -251,13 +260,31 @@ export default function DashboardPage() {
             <AlertCircle size={16} className="text-amber-500" />
             Perlu Perhatian
           </h2>
-          <div className="flex flex-col items-center justify-center py-10 text-slate-400">
-            <svg xmlns="http://www.w3.org/2000/svg" width={32} height={32} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-emerald-400 mb-3">
-              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-              <polyline points="22 4 12 14.01 9 11.01" />
-            </svg>
-            <p className="text-sm">Tidak ada pekerjaan yang memerlukan perhatian.</p>
-          </div>
+          {overview && overview.alerts.length > 0 ? (
+            <ul className="space-y-2">
+              {overview.alerts.map((alert) => (
+                <li
+                  key={alert.id}
+                  className={`flex items-start gap-2.5 rounded-lg border p-3 ${
+                    alert.severity === 'danger'
+                      ? 'border-rose-200 bg-rose-50 text-rose-700'
+                      : 'border-amber-200 bg-amber-50 text-amber-700'
+                  }`}
+                >
+                  <AlertCircle size={16} className="mt-0.5 shrink-0" />
+                  <p className="text-xs leading-relaxed">{alert.message}</p>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-10 text-slate-400">
+              <svg xmlns="http://www.w3.org/2000/svg" width={32} height={32} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-emerald-400 mb-3">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                <polyline points="22 4 12 14.01 9 11.01" />
+              </svg>
+              <p className="text-sm">Tidak ada pekerjaan yang memerlukan perhatian.</p>
+            </div>
+          )}
         </div>
 
       </div>
@@ -266,10 +293,10 @@ export default function DashboardPage() {
       <div>
         <h2 className="text-sm font-semibold text-slate-700 uppercase tracking-wider mb-3">Ringkasan Perpustakaan</h2>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <SummaryCard icon={<BookOpen size={18} />} label="Total Buku" value={loading ? '...' : stats.totalBooks} />
-          <SummaryCard icon={<PackageSearch size={18} />} label="Total Inventaris" value="—" />
-          <SummaryCard icon={<Users size={18} />} label="Total Anggota" value={loading ? '...' : stats.totalMembers} />
-          <SummaryCard icon={<BookMarked size={18} />} label="Sedang Dipinjam" value={loading ? '...' : stats.activeBorrowings} />
+          <SummaryCard icon={<BookOpen size={18} />} label="Total Buku" value={loading ? '...' : overview?.summary.totalBooks ?? '—'} />
+          <SummaryCard icon={<PackageSearch size={18} />} label="Total Inventaris" value={loading ? '...' : overview?.summary.totalInventories ?? '—'} />
+          <SummaryCard icon={<Users size={18} />} label="Total Anggota" value={loading ? '...' : overview?.summary.totalMembers ?? '—'} />
+          <SummaryCard icon={<BookMarked size={18} />} label="Sedang Dipinjam" value={loading ? '...' : overview?.summary.activeBorrowings ?? '—'} />
         </div>
       </div>
 

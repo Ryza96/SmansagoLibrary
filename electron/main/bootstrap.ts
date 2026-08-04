@@ -48,6 +48,8 @@ import { AuthorRepository as NewAuthorRepository } from '../../src/main/reposito
 import { PublisherRepository as NewPublisherRepository } from '../../src/main/repositories/publisher.repository'
 import { CategoryRepository as NewCategoryRepository } from '../../src/main/repositories/category.repository'
 import { BookRepository as NewBookRepository } from '../../src/main/repositories/book.repository'
+import { DashboardService } from '../../src/main/services/dashboard.service'
+import { DashboardRepository } from '../../src/main/repositories/dashboard.repository'
 
 export interface Container {
   bookService: BookService
@@ -76,6 +78,7 @@ export interface Container {
   matchingEngine: MatchingEngineService
   autoCreateService: AutoCreateService
   bookImportService: BookImportService
+  dashboardService: DashboardService
 }
 
 export function createContainer(): Container {
@@ -141,6 +144,8 @@ export function createContainer(): Container {
   const autoCreateService = new AutoCreateService(new NewAuthorRepository(), new NewPublisherRepository(), new NewCategoryRepository())
   const bookImportService = new BookImportService(new NewBookRepository(), new NewBookCopyRepository(), autoCreateService)
 
+  const dashboardService = new DashboardService(new DashboardRepository())
+
   return {
     bookService,
     authorService,
@@ -167,6 +172,7 @@ export function createContainer(): Container {
     settingService,
     matchingEngine,
     autoCreateService,
-    bookImportService
+    bookImportService,
+    dashboardService
   }
 }
