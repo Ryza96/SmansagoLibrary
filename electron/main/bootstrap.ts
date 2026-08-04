@@ -38,6 +38,8 @@ import { EnrollmentService } from '../../src/main/services/enrollment.service'
 import { EnrollmentRepository } from '../../src/main/repositories/enrollment.repository'
 import { PromotionRunService } from '../../src/main/services/promotion-run.service'
 import { PromotionRepository } from '../../src/main/repositories/promotion.repository'
+import { PromotionPreviewService } from '../../src/main/services/promotion-preview.service'
+import { PromotionExecuteService } from '../../src/main/services/promotion-execute.service'
 import { MatchingEngineService } from '../../src/services/MatchingEngineService'
 import { createProductionStrategies } from '../../src/main/strategies/index'
 import { AutoCreateService } from '../../src/main/services/auto-create.service'
@@ -62,6 +64,8 @@ export interface Container {
   classService: ClassService
   enrollmentService: EnrollmentService
   promotionRunService: PromotionRunService
+  promotionPreviewService: PromotionPreviewService
+  promotionExecuteService: PromotionExecuteService
   newBookCopyService: NewBookCopyService
   newReturnService: NewReturnService
   borrowDetailRepository: BorrowDetailRepository
@@ -112,6 +116,15 @@ export function createContainer(): Container {
   const enrollmentService = new EnrollmentService(enrollmentRepository, newMemberRepository, classRepository)
   const promotionRepository = new PromotionRepository()
   const promotionRunService = new PromotionRunService(promotionRepository)
+  const promotionPreviewService = new PromotionPreviewService(academicYearRepository, classRepository, enrollmentRepository)
+  const promotionExecuteService = new PromotionExecuteService(
+    academicYearRepository,
+    classRepository,
+    enrollmentRepository,
+    newMemberRepository,
+    promotionRepository,
+    promotionRunService
+  )
   const borrowService = new BorrowService(borrowRepository, borrowDetailRepository, newMemberRepository, newBookCopyRepository, enrollmentService)
 
   const memberDuplicateChecker = new MemberDuplicateChecker(newMemberRepository)
@@ -143,6 +156,8 @@ export function createContainer(): Container {
     classService,
     enrollmentService,
     promotionRunService,
+    promotionPreviewService,
+    promotionExecuteService,
     newBookCopyService,
     newReturnService,
     borrowDetailRepository,

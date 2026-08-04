@@ -190,6 +190,8 @@ interface ElectronAPI {
       limit: number
     }>
     findById: (id: string) => Promise<import('../../src/shared/dto/promotion').PromotionRunDTO>
+    preview: (input: import('../../src/shared/dto/promotion').AutomaticPromotionPreviewInput) => Promise<import('../../src/shared/dto/promotion').PromotionPreviewDTO>
+    execute: (input: import('../../src/shared/dto/promotion').AutomaticPromotionExecuteInput) => Promise<import('../../src/shared/dto/promotion').PromotionRunDTO>
   }
   inventory: {
     findMany: (params: {

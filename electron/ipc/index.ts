@@ -17,6 +17,8 @@ import type { CurriculumService } from '../../src/main/services/curriculum.servi
 import type { ClassService } from '../../src/main/services/class.service'
 import type { EnrollmentService } from '../../src/main/services/enrollment.service'
 import type { PromotionRunService } from '../../src/main/services/promotion-run.service'
+import type { PromotionPreviewService } from '../../src/main/services/promotion-preview.service'
+import type { PromotionExecuteService } from '../../src/main/services/promotion-execute.service'
 import type { InventoryService } from '../main/services/inventory.service'
 import type { AssetEventService } from '../main/services/asset-event.service'
 import type { SettingService } from '../main/services/setting.service'
@@ -58,6 +60,8 @@ export function registerAllHandlers(
     classService: ClassService
     enrollmentService: EnrollmentService
     promotionRunService: PromotionRunService
+    promotionPreviewService: PromotionPreviewService
+    promotionExecuteService: PromotionExecuteService
     newBookCopyService: BookCopyService
     newReturnService: NewReturnService
     borrowDetailRepository: BorrowDetailRepository
@@ -85,7 +89,11 @@ export function registerAllHandlers(
   registerCurriculumHandlers(services.curriculumService)
   registerClassHandlers(services.classService)
   registerEnrollmentHandlers(services.enrollmentService)
-  registerPromotionHandlers(services.promotionRunService)
+  registerPromotionHandlers({
+    runService: services.promotionRunService,
+    previewService: services.promotionPreviewService,
+    executeService: services.promotionExecuteService
+  })
   registerInventoryHandlers(services.inventoryService)
   registerAssetEventHandlers(services.assetEventService)
   registerSettingHandlers(services.settingService)

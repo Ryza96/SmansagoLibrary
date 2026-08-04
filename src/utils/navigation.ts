@@ -40,6 +40,7 @@ export const ROUTES = {
   MASTER_CLASS_NEW: '/master/classes/new',
   MASTER_CLASS_EDIT: '/master/classes/:id/edit',
   PROMOTIONS: '/promotions',
+  PROMOTION_RUN: '/promotions/run',
   PROMOTION_DETAIL: '/promotions/:id',
 } as const
 
