@@ -700,27 +700,49 @@ Audit menyeluruh terhadap Borrowing Module: Prisma schema, Repository, Service, 
 
 ---
 
-## WO 22A: Backfill Execution � Development Database (COMPLETE - READY review PO)
+## WO 22A: Backfill Execution � Development Database (COMPLETE - READY review PO)
 
 ### Ringkasan
 - **Eksekusi scripts/backfill-member-enrollment.ts pada Development Database** prisma/aplibrary.db (WO 3 F2b dibuat di commit 195cd5, ikut rilis Milestone A 521824, TIDAK PERNAH dijalankan). Menutup gap migrasi: 0 MemberEnrollment ? 395.
 - **Hasil PERSIS prediksi plan:** membersWithClassId 395, enrollmentsCreated **395**, skippedAlreadyActive **0**, orphanMembers **0**, totalEnrollments 395. Semua status='ACTIVE', leftAt=null, cademicYearId konsisten dengan kelas (tahun 2026/2027). Duplicate (ACTIVE>1 per member) = 0. Invarian satu-ACTIVE = 0 pelanggaran.
 - **Preflight:** app Electron/node repo di-stop (persetujuan PO); DATABASE_URL absolute ile:D:/.../prisma/aplibrary.db; preflight read-only 395/395 classId, 13/13 kelas resolve, 0 orphan, 0 enrollment.
-- **Backup:** ackup/backfill-20260804/aplibrary.db (integrity_check=ok; hanya .db � tanpa -wal/-shm karena app mati).
+- **Backup:** ackup/backfill-20260804/aplibrary.db (integrity_check=ok; hanya .db � tanpa -wal/-shm karena app mati).
 - **Eksekusi:** compile 
 px tsc --module commonjs --target es2022 --moduleResolution node --esModuleInterop --skipLibCheck --outDir <tmp>/out scripts/backfill-member-enrollment.ts; run dgn DATABASE_URL + NODE_PATH=<repo>\node_modules; output created 395 / skipped 0 / orphan 0.
-- **Member.classId & Member.status TIDAK berubah** � fingerprint SHA-256 (id|classId|status) backup vs live IDENTIK (eb5392a�). Status tetap 395� INACTIVE (ekspektasi: Membership ? Academic; alignment = Architecture Backlog).
+- **Member.classId & Member.status TIDAK berubah** � fingerprint SHA-256 (id|classId|status) backup vs live IDENTIK (eb5392a�). Status tetap 395� INACTIVE (ekspektasi: Membership ? Academic; alignment = Architecture Backlog).
 - **Blocker teratasi:** S-000140 Finza kini enrollment XI Merdeka 4 / 2026/2027 (ACTIVE) ? guard borrow eligibility (IT-1) lolos.
 - **Validation PASS:** (1) data validation (395/0/0/0); (2) smoke regression 11 suite fresh temp DB = **488/488 PASS** (Borrow: it_borrow_eligibility 7 + it1_borrow_return 34 + wo14_e2 36; Promotion: p1 33 + p2 87 + p3 75 + p4 37; Import: wo19_mi3 38 + wo20_mi4 24; Enrollment: wo13_e1 39 + wo15_e3 78); (3) 
 pm run lint PASS; (4) 
-pm run build PASS (main 1,819.55 kB � preload 9.02 kB � renderer 1,044.75 kB � identik baseline IT-1, TANPA perubahan kode); (5) prisma migrate diff --from-migrations & --from-url (dev DB) = "No difference detected" (exit 0); (6) migrate status up to date (4 migrations).
+pm run build PASS (main 1,819.55 kB � preload 9.02 kB � renderer 1,044.75 kB � identik baseline IT-1, TANPA perubahan kode); (5) prisma migrate diff --from-migrations & --from-url (dev DB) = "No difference detected" (exit 0); (6) migrate status up to date (4 migrations).
 - **Laporan:** BACKFILL_EXECUTION_REPORT.md, BACKFILL_FINAL_REVIEW.md, BACKFILL_RELEASE_REPORT.md. AGENTS.md + .gitignore (+ackup/).
-- **Status: DONE � menunggu review PO.** Selanjutnya per PO: Validation ? ? Integration Test ? UAT ? kembali ke Member.status Alignment (backlog).
+- **Status: DONE � menunggu review PO.** Selanjutnya per PO: Validation ? ? Integration Test ? UAT ? kembali ke Member.status Alignment (backlog).
 
 ### Pelajaran (retain)
 - **Eksekusi migrasi satu-kali ? rilis kode.** Script backfill sudah di-commit & dirilis sejak Milestone A, tetapi DB tidak pernah di-backfill (0 enrollment) sampai WO 22A. Rilis kode tidak menjamin data ter-migrasi.
-- **Eksekusi backfill:** 1) stop app; 2) preflight read-only (bandingkan dengan prediksi plan); 3) backup DB + PRAGMA integrity_check; 4) compile script (--outDir temp) + run SATU proses dengan DATABASE_URL absolute + NODE_PATH=<repo>\node_modules; 5) validasi dengan **fingerprint** tabel yang HARUS tidak berubah (backup vs live) � bukti definitif, bukan sekadar hitung ulang.
+- **Eksekusi backfill:** 1) stop app; 2) preflight read-only (bandingkan dengan prediksi plan); 3) backup DB + PRAGMA integrity_check; 4) compile script (--outDir temp) + run SATU proses dengan DATABASE_URL absolute + NODE_PATH=<repo>\node_modules; 5) validasi dengan **fingerprint** tabel yang HARUS tidak berubah (backup vs live) � bukti definitif, bukan sekadar hitung ulang.
 - **Fingerprint field tak-terubah:** SHA-256 dari (id|classId|status) seluruh member, dihitung pada backup dan live, dibandingkan identik ? membuktikan backfill hanya menambah baris dan tidak menyentuh kolom yang dilarang.
 - **Smoke suite fresh DB per run:** compile batch --rootDir . --outDir <tmp>\out (struktur $out\<wo>_smoke\smoke.js), fresh DB per suite (Remove-Item *.db* ? prisma migrate deploy workdir prisma/), run dgn DATABASE_URL absolute + NODE_PATH.
 - **Backup DB berisi data personal** ? jangan commit; tambahkan ackup/ ke .gitignore.
 - **Verifikasi member "eligible" setelah backfill** via sampling service-level (enrollment ACTIVE ada), bukan hanya count baris.
+
+---
+
+## WO-1 (Borrow Card): Template & Data Contract (COMPLETE - READY review PO)
+
+### Ringkasan
+- Source of Truth: `BORROW_RECEIPT_DESIGN_AMENDMENT.md` (FINAL DESIGN DECISION) + Discovery/Architecture/Wireframe. WO berdiri sendiri **tanpa wiring** (belum ada Preview/Print/PDF — itu WO-2..4).
+- **File baru (3 source + 1 smoke):** `src/shared/config/borrow-status.ts` (`BORROW_STATUS` config leaf: ACTIVE→AKTIF/badge-active, RETURNED→DIKEMBALIKAN/badge-returned, OVERDUE→TERLAMBAT/badge-overdue; `borrowStatusConfig` fallback label-raw+badge-neutral; `deriveBorrowStatus(returnDate, dueDate, now)` pure — D9), `src/shared/dto/borrow-card.ts` (`BorrowCardData` = header/member/borrow/books[]/footer; semua string siap-render — D5), `src/main/services/borrow-card.service.ts` (**engine**: layout 110×60mm, `escapeHtml`, `initialsOf`, `generateAvatarPlaceholderSvg` (D6), `generateLogoMonogramSvg`+`generateBookIconSvg` (D13), `paginateBorrowCard`/`generateBorrowCardPages` (D10/R4), template TUNGGAL `generateBorrowCardHtml` (D2/D4), assembler `buildBorrowCardData` (D5)), `borrow_card_wo1_smoke/smoke.ts` (**101/101 PASS** murni, tanpa DB/Electron).
+- **Dimodifikasi (1):** `src/main/services/barcode.service.ts` (+`generateQrCodeSvg` bcid `qrcode` bwip-js, scale 4, no text, padding 4, viewBox 264×264 — D8). **TIDAK diubah:** BorrowService/Repository/schema/migration/IPC/preload/bootstrap/env.d.ts/UI.
+- **Keputusan desain kunci:** QR payload = `borrowing.id` UUID (D7, bukan borrowNumber); **auto pagination tanpa "+N lainnya"** — kapasitas baris buku halaman 1 = `floor((60−6−42)/3.4)` = **3**, lanjutan = `floor((60−6−18)/3.4)` = **10** (memenuhi MAX_BOOKS=20 → 1 kartu utama + 2 lanjutan); halaman lanjutan header ringkas + label "LANJUTAN" + footer diulang (setiap halaman dokumen sah, R4); avatar = inisial SVG (Member TIDAK punya kolom foto di schema, D6); logo = data URI → monogram → ikon buku (D13); tanggal format DD-MM-YYYY.
+- **Separasi arsitektur:** assembler (baca relasi/fetch data, lookup memberTypeLabel, fallback snapshot memberName/memberNumber/bookTitle, logo via dependency-injected `readFileAsDataUri`) → `BorrowCardData` → template PURE `data→HTML` (tidak menyentuh DB/Electron). Template adalah satu-satunya sumber Preview/Print/PDF.
+- **Validation PASS:** smoke WO-1 101/101; regression borrow fresh DB `it1_borrow_return` 34/34 + `it_borrow_eligibility` 7/7 + `wo14_e2` 36/36 = **77 PASS**; `npm run lint` PASS; `npm run build` PASS (**bundle IDENTIK baseline IT-1** main 1,819.55/preload 9.02/renderer 1,044.75 kB = bukti tanpa wiring); `prisma migrate diff` = "No difference detected".
+- **Laporan:** `WORK_ORDER_BORROW_WO1_IMPLEMENTATION_REPORT.md`, `BORROW_WO1_FINAL_REVIEW.md`, `BORROW_WO1_RELEASE_REPORT.md`. Status: **DONE - menunggu review PO** (tidak lanjut WO-2 Preview).
+
+### Pelajaran (retain)
+- **Compile smoke yang mengimpor `bwip-js`:** pakai `--module node16 --moduleResolution node16` (bukan `node`) karena paket memakai conditional exports (TS2307 "could not be resolved"); jalankan hasil `.js` dengan `NODE_PATH=<repo>\node_modules` karena output di temp di luar repo. Ini MELENGKAPI pola `commonjs+node` yang dipakai smoke lain yang tidak menyentuh bwip-js.
+- **Kapasitas baris buku = fungsi murni layout mm** — pagination deterministik karena CSS pakai mm yang sama (`bookRowHeightMm 3.4`); jangan hardcode jumlah baris.
+- **QR = `borrowing.id` (UUID)**, bukan borrowNumber; nilai QR bergantung pada payload (smoke: dua payload → SVG berbeda).
+- **Config status badge** (`BORROW_STATUS`) = pola config leaf yang sama dengan `academic-status`/`member-type`/`book-copy-status`; template memetakan label+class via config, unknown code → fallback label-raw + badge-neutral (tidak pernah crash).
+- **Assembler murni dengan deps di-inject** (`readFileAsDataUri`) → logo gagal baca = fallback monogram; logoPath kosong = fallback; relasi member kosong = fallback snapshot kolom — seluruhnya diuji smoke.
+- **WO berdiri sendiri = bukti bundle identik**: jika suatu fitur tidak me-wire IPC/preload/UI, bundle main/preload/renderer harus BYTE-identik dengan baseline — jangan sampai ada perubahan siluman.
+- WO-1 adalah pondasi: Preview (WO-2), Cetak (WO-3), PDF (WO-4) akan memanggil `generateBorrowCardHtml`/`buildBorrowCardData` TANPA modifikasi template.
