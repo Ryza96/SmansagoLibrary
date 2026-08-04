@@ -20,6 +20,6 @@ export function registerBookCopyHandlers(
     bookCopyService.addCopies(bookId, input)
   )
   ipcMain.handle('bookCopies:decommissionCopy', async (_event, id: string) =>
-    bookCopyService.decommissionCopy(id)
+    newBookCopyService.decommissionCopy(id)
   )
 }

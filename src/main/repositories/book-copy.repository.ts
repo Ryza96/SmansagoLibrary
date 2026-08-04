@@ -20,6 +20,10 @@ type BookCopyWithBook = Prisma.BookCopyGetPayload<{
   include: { book: true }
 }>
 
+type BookCopyWithHistory = Prisma.BookCopyGetPayload<{
+  include: { _count: { select: { borrowDetails: true } } }
+}>
+
 const bookCopyInclude = {
   book: true
 } as const
@@ -46,6 +50,23 @@ export class BookCopyRepository extends BaseRepository {
       where: { id },
       include: bookCopyInclude
     })
+  }
+
+  async findByIdWithHistory(id: string): Promise<BookCopyWithHistory | null> {
+    return this.prisma.bookCopy.findUnique({
+      where: { id },
+      include: { _count: { select: { borrowDetails: true } } }
+    })
+  }
+
+  // IT-1 — transisi status atomik dengan predikat status asal.
+  // updateMany + predikat = guard concurrent-safe (tidak menimpa status yang berubah).
+  async updateStatusIf(id: string, fromStatus: string, toStatus: string): Promise<boolean> {
+    const result = await this.prisma.bookCopy.updateMany({
+      where: { id, status: fromStatus },
+      data: { status: toStatus }
+    })
+    return result.count === 1
   }
 
   async findByBarcode(barcode: string): Promise<BookCopy | null> {

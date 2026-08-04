@@ -11,13 +11,6 @@ import { InventoryAllocator } from './inventory-allocator'
 import type { BookCopyDTO, CreateBookCopiesDTO } from '../../../src/shared/dto/book'
 import crypto from 'crypto'
 
-const ALLOWED_TRANSITIONS: Record<string, string[]> = {
-  [BookCopyStatus.AVAILABLE]: [BookCopyStatus.BORROWED, BookCopyStatus.LOST, BookCopyStatus.REMOVED],
-  [BookCopyStatus.BORROWED]: [BookCopyStatus.AVAILABLE, BookCopyStatus.LOST, BookCopyStatus.REMOVED],
-  [BookCopyStatus.LOST]: [BookCopyStatus.REMOVED],
-  [BookCopyStatus.REMOVED]: []
-}
-
 const VALID_CONDITIONS = [
   BookCopyCondition.GOOD,
   BookCopyCondition.LIGHT_DAMAGE,
@@ -158,79 +151,6 @@ export class BookCopyService {
   }
 
   async decommissionCopy(id: string): Promise<void> {
-    const copy = await this.repository.findById(id)
-    if (!copy) {
-      throw new AppError(404, 'Not Found', 'Eksemplar tidak ditemukan.')
-    }
-
-    this.validateStatusTransition(copy.status, BookCopyStatus.REMOVED)
-
-    if (copy._count.borrowDetails > 0) {
-      await this.repository.updateStatus(prisma, id, BookCopyStatus.REMOVED)
-      return
-    }
-
-    await this.repository.deleteById(id)
-  }
-
-  async updateStatus(
-    id: string,
-    newStatus: string,
-    tx?: any
-  ): Promise<void> {
-    const client = tx ?? prisma
-
-    const copy = await this.repository.findByIdWithTx(client, id)
-    if (!copy) {
-      throw new AppError(404, 'Not Found', 'Eksemplar tidak ditemukan.')
-    }
-
-    this.validateStatusTransition(copy.status, newStatus)
-
-    await this.repository.updateStatus(client, id, newStatus)
-  }
-
-  async updateCondition(id: string, newCondition: string): Promise<void> {
-    if (!VALID_CONDITIONS.includes(newCondition as any)) {
-      throw new AppError(400, 'Validation Error', `Kondisi "${newCondition}" tidak valid.`)
-    }
-
-    const copy = await this.repository.findById(id)
-    if (!copy) {
-      throw new AppError(404, 'Not Found', 'Eksemplar tidak ditemukan.')
-    }
-
-    const oldCondition = copy.condition
-
-    await prisma.$transaction(async (tx) => {
-      await this.repository.updateCondition(tx, id, newCondition)
-
-      await this.eventRepo.record(tx, {
-        bookCopyId: id,
-        eventType: AssetEventType.CONDITION_CHANGED,
-        actorType: ActorType.USER,
-        metadata: JSON.stringify({
-          oldCondition,
-          newCondition
-        })
-      })
-    })
-  }
-
-  private validateStatusTransition(currentStatus: string, newStatus: string): void {
-    if (currentStatus === newStatus) return
-
-    const allowed = ALLOWED_TRANSITIONS[currentStatus]
-    if (!allowed) {
-      throw new AppError(400, 'Invalid Transition', `Status "${currentStatus}" tidak dikenal.`)
-    }
-
-    if (!allowed.includes(newStatus)) {
-      throw new AppError(
-        400,
-        'Invalid Transition',
-        `Tidak dapat mengubah status dari "${currentStatus}" ke "${newStatus}".`
-      )
-    }
+    throw new Error('decommissionCopy dipindah ke stack baru (src/main/services/book-copy.service.ts) — jalur IPC bookCopies:decommissionCopy sudah dialihkan.')
   }
 }

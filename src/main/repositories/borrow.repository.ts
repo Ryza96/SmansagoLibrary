@@ -2,6 +2,8 @@ import { BaseRepository } from './base/base.repository'
 import { getPaginationParams, toPaginatedResult } from './base/pagination'
 import type { FindOptions } from './base/repository.types'
 import type { Borrow, Prisma } from '@prisma/client'
+import { BOOK_COPY_STATUS, canTransitionStatus } from '../../shared/config/book-copy-status'
+import { AppError } from '../../../electron/main/errorHandler'
 
 type CreateBorrowData = Pick<Borrow, 'borrowNumber' | 'memberId' | 'borrowDate' | 'dueDate' | 'memberName' | 'memberNumber'> & {
   returnDate?: Date
@@ -138,10 +140,21 @@ export class BorrowRepository extends BaseRepository {
         }
       })
 
-      await tx.bookCopy.updateMany({
-        where: { id: { in: itemsData.map((i) => i.bookCopyId) } },
-        data: { status: 'BORROWED' }
+      // IT-1 — guard atomik transisi AVAILABLE → BORROWED DI DALAM transaksi.
+      // updateMany berpredikat status:AVAILABLE + count check → TOCTOU dihapus;
+      // bila ada id yang tidak lagi AVAILABLE, seluruh transaksi di-rollback
+      // (all-or-nothing: tidak ada Borrow/Detail parsial, tidak ada resurrection REMOVED/LOST).
+      const statusGuard = await tx.bookCopy.updateMany({
+        where: {
+          id: { in: itemsData.map((i) => i.bookCopyId) },
+          status: BOOK_COPY_STATUS.AVAILABLE
+        },
+        data: { status: BOOK_COPY_STATUS.BORROWED }
       })
+
+      if (statusGuard.count !== itemsData.length) {
+        throw new AppError(400, 'Validation Error', 'Salah satu buku sedang tidak tersedia. Transaksi dibatalkan.')
+      }
 
       return created
     })
@@ -171,10 +184,23 @@ export class BorrowRepository extends BaseRepository {
         }
       })
 
-      await tx.bookCopy.update({
+      // IT-1 — transisi status berbasis keputusan PO:
+      //   HILANG → LOST; selainnya → AVAILABLE.
+      // Hanya dieksekusi bila transisi legal menurut SATU otoritas
+      // (canTransitionStatus). Predikat status:BORROWED menjaga jangan pernah
+      // menimpa status non-BORROWED (mis. REMOVED/LOST dari data lama) — tidak ada resurrection.
+      const targetStatus = conditionBack === 'HILANG' ? BOOK_COPY_STATUS.LOST : BOOK_COPY_STATUS.AVAILABLE
+      const currentCopy = await tx.bookCopy.findUnique({
         where: { id: detail.bookCopyId },
-        data: { status: 'AVAILABLE' }
+        select: { status: true }
       })
+
+      if (currentCopy && canTransitionStatus(currentCopy.status, targetStatus)) {
+        await tx.bookCopy.updateMany({
+          where: { id: detail.bookCopyId, status: currentCopy.status },
+          data: { status: targetStatus }
+        })
+      }
 
       const remainingActive = await tx.borrowDetail.count({
         where: {

@@ -76,7 +76,12 @@ export default function BookDetail({ book, copies, onAddCopies, onDecommissionCo
       ? LABELS.COPY.CONFIRM_DECOMMISSION_WITH_HISTORY
       : LABELS.COPY.CONFIRM_DECOMMISSION
     if (!window.confirm(msg)) return
-    await onDecommissionCopy(copy.id)
+    try {
+      await onDecommissionCopy(copy.id)
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Gagal menghapus eksemplar.'
+      window.alert(message)
+    }
   }
 
   function handlePrintLabels() {
