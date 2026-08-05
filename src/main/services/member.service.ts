@@ -4,6 +4,34 @@ import { NumberGeneratorService } from './number-generator.service'
 import type { MemberDTO, CreateMemberDTO, UpdateMemberDTO } from '../../shared/dto/member'
 import { AppError } from '../../../electron/main/errorHandler'
 
+function classInfoFrom(
+  enrollment:
+    | {
+        classId: string
+        class: {
+          educationLevel: string
+          parallel: string
+          curriculum: { id: string; name: string } | null
+        }
+        academicYear: { id: string; name: string; isActive: boolean } | null
+      }
+    | null
+    | undefined
+): MemberDTO['classInfo'] {
+  if (!enrollment) return null
+  return {
+    id: enrollment.classId,
+    educationLevel: enrollment.class.educationLevel,
+    parallel: enrollment.class.parallel,
+    academicYear: enrollment.academicYear
+      ? { id: enrollment.academicYear.id, name: enrollment.academicYear.name, isActive: enrollment.academicYear.isActive }
+      : null,
+    curriculum: enrollment.class.curriculum
+      ? { id: enrollment.class.curriculum.id, name: enrollment.class.curriculum.name }
+      : null
+  }
+}
+
 function toDTO(
   member: NonNullable<Awaited<ReturnType<MemberRepository['findById']>>>,
   enrollment: Awaited<ReturnType<EnrollmentRepository['findActiveByMember']>>
@@ -24,19 +52,7 @@ function toDTO(
     phone: member.phone,
     email: member.email,
     classId: member.classId,
-    classInfo: enrollment
-      ? {
-          id: enrollment.classId,
-          educationLevel: enrollment.class.educationLevel,
-          parallel: enrollment.class.parallel,
-          academicYear: enrollment.academicYear
-            ? { id: enrollment.academicYear.id, name: enrollment.academicYear.name, isActive: enrollment.academicYear.isActive }
-            : null,
-          curriculum: enrollment.class.curriculum
-            ? { id: enrollment.class.curriculum.id, name: enrollment.class.curriculum.name }
-            : null
-        }
-      : null,
+    classInfo: classInfoFrom(enrollment),
     status: member.status,
     createdAt: member.createdAt.toISOString(),
     updatedAt: member.updatedAt.toISOString()
@@ -70,7 +86,7 @@ export class MemberService {
         phone: m.phone,
         email: m.email,
         classId: m.classId,
-        classInfo: null,
+        classInfo: classInfoFrom(m.memberEnrollments?.[0]),
         status: m.status,
         createdAt: m.createdAt.toISOString(),
         updatedAt: m.updatedAt.toISOString()

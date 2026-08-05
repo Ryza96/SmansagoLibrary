@@ -3,6 +3,7 @@ import { getPaginationParams, toPaginatedResult } from './base/pagination'
 import type { FindOptions } from './base/repository.types'
 import type { Member, Prisma } from '@prisma/client'
 import { IMPORT_CONFIG } from '../../config/import.config'
+import { ACADEMIC_STATUS } from '../../shared/config/academic-status'
 
 type CreateMemberData = Pick<Member, 'memberNumber' | 'fullName'> & {
   memberType?: string
@@ -90,7 +91,21 @@ export class MemberRepository extends BaseRepository {
         where,
         skip,
         take,
-        orderBy: { memberNumber: 'asc' }
+        orderBy: { memberNumber: 'asc' },
+        // Fix kolom "Kelas" di Daftar Siswa: Source of Truth penempatan kelas
+        // = MemberEnrollment (bukan Member.classId). Include enrollment ACTIVE
+        // dengan filter identik findActiveByMember (status=ACTIVE, leftAt=null)
+        // agar DTO list konsisten dengan findById/toDTO.
+        include: {
+          memberEnrollments: {
+            where: { status: ACADEMIC_STATUS.active, leftAt: null },
+            include: {
+              class: { include: { curriculum: true } },
+              academicYear: true
+            },
+            orderBy: { enrolledAt: 'desc' }
+          }
+        }
       }),
       this.prisma.member.count({ where })
     ])
