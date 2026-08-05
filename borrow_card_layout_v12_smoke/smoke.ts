@@ -1,8 +1,9 @@
 // BORROW CARD LAYOUT REFINEMENT v1.2 — smoke test MURNI (tanpa DB, tanpa Electron).
 // Memverifikasi penyempurnaan visual kartu 110×60mm TANPA mengubah ukuran kartu/PDF:
 //   1. Judul buku diperkecil 8→7.5pt (tetap > teks identitas 6.5pt, tetap terbaca).
-//   2. Inventory number MENGIKUTI judul dengan jarak tetap ~13mm
-//      (margin-left .inv) — bukan rata ke tepi kanan (space-between dihapus).
+//   2. Inventory number MENGIKUTI judul dengan jarak proporsional
+//      (flex gap 3mm + margin-left .inv 5mm ≈ 8mm total) — bukan rata ke tepi
+//      kanan (space-between dihapus) & bukan jarak keras 13mm (revisi PO).
 //   3. Garis pemisah tipis abu terang antara data anggota & daftar buku
 //      (border-bottom .body + margin-bottom 1mm) + jarak nyaman atas & bawah.
 //   Kapasitas dipertahankan 5+13 (body 17mm & baris 2.7mm).
@@ -96,21 +97,22 @@ function main(): void {
 
   console.log('--- STEP 2: judul buku diperkecil 7.5pt (tetap > identitas 6.5pt) ---')
   const html1 = generateBorrowCardHtml(baseData())
-  check('judul/baris 7.5pt', html1.includes('.book-row { display: flex; font-size: 7.5pt;'))
+  check('judul/baris 7.5pt', html1.includes('.book-row { display: flex; gap: 3mm; font-size: 7.5pt;'))
   check('judul 7.5pt > teks identitas 6.5pt (kode sumber)', (() => {
-    const titlePos = html1.indexOf('.book-row { display: flex; font-size: 7.5pt;')
+    const titlePos = html1.indexOf('.book-row { display: flex; gap: 3mm; font-size: 7.5pt;')
     const identPos = html1.indexOf('.col { flex: 1; min-width: 0; font-size: 6.5pt;')
     return titlePos !== -1 && identPos !== -1
   })())
   check('line-height 2.7mm (>= 7.5pt = 2.646mm, leading cukup)', html1.includes('line-height: 2.7mm;'))
-  check('nomor urut & inv tetap 6.5pt', html1.includes('.book-row .num { flex: 0 0 5mm; margin-right: 3mm; font-size: 6.5pt;') && html1.includes('font-size: 6.5pt; }'))
+  check('nomor urut & inv tetap 6.5pt', html1.includes('.book-row .num { flex: 0 0 5mm; font-size: 6.5pt;') && html1.includes('font-size: 6.5pt; }'))
   check('judul utuh ter-render (1 buku)', html1.includes('Buku Ke-1'))
 
-  console.log('--- STEP 3: inventory number mengikuti judul ~13mm ---')
-  check('inv margin-left 13mm', html1.includes('.book-row .inv { flex: 0 0 auto; margin-left: 13mm;'))
-  check('baris TANPA justify-content space-between (inv tidak dipaksa ke kanan)', !html1.includes('.book-row { display: flex; justify-content: space-between'))
+  console.log('--- STEP 3: inventory number mengikuti judul (gap proporsional ~8mm) ---')
+  check('gap baris 3mm (pemisah antar item fleksibel)', html1.includes('.book-row { display: flex; gap: 3mm; font-size: 7.5pt;'))
+  check('inv margin-left 5mm (≈8mm total gap ke judul)', html1.includes('.book-row .inv { flex: 0 0 auto; margin-left: 5mm;'))
+  check('baris TANPA justify-content space-between (inv tidak dipaksa ke kanan)', !html1.includes('.book-row { display: flex; justify-content: space-between') && !html1.includes('justify-content: space-between; font-size: 7.5pt'))
   check('judul flex 0 1 auto (tidak memenuhi sisa baris)', html1.includes('.book-row .title { flex: 0 1 auto; min-width: 0;'))
-  check('jarak num->judul tetap 3mm (margin-right .num)', html1.includes('.book-row .num { flex: 0 0 5mm; margin-right: 3mm;'))
+  check('num TANPA margin-right keras (gap baris menggantikannya)', !html1.includes('.book-row .num { flex: 0 0 5mm; margin-right: 3mm;'))
   const page1 = generateBorrowCardPageHtml(baseData({ books: books(1) }), paginateBorrowCard(1)[0])
   check('struktur baris tetap: nomor -> judul -> inv', /<div class="book-row"><span class="num">1\.<\/span><span class="title">Buku Ke-1<\/span><span class="inv">INV-000001<\/span><\/div>/.test(page1))
 

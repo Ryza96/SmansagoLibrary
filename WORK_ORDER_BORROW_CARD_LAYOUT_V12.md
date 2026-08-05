@@ -9,14 +9,14 @@
 | # | Perubahan | Sebelum | Sesudah |
 |---|-----------|---------|---------|
 | 1 | Ukuran judul buku | 8pt | **7.5pt** (tetap > identitas 6.5pt → judul tetap dominan) |
-| 2 | Posisi inventory number | rata tepi kanan (`justify-content: space-between`) | **mengikuti judul, jarak tetap ~13mm** (`margin-left: 13mm`, baris tanpa space-between) |
+| 2 | Posisi inventory number | rata tepi kanan (`justify-content: space-between`) | **mengikuti judul, jarak proporsional ~8mm** (flex `gap: 3mm` + inv `margin-left: 5mm`, baris tanpa space-between) — revisi PO: gap keras 13mm hanya ilustrasi, yang dinilai adalah hasil visual (inv satu grup dgn judul) |
 | 3 | Pemisah data anggota ↔ daftar buku | tidak ada | **garis tipis abu terang** `border-bottom: 1px solid #e2e8f0` + `margin-bottom: 1mm` |
 
 ### Detail implementasi (CSS)
-- `.book-row` → `font-size: 7.5pt; line-height: 2.7mm;` (hapus `justify-content: space-between; gap: 3mm`)
-- `.book-row .num` → tambah `margin-right: 3mm` (gap tetap nomor→judul)
+- `.book-row` → `font-size: 7.5pt; line-height: 2.7mm;` + `gap: 3mm` (hapus `justify-content: space-between`)
+- `.book-row .num` → `flex: 0 0 5mm` (margin-right 3mm DIHAPUS — gap flex yang memisahkan)
 - `.book-row .title` → `flex: 1` → **`flex: 0 1 auto`** (tidak memenuhi sisa baris; ellipsis tetap)
-- `.book-row .inv` → tambah `margin-left: 13mm` (mengikuti judul)
+- `.book-row .inv` → `margin-left: 5mm` (gap flex 3mm + margin 5mm = **~8mm total** inv mengikuti judul; bukan margin keras 13mm)
 - `.body` → `height: 18mm` → **`17mm`**, tambah `margin-bottom: 1mm; border-bottom: 1px solid #e2e8f0`
 - `.avatar` → `18mm` → **`17mm`** (menyesuaikan body)
 
@@ -38,18 +38,18 @@
 
 ## Validation
 - `npm run lint` PASS
-- `npm run build` PASS (main **1,883.06 kB** +0.05 · preload **9.95 kB identik** · renderer **1,147.66 kB identik**)
+- `npm run build` PASS (main **1,883.05 kB** ±0.01 · preload **9.95 kB identik** · renderer **1,147.66 kB identik**)
 - `prisma migrate diff --from-migrations --to-schema-datamodel --script` = "This is an empty migration."
-- Smoke MURNI (fresh): wo1 **104** · v11 layout **60** · v12 layout **37** = 201 PASS 0 FAIL
+- Smoke MURNI (fresh): wo1 **104** · v11 layout **60** · v12 layout **38** = 202 PASS 0 FAIL
 - Smoke DB (fresh temp DB `file:C:/.../uat/smoke.db` + `prisma migrate deploy`): uat **31** = 31 PASS 0 FAIL
 - Smoke Electron (render nyata): v11 geometry **10** · v12 geometry **18** · PDF **6** = 34 PASS 0 FAIL
-- **TOTAL: 266 PASS, 0 FAIL**
+- **TOTAL: 267 PASS, 0 FAIL**
 
 ### Bukti geometry nyata (v12 geometry, render Electron)
-- Gap `inventory → judul` = **tepat 13mm** di semua baris (`[13,13,13,13,13]`)
-- Gap `nomor → judul` = **tepat 3mm**
-- Judul pendek ("Buku Ke-1") → legroom kanan **60.78mm** (inv TIDAK rata tepi kartu)
-- Judul panjang → ter-ellipsis, inv tetap **13mm** setelah judul
+- Gap `inventory → judul` = **tepat 8mm** di semua baris (`[8,8,8,8,8]`) — flex gap 3mm + margin-left 5mm
+- Gap `nomor → judul` = **tepat 3mm** (flex gap)
+- Judul pendek ("Buku Ke-1") → legroom kanan **65.79mm** (inv TIDAK rata tepi kartu; area sign lebih lega)
+- Judul panjang → ter-ellipsis, inv tetap **8mm** setelah judul
 - Pemisah border-bottom abu terang + jarak ke list **1mm**
 - Kapasitas dipertahankan: 20 buku → distribusi **[5,13,2]**, tiap sheet tanpa overlap, di dalam kartu, footer clear
 - QR & tanda tangan terpisah (tidak overlap); header-info di kanan atas; tanpa footer-left
@@ -59,6 +59,11 @@
 - Compile smoke dengan `bwip-js` transitif: `npx tsc --module node16 --moduleResolution node16 --target es2022 --esModuleInterop --skipLibCheck --rootDir . --outDir <out>` + `NODE_PATH=<repo>\node_modules`
 - Geometry dijalankan `electron geometry.cjs <outDir>` — outDir hasil compile DI DALAM repo (Electron abaikan NODE_PATH); `out/` di-gitignore.
 - Smoke uat butuh fresh DB temp: `Remove-Item *.db*` → `prisma migrate deploy` (workdir `prisma/`) → run dengan `DATABASE_URL` absolute.
+
+## Revisi Review PO (teknik posisi inventory number)
+- Rilis awal v1.2 memakai `margin-left: 13mm` (gap keras) — **DITOLAK PO**: nilai 13mm hanyalah ilustrasi visual di keputusan, BUKAN requirement.
+- Korolari PO: yang dinilai adalah **hasil visual**, bukan teknik CSS: (1) judul pendek → judul + inv tampak **satu grup informasi** (`Belajar Prisma    INV-000008`), (2) judul panjang → ellipsis bekerja, inv tetap dekat judul, (3) area kanan kartu lebih lega untuk QR + tanda tangan. Teknik apa pun boleh (flex/gap/inline-flex/margin/grid).
+- **Revisi diterapkan:** `gap: 3mm` pada `.book-row` (menggantikan `margin-right` pada `.num`) + inv `margin-left: 5mm` → total **~8mm** (proporsional, bukan keras). Geometry nyata membuktikan gap inv→judul tepat 8mm, legroom 65.79mm, judul panjang tetap 8mm.
 
 ## Status
 **DONE - menunggu review PO** (tidak membuka WO baru).

@@ -3,7 +3,8 @@
 //   - Jumlah + Status pindah ke pojok kanan ATAS (header-info), footer kiri bawah dikosongkan.
 //   - Kapasitas daftar buku: halaman 1 = 5, lanjutan = 13 (dipertahankan di v1.2).
 //   - REFINEMENT v1.2: judul buku diperkecil 7.5pt (tetap dominan di list);
-//     inventory number mengikuti judul dengan jarak tetap ~13mm (bukan rata tepi kanan);
+//     inventory number mengikuti judul dengan jarak proporsional (flex gap 3mm +
+//     inv margin-left 5mm ≈ 8mm — bukan rata tepi kanan & bukan jarak keras 13mm);
 //     garis pemisah tipis abu terang antara data anggota & daftar buku.
 //   - QR & tanda tangan tetap di kanan bawah footer.
 // Jalankan: compile tsc commonjs + node dengan NODE_PATH=<repo>\node_modules
@@ -127,12 +128,12 @@ function main(): void {
   check('urutan dalam baris: nomor -> judul -> inv', /<div class="book-row"><span class="num">1\.<\/span><span class="title">Buku Ke-1<\/span><span class="inv">INV-000001<\/span><\/div>/.test(page1))
 
   console.log('--- STEP 5: CSS v1.1 + REFINEMENT v1.2 (spacing & font) ---')
-  check('baris buku 7.5pt (judul dominan di list)', html1.includes('.book-row { display: flex; font-size: 7.5pt;'))
+  check('baris buku 7.5pt + gap flex 3mm (judul dominan di list)', html1.includes('.book-row { display: flex; gap: 3mm; font-size: 7.5pt;'))
   check('line-height baris 2.7mm', html1.includes('line-height: 2.7mm;'))
-  check('num 6.5pt + jarak ke judul 3mm', html1.includes('.book-row .num { flex: 0 0 5mm; margin-right: 3mm; font-size: 6.5pt;'))
-  check('inv mengikuti judul ~13mm (margin-left)', html1.includes('.book-row .inv { flex: 0 0 auto; margin-left: 13mm; font-family: Consolas, \'Courier New\', monospace; font-size: 6.5pt; }'))
+  check('num 6.5pt, TANPA margin-right keras (gap baris yang memisahkan)', !html1.includes('.book-row .num { flex: 0 0 5mm; margin-right: 3mm;'))
+  check('inv mengikuti judul (margin-left 5mm ≈ 8mm total gap)', html1.includes('.book-row .inv { flex: 0 0 auto; margin-left: 5mm; font-family: Consolas, \'Courier New\', monospace; font-size: 6.5pt; }'))
   check('judul ellipsis, flex 0 1 auto (tidak memenuhi sisa baris)', html1.includes('.book-row .title { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }'))
-  check('baris tanpa justify-content space-between (inv dekat judul)', html1.includes('.book-row { display: flex; font-size: 7.5pt;') && !html1.includes('.book-row { display: flex; justify-content: space-between'))
+  check('baris tanpa justify-content space-between (inv dekat judul)', html1.includes('.book-row { display: flex; gap: 3mm; font-size: 7.5pt;') && !html1.includes('justify-content: space-between'))
   check('body 17mm + pemisah border-bottom abu terang + margin-bottom 1mm', html1.includes('.body { display: flex; gap: 3mm; height: 17mm; margin-top: 0; margin-bottom: 1mm; align-items: stretch; border-bottom: 1px solid #e2e8f0; }'))
   check('avatar menyesuaikan body 17mm', html1.includes('.avatar { width: 17mm; height: 17mm; flex: 0 0 17mm;'))
   check('footer 9mm', html1.includes('.footer { display: flex; align-items: flex-end; gap: 4mm; height: 9mm;'))

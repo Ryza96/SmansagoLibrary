@@ -1,9 +1,10 @@
 // BORROW CARD LAYOUT REFINEMENT v1.2 — geometry check di Electron (render nyata).
 // Memuat HTML kartu asli (generateBorrowCardHtml) di BrowserWindow dan mengukur
 // bounding box untuk membuktikan penyempurnaan visual v1.2:
-//   - inventory number mengikuti judul dgn jarak tetap ~13mm (bukan rata tepi kanan);
+//   - inventory number mengikuti judul dgn jarak proporsional ~8mm (flex gap 3mm
+//     + inv margin-left 5mm; bukan rata tepi kanan & bukan jarak keras 13mm);
 //   - judul PENDEK menyisakan ruang legroom di kanan baris (sign area terlihat lebih luas);
-//   - judul PANJANG ter-ellipsis namun inv tetap ~13mm setelah judul;
+//   - judul PANJANG ter-ellipsis namun inv tetap ~8mm setelah judul;
 //   - garis pemisah abu terang antara data anggota & daftar buku + jarak ~1mm;
 //   - regresi v1.1: baris tidak overlap, di dalam kartu, footer clear, QR & ttd terpisah;
 //   - kapasitas 5+13 dipertahankan (20 buku -> 3 sheet, distribusi 5+13+2).
@@ -169,8 +170,8 @@ app.whenReady().then(async () => {
   const c0 = single.cards[0]
   report('1 kartu utk 5 buku (kapasitas hal1 = 5)', single.sheets === 1 && c0.rows === 5, `sheets=${single.sheets} rows=${c0.rows}`)
   report('5 baris tidak overlap & di dalam kartu & footer clear', !c0.rowOverlap && c0.insideCard && c0.footerClear, `overlap=${c0.rowOverlap} inside=${c0.insideCard} lastBottom=${c0.lastRowBottom} footerTop=${c0.footerTop}`)
-  report('gap inv->judul ~13mm (semua baris)', c0.gaps.every((g) => inRange(g.titleInv, 13, 2)), JSON.stringify(c0.gaps.map((g) => g.titleInv)))
-  report('gap num->judul ~3mm', c0.gaps.every((g) => inRange(g.numTitle, 3, 2)), JSON.stringify(c0.gaps.map((g) => g.numTitle)))
+  report('gap inv->judul ~8mm (flex gap 3mm + margin-left 5mm, semua baris)', c0.gaps.every((g) => inRange(g.titleInv, 8, 2)), JSON.stringify(c0.gaps.map((g) => g.titleInv)))
+  report('gap num->judul ~3mm (flex gap)', c0.gaps.every((g) => inRange(g.numTitle, 3, 2)), JSON.stringify(c0.gaps.map((g) => g.numTitle)))
   report('judul pendek menyisakan legroom kanan (inv tidak rata ke tepi)', c0.legroomMm !== null && c0.legroomMm >= 5, `legroom=${c0.legroomMm}mm cardRight=${c0.cardRight}`)
   report('separator abu terang antara body & books', c0.hasSeparator, `borderBottom=${c0.hasSeparator}`)
   report('jarak pemisah ke daftar buku ~1mm', c0.hasBody && inRange(c0.bodyBooksGapMm, 1, 0.8), `gap=${c0.bodyBooksGapMm}mm`)
@@ -181,7 +182,7 @@ app.whenReady().then(async () => {
   const longTitle = await measure(buildCardHtml(1, 'Panduan Lengkap Administrasi Perpustakaan Sekolah dan Pengelolaan Koleksi Buku Digital Tahun 2026'))
   const cLong = longTitle.cards[0]
   report('judul panjang ter-ellipsis (truncate)', cLong.titleTruncated, `titleTruncated=${cLong.titleTruncated}`)
-  report('judul panjang: inv tetap ~13mm setelah judul', cLong.gaps.every((g) => inRange(g.titleInv, 13, 2)), JSON.stringify(cLong.gaps.map((g) => g.titleInv)))
+  report('judul panjang: inv tetap ~8mm setelah judul', cLong.gaps.every((g) => inRange(g.titleInv, 8, 2)), JSON.stringify(cLong.gaps.map((g) => g.titleInv)))
   report('judul panjang: baris tidak overlap / di dalam kartu', !cLong.rowOverlap && cLong.insideCard && cLong.footerClear, JSON.stringify({ ov: cLong.rowOverlap, in: cLong.insideCard, fc: cLong.footerClear }))
 
   const many = await measure(buildCardHtml(20))
@@ -190,7 +191,7 @@ app.whenReady().then(async () => {
   report('distribusi baris 5+13+2 (kapasitas dipertahankan)', JSON.stringify(dist) === JSON.stringify([5, 13, 2]), JSON.stringify(dist))
   const allNoOverlap = many.cards.every((c) => !c.rowOverlap && c.insideCard && c.footerClear)
   report('tiap sheet: tanpa overlap, di dalam kartu, footer clear', allNoOverlap, JSON.stringify(many.cards.map((c) => ({ rows: c.rows, ov: c.rowOverlap, in: c.insideCard, fc: c.footerClear }))))
-  report('tiap sheet: gap inv->judul ~13mm', many.cards.every((c) => c.gaps.length === 0 || c.gaps.every((g) => inRange(g.titleInv, 13, 2))), JSON.stringify(many.cards.map((c) => c.gaps[0])))
+  report('tiap sheet: gap inv->judul ~8mm', many.cards.every((c) => c.gaps.length === 0 || c.gaps.every((g) => inRange(g.titleInv, 8, 2))), JSON.stringify(many.cards.map((c) => c.gaps[0])))
   report('halaman lanjutan TANPA separator (tidak ada body)', many.cards.slice(1).every((c) => !c.hasBody && !c.hasSeparator), JSON.stringify(many.cards.slice(1).map((c) => ({ body: c.hasBody, sep: c.hasSeparator }))))
 
   console.log('GEOMETRY=' + JSON.stringify({ single: { rows: c0.rows, gaps: c0.gaps, sepGap: c0.bodyBooksGapMm }, many: dist, longTitle: { truncated: cLong.titleTruncated, gap: cLong.gaps[0] } }))

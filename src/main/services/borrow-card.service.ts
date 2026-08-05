@@ -25,8 +25,10 @@ import { generateQrCodeSvg } from './barcode.service'
 // WO-1 BORROW CARD LAYOUT REFINEMENT v1.2 — penyempurnaan visual (tanpa mengubah
 // ukuran kartu / PDF / print pipeline / QR / header / logo / identitas anggota).
 //  - Judul buku diperkecil 8→7.5pt (tetap > teks identitas 6.5pt, tetap terbaca).
-//  - Inventory number mengikuti judul dengan jarak tetap ~13mm (bukan rata ke
-//    tepi kanan) — judul pendek → inv dekat; judul panjang → judul ter-ellipsis.
+//  - Inventory number mengikuti judul dengan jarak proporsional (flex gap 3mm +
+//    margin-left 5mm ≈ 8mm total — bukan rata ke tepi kanan) — judul pendek →
+//    inv dekat (satu grup informasi); judul panjang → judul ter-ellipsis, inv
+//    tetap mengikuti judul, area kanan lega untuk QR & tanda tangan.
 //  - Garis pemisah tipis abu terang antara data anggota & daftar buku
 //    (border-bottom .body + margin-bottom 1mm) — jarak nyaman di atas & bawah.
 //  Kapasitas dipertahankan 5+13: body 18→17mm & baris 2.8→2.7mm memberi ruang
@@ -275,10 +277,10 @@ export function generateBorrowCardHtml(data: BorrowCardData): string {
   .row b { flex: 0 0 21mm; font-weight: 600; color: #475569; }
   .row span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .books { flex: 1; min-height: 0; overflow: hidden; margin-top: 0; }
-  .book-row { display: flex; font-size: 7.5pt; line-height: 2.7mm; margin-bottom: 0; }
-  .book-row .num { flex: 0 0 5mm; margin-right: 3mm; font-size: 6.5pt; color: #64748b; }
+  .book-row { display: flex; gap: 3mm; font-size: 7.5pt; line-height: 2.7mm; margin-bottom: 0; }
+  .book-row .num { flex: 0 0 5mm; font-size: 6.5pt; color: #64748b; }
   .book-row .title { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .book-row .inv { flex: 0 0 auto; margin-left: 13mm; font-family: Consolas, 'Courier New', monospace; font-size: 6.5pt; }
+  .book-row .inv { flex: 0 0 auto; margin-left: 5mm; font-family: Consolas, 'Courier New', monospace; font-size: 6.5pt; }
   .footer { display: flex; align-items: flex-end; gap: 4mm; height: 9mm; margin-top: 0.5mm; }
   .badge { display: inline-block; padding: 0.5mm 2mm; border-radius: 1mm; font-size: 6pt; font-weight: 700; letter-spacing: 0.3px; margin-top: 1mm; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .badge-active   { background: #dcfce7; color: #166534; }
