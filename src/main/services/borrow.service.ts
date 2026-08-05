@@ -203,6 +203,15 @@ export class BorrowService {
       }))
     )
 
+    // FIRST BORROW ACTIVATION — Membership Status (bukan Academic Status):
+    // peminjaman pertama yang BERHASIL mengaktifkan keanggotaan (INACTIVE → ACTIVE).
+    // Status ACTIVE TIDAK boleh kembali INACTIVE hanya karena buku dikembalikan
+    // (ReturnService tidak pernah menulis Member.status). Membership ≠ eligibility:
+    // guard peminjaman tetap berbasis Enrollment (tidak berubah).
+    if (member.status === 'INACTIVE') {
+      await this.memberRepository.update(member.id, { status: 'ACTIVE' })
+    }
+
     return toDTO(created)
   }
 }

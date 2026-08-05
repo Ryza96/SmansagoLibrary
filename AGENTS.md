@@ -806,3 +806,23 @@ pm run build PASS (main 1,819.55 kB � preload 9.02 kB � renderer 1,044.75 kB
 - **RecentActivity id = prefix + primary key** (`borrow-<id>`/`return-<id>`) agar unik lintas dua tabel saat digabung; merge sort desc + slice 8.
 - **Boundary hari di Service** (repo terima Date bounds) — murni & deterministic, diuji smoke; jangan simpan timezone di repo.
 - Smoke dashboard: fresh DB temp per run + `prisma migrate deploy` (workdir `prisma/`) + DATABASE_URL absolute + NODE_PATH; bukti B1 pakai `createMany` bulk 120 peminjaman dengan `borrowDate`/`dueDate` jauh dari hari ini agar tidak mengganggu KPI/alerts/recentActivity.
+
+---
+
+## MEMBERSHIP STATUS FIRST BORROW ACTIVATION (COMPLETE - READY review PO)
+
+### Ringkasan
+- Bug "Semua anggota NONAKTIF" ditutup (root cause = design gap: tidak ada jalur otomatis INACTIVE→ACTIVE). Keputusan PO: **Membership Status ≠ Academic Status ≠ Borrow Eligibility**; anggota baru INACTIVE → **peminjaman pertama yang BERHASIL mengaktifkan** keanggotaan → ACTIVE; status **tidak pernah kembali INACTIVE** hanya karena buku dikembalikan.
+- **Modifikasi (1 file source):** `src/main/services/borrow.service.ts` — blok "FIRST BORROW ACTIVATION" di `create()` **SETELAH** `borrowRepository.createWithItems(...)` sukses, **SEBELUM** `return toDTO(created)`: `if (member.status === 'INACTIVE') await this.memberRepository.update(member.id, { status: 'ACTIVE' })`. `memberRepository` sudah ada di constructor; `member` sudah dimuat `.status`; eligibility tetap enrollment-based (guard tidak disentuh).
+- **TIDAK diubah:** Enrollment, Promotion, Dashboard, Borrow Eligibility, ReturnService, UI, schema/migration, IPC/preload/bootstrap, repository lain; **tidak ada backfill** (dev DB tetap 395 INACTIVE — aktivasi organik per pinjam).
+- **Validation PASS:** smoke baru `membership_first_borrow_smoke` **20/20** (5 mandat: INACTIVE→pinjam1→ACTIVE; pinjam2 tetap ACTIVE; return semua tetap ACTIVE; eligibility enrollment — siswa ACTIVE tanpa enrollment ditolak; guru INACTIVE tanpa enrollment sukses→ACTIVE; dashboard berjalan); regression **253/253** (it1 34 · eligibility 7 · wo14_e2 36 · borrow_card_uat 29 · dashboard_phase1 30 · wo13_e1 39 · wo15_e3 78); lint PASS; build PASS (main **1,844.57** kB +0.12 dari guard · preload 9.47 · renderer 1,060.86 **identik baseline**); `prisma migrate diff` empty (from-migrations & from-url); `migrate status` up to date (4 migrations).
+- **Laporan:** `WORK_ORDER_MEMBERSHIP_FIRST_BORROW_REPORT.md`, `MEMBERSHIP_FIRST_BORROW_FINAL_REVIEW.md`, `MEMBERSHIP_FIRST_BORROW_RELEASE_REPORT.md`. Status: **DONE — menunggu review PO** (tidak lanjut WO berikutnya).
+- **Commit:** satu final commit + push (fix + smoke + laporan + AGENTS.md). File untracked WO lain (BORROW_ENROLLMENT_DISCOVERY, INTEGRATION_TEST_PHASE1_DISCOVERY, IT1_DISCOVERY_REPORT, MEMBERSHIP_STATUS_BUG_REPORT, MEMBER_STATUS_ALIGNMENT_PLAN, MEMBER_STATUS_FINAL_AUDIT) TIDAK diikutkan.
+
+### Pelajaran (retain)
+- **Aktivasi status harus berada SETELAH transaksi yang menentukan sukses**, bukan sebelum — menempatkan `update` setelah `await createWithItems(...)` menjamin hanya peminjaman berhasil yang mengaktifkan (tidak ada aktivasi parsial/gagal).
+- **`Member.status` dan eligibility adalah dua domain berbeda**: eligibility (siswa) = `MemberEnrollment.status=ACTIVE` (IT-1 HOTFIX); `Member.status` = status keanggotaan yang kini dipicu by-borrow. Jangan pernah menyambungkan keduanya.
+- **"Status tidak revert saat return" dijamin secara arsitektur** (ReturnService tidak menulis `Member.status`), bukan via guard tambahan — buktikan lewat smoke (return semua buku → tetap ACTIVE), bukan kode berlebihan.
+- **Fix bug data-driven (bukan regresi kode) cukup smoke baru + regression lintasan terkait** — regression di-scope ke Borrow (it1/eligibility/e2/uat) + Dashboard + Enrollment; domain lain (Promotion/Import) tidak menyentuh `Member.status` jalur borrow.
+- **Tidak ada backfill siluman**: mengubah 395 INACTIVE→ACTIVE massal dilarang; aktivasi organik per peminjaman nyata adalah perilaku yang disetujui PO.
+- Smoke compile: suite tanpa bwip-js pakai `--module commonjs --moduleResolution node`; suite yang transitif memuat `barcode.service`/`print.service` (borrow-card uat) pakai `--module node16 --moduleResolution node16`. Jalankan dengan `DATABASE_URL` absolute + `NODE_PATH=<repo>\node_modules`; `migrate deploy` dari workdir `prisma/`; template DB di-copy per suite untuk hemat waktu generate client.
