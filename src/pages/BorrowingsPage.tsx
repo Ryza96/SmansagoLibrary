@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { X, BookmarkCheck, Printer } from 'lucide-react'
+import { X, BookmarkCheck } from 'lucide-react'
 import SearchableSelect from '../components/ui/SearchableSelect'
+import { useNotification } from '../notification/NotificationContext'
 import type { CreateBorrowingInput } from '../types/dtos/borrowing'
 import type { MemberDTO } from '../types/dtos/member'
 import { receiptPreviewPath } from '../utils/navigation'
@@ -26,6 +27,7 @@ function useDebounce<T extends (...args: any[]) => void>(fn: T, delay: number): 
 
 export default function BorrowingPage() {
   const navigate = useNavigate()
+  const { notify } = useNotification()
   const barcodeRef = useRef<HTMLInputElement>(null)
   const [barcode, setBarcode] = useState('')
   const [books, setBooks] = useState<BookEntry[]>([])
@@ -34,8 +36,6 @@ export default function BorrowingPage() {
   const [memberStats, setMemberStats] = useState<{ activeBookCount: number; nearestDueDate: string | null } | null>(null)
   const [dueDate, setDueDate] = useState('')
   const [saving, setSaving] = useState(false)
-  const [lastSuccessBorrowingId, setLastSuccessBorrowingId] = useState<string | null>(null)
-  const [printing, setPrinting] = useState(false)
 
   const canSave = selectedMember !== null && books.length > 0 && dueDate !== '' && !saving
 
@@ -126,8 +126,7 @@ export default function BorrowingPage() {
         bookCopyIds: books.map((b) => b.bookCopyId)
       }
       const result = await window.electronAPI.borrowings.create(input)
-      setLastSuccessBorrowingId(result.id)
-      alert('Transaksi berhasil disimpan.')
+      notify.success('Transaksi berhasil disimpan.')
       navigate(receiptPreviewPath(result.id))
       setBooks([])
       setSelectedMember(null)
@@ -141,19 +140,6 @@ export default function BorrowingPage() {
       alert(message)
     } finally {
       setSaving(false)
-    }
-  }
-
-  async function handlePrintReceipt() {
-    if (!lastSuccessBorrowingId) return
-    setPrinting(true)
-    try {
-      await window.electronAPI.print.borrowReceipt(lastSuccessBorrowingId)
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Gagal mencetak.'
-      alert(message)
-    } finally {
-      setPrinting(false)
     }
   }
 
@@ -319,20 +305,6 @@ export default function BorrowingPage() {
             <BookmarkCheck size={18} />
             {saving ? 'Menyimpan...' : 'SIMPAN TRANSAKSI'}
           </button>
-
-          {lastSuccessBorrowingId && (
-            <div className="bg-green-50 rounded-lg border border-green-200 p-4 space-y-2">
-              <p className="text-sm text-green-700 font-medium">Transaksi berhasil disimpan!</p>
-              <button
-                onClick={handlePrintReceipt}
-                disabled={printing}
-                className="flex items-center justify-center gap-2 w-full px-4 py-2 bg-white text-green-700 text-sm font-medium rounded-lg border border-green-300 hover:bg-green-100 disabled:opacity-50 transition-colors"
-              >
-                <Printer size={18} />
-                {printing ? 'Mencetak...' : 'CETAK BUKTI'}
-              </button>
-            </div>
-          )}
         </div>
       </div>
     </div>

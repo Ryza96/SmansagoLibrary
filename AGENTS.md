@@ -1040,4 +1040,24 @@ pm run build PASS (main 1,819.55 kB ï¿½ preload 9.02 kB ï¿½ renderer 1,044
 - **Constrain scope = bukti bundle identik**: main & preload byte-identik baseline membuktikan tidak ada wiring lain; satu-satunya delta renderer +11.22 kB = modul notification. Jika WO menyentuh hanya renderer, delta renderer-lah yang wajar.
 - **Smoke pure tanpa DB/Electron**: compile `npx tsc --module commonjs --target es2022 --moduleResolution node --esModuleInterop --skipLibCheck --rootDir . --outDir <tmp>\out ns1_notification_smoke/smoke.ts` lalu `node <tmp>\out\ns1_notification_smoke\smoke.js` (tanpa bwip-js → pola commonjs+node, bukan node16).
 
+---
+
+## NS-2 (PILOT Migration): Notifikasi Sukses Peminjaman Buku (COMPLETE - READY review PO)
+
+### Ringkasan
+- **Pilot migration Notification System — HANYA SATU FITUR: Peminjaman Buku, HANYA alur sukses setelah peminjaman berhasil disimpan.** Notifikasi sukses legacy diganti `notify.success()`. BELUM Return, Master Data, Error, Confirm.
+- **File diubah (1 renderer):** `src/pages/BorrowingsPage.tsx` — import `useNotification` (hapus `Printer`), `const { notify } = useNotification()`, alur sukses `alert('Transaksi berhasil disimpan.')` → `notify.success('Transaksi berhasil disimpan.')`; **hapus dead UI legacy**: kotak hijau `lastSuccessBorrowingId && (...CETAK BUKTI...)`, `handlePrintReceipt` (channel legacy `printing:borrowReceipt`), state `lastSuccessBorrowingId`/`printing`.
+- **Kenapa kotak hijau dihapus:** kotak hijau = notifikasi sukses lama (dead code di happy path — `navigate(receiptPreviewPath(id))` jalan tanpa syarat setelah create sukses → halaman unmount → kotak tak pernah terlihat); preview WO-2 sudah punya Cetak/PDF (`borrowCard`/`borrowCardPdf`). Channel legacy `printing:borrowReceipt` di electron/main/preload **dibiarkan** (cleanup di WO terpisah).
+- **TIDAK diubah:** ERROR (4 `alert` error di BorrowingsPage: duplikat barcode/barcode tak ditemukan/buku tak tersedia/catch), CONFIRM, halaman lain (ReturnsPage masih `alert` sukses — target NS berikut), business logic (create→navigate→reset form utuh), schema/migration/IPC/preload/env.
+- **Validation PASS:** `npm run lint`; `npm run build` (main 1,882.54 · preload 9.95 **identik** · renderer **1,147.66 kB**); `prisma migrate diff` = "This is an empty migration."
+- **Laporan:** `WORK_ORDER_NS2_IMPLEMENTATION.md`, `NS2_FINAL_REVIEW.md`, `NS2_RELEASE.md`. Status: **DONE - READY review PO** (belum migrasi Return/Master Data/Error/Confirm). Commit: Satu final commit NS-2 + push.
+
+### Pelajaran (retain)
+- **Pilot migration = bukti pola migrasi**: titik migrasi HANYA di jalur sukses (setelah `await create()` sukses); error & confirm dilarang bersentuhan; provider global NS-1 memungkinkan toast survive navigasi (viewport render di luar halaman) — `notify.success()` dipanggil sebelum `navigate()` tetap terlihat di preview.
+- **Notifikasi sukses lama bisa berupa lebih dari `alert()`** — kotak hijau + tombol "CETAK BUKTI" (dead code karena navigate tanpa syarat). Audit UX menangkap `alert()` sukses; kotak hijau ditemukan saat inspeksi file. Selalu cek UI sukses selain alert saat migrasi satu fitur.
+- **Channel legacy (`printing:borrowReceipt`/`returnReceipt`) tidak dihapus saat pemanggil renderer hilang** — keputusan desain BORROW_RECEIPT menunda cleanup; hapus hanya di WO housekeeping terpisah bila PO setuju, bukan di WO migrasi notifikasi.
+- **Constrain scope renderer**: main & preload byte-identik baseline = bukti tanpa wiring; renderer delta 1,148.88→1,147.66 kB (hapus dead UI + import) — delta negatif wajar saat menghapus legacy UI.
+- **Verifikasi error-path utuh dengan grep**: `alert(` di BorrowingsPage tersisa 4, semua jalur error — bukan kebetulan, diverifikasi eksplisit sebelum commit.
+
+
 
