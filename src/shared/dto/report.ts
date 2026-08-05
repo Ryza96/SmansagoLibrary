@@ -26,6 +26,9 @@ export interface BorrowReportFilter {
   from: string
   to: string
   status?: BorrowReportStatus
+  // Pencarian server-side (R-2, aditif non-breaking): cocok di nomor
+  // transaksi, nomor/nama anggota, dan judul buku.
+  search?: string
   page?: number
   limit?: number
 }

@@ -21,6 +21,7 @@ export const ROUTES = {
   INVENTORY: '/inventory',
   INVENTORY_DETAIL: '/inventory/:id',
   REPORTS: '/reports',
+  REPORT_BORROWINGS: '/reports/borrowings',
   SETTINGS: '/settings',
   MASTER_AUTHORS: '/master/authors',
   MASTER_AUTHOR_NEW: '/master/authors/new',

@@ -77,8 +77,8 @@ export class ReportService {
     const now = Date.now()
 
     const [result, summary] = await Promise.all([
-      this.reportRepository.findBorrowingsBetween({ from, to, status: filter.status, page: filter.page, limit: filter.limit }),
-      this.reportRepository.countBorrowStatusSummary(from, to)
+      this.reportRepository.findBorrowingsBetween({ from, to, status: filter.status, search: filter.search, page: filter.page, limit: filter.limit }),
+      this.reportRepository.countBorrowStatusSummary(from, to, filter.search)
     ])
 
     const rows: BorrowingReportRowDTO[] = []

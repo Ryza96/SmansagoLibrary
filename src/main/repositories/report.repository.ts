@@ -14,6 +14,7 @@ export interface BorrowReportQuery {
   from: Date
   to: Date
   status?: BorrowReportStatusFilter
+  search?: string
   page?: number
   limit?: number
 }
@@ -101,6 +102,21 @@ function buildBorrowReportWhere(query: BorrowReportQuery): Prisma.BorrowWhereInp
     where.returnDate = null
     where.dueDate = { lt: new Date() }
   }
+  if (query.search) {
+    const s = query.search
+    where.OR = [
+      { borrowNumber: { contains: s } },
+      {
+        member: {
+          OR: [
+            { memberNumber: { contains: s } },
+            { fullName: { contains: s } }
+          ]
+        }
+      },
+      { details: { some: { bookCopy: { book: { title: { contains: s } } } } } }
+    ]
+  }
   return where
 }
 
@@ -127,8 +143,8 @@ export class ReportRepository extends BaseRepository {
     return toPaginatedResult<BorrowReportRow>(data, total, { page: query.page, limit: query.limit })
   }
 
-  async countBorrowStatusSummary(from: Date, to: Date) {
-    const base: Prisma.BorrowWhereInput = { borrowDate: { gte: from, lte: to } }
+  async countBorrowStatusSummary(from: Date, to: Date, search?: string) {
+    const base = buildBorrowReportWhere({ from, to, search })
     const [active, completed, overdue] = await Promise.all([
       this.prisma.borrow.count({ where: { ...base, returnDate: null } }),
       this.prisma.borrow.count({ where: { ...base, returnDate: { not: null } } }),
