@@ -1059,5 +1059,22 @@ pm run build PASS (main 1,819.55 kB ï¿½ preload 9.02 kB ï¿½ renderer 1,044
 - **Constrain scope renderer**: main & preload byte-identik baseline = bukti tanpa wiring; renderer delta 1,148.88→1,147.66 kB (hapus dead UI + import) — delta negatif wajar saat menghapus legacy UI.
 - **Verifikasi error-path utuh dengan grep**: `alert(` di BorrowingsPage tersisa 4, semua jalur error — bukan kebetulan, diverifikasi eksplisit sebelum commit.
 
+---
+
+## NS-2 HOTFIX: Tailwind content scan — toast tidak terlihat (COMPLETE - READY review PO)
+
+### Ringkasan
+- **Bug:** setelah klik SIMPAN TRANSAKSI di Peminjaman Buku, tidak ada alert maupun toast; aplikasi langsung navigate ke preview. Investigasi READ ONLY `NS2_TOAST_INVESTIGATION.md` menemukan **root cause = build-time, bukan runtime**: `tailwind.config.js` `content` globs TIDAK mencakup `./src/notification/**/*`, sehingga seluruh class utility Tailwind eksklusif modul Notification di-purge saat build → toast & confirm dialog tetap masuk DOM (JS bundle lengkap) tapi tanpa style positioning/visual → invisible.
+- **Bukti:** grep CSS build lama `index-BSa87M2u.css` — `top-14`/`right-4`/`z-[90]`/`z-[100]`/`bg-emerald-500`/`.w-1`/`.pr-2`/`hover:bg-slate-100` semua MISSING; class `.fixed`/`.w-80`/`bg-white` KEBETULAN ada karena di-generate file lain yang tercakup globs. JS bundle `index-BxKcJ9qP.js:15192` masih memuat `className="... top-14 right-4 z-[90] ..."` — class tertulis di DOM tapi rule CSS-nya tidak ada.
+- **Fix (1 baris konfigurasi, TIDAK ada perubahan source):** `tailwind.config.js` `content` + `'./src/notification/**/*.{js,ts,jsx,tsx}'`. Main/preload bundle IDENTIK baseline (1,882.54 / 9.95 kB); renderer 1,147.66 kB (JS hash berubah, ukuran sama); CSS baru `index-Catve8Qm.css` 41.28 kB (+1.6 kB = class notification).
+- **Validation PASS:** (1) grep CSS baru — 5 class wajib `top-14`, `right-4`, `z-[90]`, `z-[100]`, `bg-emerald-500` + `bg-rose/amber/sky-500`, `.w-1`, `.pr-2`, `hover:bg-slate-100`, `.toast-enter` semua FOUND; (2) `npm run lint` PASS; (3) `npm run build` PASS; (4) `prisma migrate diff --from-migrations` = "This is an empty migration."; (5) UAT headless: `BorrowingsPage.tsx:129-130` `notify.success` dipanggil SEBELUM `navigate`; `App.tsx` provider di atas router → ToastViewport (portal `document.body`) survive navigasi; JS bundle memuat `Transaksi berhasil disimpan.` + viewport class + `receipt-preview`. Klik nyata & visual toast butuh runtime Electron — konfirmasi manual PO direkomendasikan.
+- **Laporan:** `NS2_TOAST_INVESTIGATION.md`, `NS2_TOAST_FIX_IMPLEMENTATION.md`, `NS2_TOAST_FIX_FINAL_REVIEW.md`, `NS2_TOAST_FIX_RELEASE.md`. Status: **DONE - READY review PO** (tidak membuka NS-3). Commit: satu final commit + push.
+
+### Pelajaran (retain)
+- **Tailwind `content` ≠ tsconfig include.** `tsconfig.web.json` bisa include `src/notification/**/*` (type-check PASS) padahal Tailwind tidak men-scan folder itu → build hijau tapi class di-purge. Verifikasi UI Tailwind WAJIB grep CSS hasil build (`top-14`/`z-[90]`/dst), bukan hanya tsc.
+- **Class yang "ada" di CSS belum tentu dari file itu** — `.fixed`/`.w-80`/`bg-white` di-generate file lain yang tercakup globs. Bukti scan folder baru yang benar = class eksklusif folder itu (`top-14`, `z-[90]`, `z-[100]`, `bg-emerald-500`) baru muncul setelah glob ditambahkan.
+- **Bug "UI tidak tampil tapi build hijau"** → selalu cek apakah komponen di bawah globs Tailwind content; purge Tailwind bersifat diam-diam (tidak error). Folder baru untuk komponen React WAJIB ditambahkan ke `content` `tailwind.config.js` (saat ini: renderer/components/pages/routes/notification).
+- **Toast tidak terlihat ≠ toast tidak masuk state** — dispatch `notify.success` sinkron sebelum `navigate`; provider di atas router + viewport portal body → toast TETAP tampil di halaman tujuan. Navigasi bukan penyebab; verifikasi posisi CSS dulu.
+
 
 
