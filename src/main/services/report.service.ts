@@ -240,8 +240,13 @@ export class ReportService {
       lateDays: diffDays(r.returnedAt, r.dueDate)
     }))
 
+    // Invariant PO (R-4): limit 10 harus SELALU menghasilkan maksimal 10 baris —
+    // gabungan ACTIVE + RETURNED tidak boleh melebihi limit per halaman. computeOverdueSlice
+    // sudah menjamin ini; slice(0, limit) adalah clamping defensif final (no-op bila benar).
+    const rows = [...activeRows, ...returnedRows].slice(0, limit)
+
     return {
-      rows: [...activeRows, ...returnedRows],
+      rows,
       pagination: {
         page,
         limit,

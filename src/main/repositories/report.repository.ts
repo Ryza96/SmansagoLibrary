@@ -166,8 +166,11 @@ function buildActiveOverdueWhere(asOf: Date, search?: string): Prisma.BorrowDeta
     returnedAt: null,
     borrow: { returnDate: null, dueDate: { lt: asOf } }
   }
-  if (search) {
-    const s = search
+  // Normalisasi sama dengan buildReturnedLateSearchSql (trim + truthy) agar search
+  // dengan spasi leading/trailing berperilaku IDENTIK antara ACTIVE dan RETURNED
+  // ("Search harus bekerja ... Baik ACTIVE maupun RETURNED" — kontrak R-4).
+  const s = search?.trim()
+  if (s) {
     where.OR = [
       { bookTitle: { contains: s } },
       { borrow: { borrowNumber: { contains: s } } },
