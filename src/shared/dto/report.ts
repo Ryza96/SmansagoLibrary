@@ -62,9 +62,16 @@ export interface BorrowingReportDTO {
 // LAPORAN PENGEMBALIAN
 // ---------------------------------------------------------------------------
 
+// Status pengembalian turunan (bukan kolom): dihitung Service dari
+// returnedAt vs dueDate. TEPAT WAKTU = returnedAt <= dueDate; TERLAMBAT = returnedAt > dueDate.
+export type ReturnStatus = 'ON_TIME' | 'LATE'
+
 export interface ReturnReportFilter {
   from: string
   to: string
+  // Pencarian server-side (R-3, aditif non-breaking): cocok di nomor
+  // transaksi, nomor/nama anggota (snapshot), dan judul buku.
+  search?: string
   page?: number
   limit?: number
 }
@@ -82,10 +89,17 @@ export interface ReturnReportRowDTO {
   dueDate: string
   // Jumlah hari terlambat saat dikembalikan (returnedAt > dueDate); null bila tepat waktu.
   lateDays: number | null
+  // Lama pinjam dalam hari (returnedAt - borrowDate) — dihitung Service, renderer tidak menurunkan.
+  durationDays: number
+  // Tepat Waktu (returnedAt <= dueDate) / Terlambat (returnedAt > dueDate).
+  status: ReturnStatus
 }
 
 export interface ReturnReportSummaryDTO {
   total: number
+  // R-3 (aditif): statistik waktu pengembalian. onTime + late === total.
+  onTime: number
+  late: number
   returnedGood: number
   returnedDamaged: number
   returnedLost: number

@@ -118,13 +118,15 @@ export class ReportService {
   async getReturnReport(filter: ReturnReportFilter): Promise<ReturnReportDTO> {
     const { from, to } = parseRange(filter.from, filter.to)
 
-    const [result, cond] = await Promise.all([
-      this.reportRepository.findReturnedDetailsBetween({ from, to, page: filter.page, limit: filter.limit }),
-      this.reportRepository.countReturnedConditionSummary(from, to)
+    const [result, cond, timing] = await Promise.all([
+      this.reportRepository.findReturnedDetailsBetween({ from, to, search: filter.search, page: filter.page, limit: filter.limit }),
+      this.reportRepository.countReturnedConditionSummary(from, to, filter.search),
+      this.reportRepository.countReturnedTimingSummary(from, to, filter.search)
     ])
 
     const rows: ReturnReportRowDTO[] = result.data.map((d) => {
       const returnedAt = d.returnedAt
+      const late = returnedAt != null && returnedAt.getTime() > d.borrow.dueDate.getTime()
       return {
         borrowNumber: d.borrow.borrowNumber,
         borrowDate: iso(d.borrow.borrowDate),
@@ -135,7 +137,9 @@ export class ReportService {
         bookTitle: d.bookTitle,
         conditionBack: d.conditionBack,
         dueDate: iso(d.borrow.dueDate),
-        lateDays: returnedAt && returnedAt.getTime() > d.borrow.dueDate.getTime() ? diffDays(returnedAt, d.borrow.dueDate) : null
+        lateDays: late ? diffDays(returnedAt as Date, d.borrow.dueDate) : null,
+        durationDays: returnedAt ? diffDays(returnedAt, d.borrow.borrowDate) : 0,
+        status: late ? 'LATE' : 'ON_TIME'
       }
     })
 
@@ -144,6 +148,8 @@ export class ReportService {
       pagination: toReportPagination(result),
       summary: {
         total: result.total,
+        onTime: timing.total - timing.late,
+        late: timing.late,
         returnedGood: cond.returnedGood,
         returnedDamaged: cond.returnedDamaged,
         returnedLost: cond.returnedLost

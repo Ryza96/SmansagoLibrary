@@ -612,5 +612,13 @@ export const LABELS = {
     STATUS_ACTIVE: 'Dipinjam',
     STATUS_COMPLETED: 'Dikembalikan',
     STATUS_OVERDUE: 'Terlambat',
+    RETURNS: 'Laporan Pengembalian',
+    RETURNS_DESC: 'Rekap seluruh pengembalian buku pada periode tertentu.',
+    TOTAL_RETURNS: 'Total Pengembalian',
+    ON_TIME: 'Tepat Waktu',
+    LATE: 'Terlambat',
+    COL_RETURN_DATE: 'Tanggal Kembali',
+    COL_DURATION: 'Lama Pinjam',
+    DAYS: 'hari',
   },
 } as const

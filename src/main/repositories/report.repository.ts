@@ -22,6 +22,7 @@ export interface BorrowReportQuery {
 export interface ReturnReportQuery {
   from: Date
   to: Date
+  search?: string
   page?: number
   limit?: number
 }
@@ -120,6 +121,25 @@ function buildBorrowReportWhere(query: BorrowReportQuery): Prisma.BorrowWhereInp
   return where
 }
 
+// Where untuk Laporan Pengembalian (1 baris = 1 BorrowDetail yang sudah dikembalikan).
+// Search R-3 (server-side) memakai snapshot pada Borrow (borrowNumber/memberNumber/
+// memberName) + snapshot bookTitle — persis nilai yang ditampilkan kolom tabel.
+function buildReturnReportWhere(query: ReturnReportQuery): Prisma.BorrowDetailWhereInput {
+  const where: Prisma.BorrowDetailWhereInput = {
+    returnedAt: { gte: query.from, lte: query.to }
+  }
+  if (query.search) {
+    const s = query.search
+    where.OR = [
+      { borrow: { borrowNumber: { contains: s } } },
+      { borrow: { memberNumber: { contains: s } } },
+      { borrow: { memberName: { contains: s } } },
+      { bookTitle: { contains: s } }
+    ]
+  }
+  return where
+}
+
 export class ReportRepository extends BaseRepository {
   // -------------------------------------------------------------------------
   // Laporan Peminjaman
@@ -159,9 +179,7 @@ export class ReportRepository extends BaseRepository {
 
   async findReturnedDetailsBetween(query: ReturnReportQuery) {
     const { skip, take } = getPaginationParams({ page: query.page, limit: query.limit })
-    const where: Prisma.BorrowDetailWhereInput = {
-      returnedAt: { gte: query.from, lte: query.to }
-    }
+    const where = buildReturnReportWhere(query)
 
     const [data, total] = await Promise.all([
       this.prisma.borrowDetail.findMany({
@@ -180,14 +198,45 @@ export class ReportRepository extends BaseRepository {
     return toPaginatedResult(data, total, { page: query.page, limit: query.limit })
   }
 
-  async countReturnedConditionSummary(from: Date, to: Date) {
-    const where: Prisma.BorrowDetailWhereInput = { returnedAt: { gte: from, lte: to } }
+  async countReturnedConditionSummary(from: Date, to: Date, search?: string) {
+    const base = buildReturnReportWhere({ from, to, search })
     const [returnedGood, returnedDamaged, returnedLost] = await Promise.all([
-      this.prisma.borrowDetail.count({ where: { ...where, conditionBack: 'BAIK' } }),
-      this.prisma.borrowDetail.count({ where: { ...where, conditionBack: 'RUSAK' } }),
-      this.prisma.borrowDetail.count({ where: { ...where, conditionBack: 'HILANG' } })
+      this.prisma.borrowDetail.count({ where: { ...base, conditionBack: 'BAIK' } }),
+      this.prisma.borrowDetail.count({ where: { ...base, conditionBack: 'RUSAK' } }),
+      this.prisma.borrowDetail.count({ where: { ...base, conditionBack: 'HILANG' } })
     ])
     return { returnedGood, returnedDamaged, returnedLost }
+  }
+
+  // Ringkasan waktu pengembalian (R-3): total detail dikembalikan + jumlah TERLAMBAT
+  // (returnedAt > dueDate). onTime dihitung Service = total - late. Perbandingan dua
+  // kolom tak bisa jadi Prisma relation filter → late pakai SQL join (pola R-1).
+  async countReturnedTimingSummary(from: Date, to: Date, search?: string) {
+    const [total, late] = await Promise.all([
+      this.prisma.borrowDetail.count({ where: buildReturnReportWhere({ from, to, search }) }),
+      this.countReturnedLate(from, to, search)
+    ])
+    return { total, late }
+  }
+
+  private async countReturnedLate(from: Date, to: Date, search?: string): Promise<number> {
+    const s = search?.trim()
+    const rows = await this.prisma.$queryRaw<Array<{ c: number | bigint }>>(Prisma.sql`
+      SELECT COUNT(*) AS c
+      FROM BorrowDetail bd
+      JOIN Borrow b ON b.id = bd.borrowId
+      WHERE bd.returnedAt IS NOT NULL
+        AND bd.returnedAt >= ${from}
+        AND bd.returnedAt <= ${to}
+        AND bd.returnedAt > b.dueDate
+        ${s ? Prisma.sql`AND (
+          b.borrowNumber LIKE ${'%' + s + '%'}
+          OR b.memberNumber LIKE ${'%' + s + '%'}
+          OR b.memberName LIKE ${'%' + s + '%'}
+          OR bd.bookTitle LIKE ${'%' + s + '%'}
+        )` : Prisma.empty}
+    `)
+    return Number(rows[0]?.c ?? 0)
   }
 
   // -------------------------------------------------------------------------
