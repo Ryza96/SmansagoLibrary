@@ -2,6 +2,8 @@ import { BaseRepository } from './base/base.repository'
 import { getPaginationParams, toPaginatedResult } from './base/pagination'
 import { Prisma } from '@prisma/client'
 import { ACADEMIC_STATUS } from '../../shared/config/academic-status'
+import { BOOK_COPY_STATUS } from '../../shared/config/book-copy-status'
+import { BookCopyCondition } from '../../../electron/main/shared/book-copy-condition'
 
 // Report Module (R-1) — query AGREGAT khusus laporan, terpisah dari repository
 // domain. Repository domain existing TIDAK diubah. Wajib memakai getPrisma()
@@ -92,14 +94,29 @@ const memberReportInclude = {
 
 type MemberReportRow = Prisma.MemberGetPayload<{ include: typeof memberReportInclude }>
 
+// R-6: copyCount = eksemplar NON-REMOVED saja (keputusan PO G-4). _count difilter
+// status != REMOVED sehingga `copyCount` row konsisten dengan totalCopies summary.
 const bookReportInclude = {
   author: true,
   publisher: true,
   category: true,
-  _count: { select: { bookCopies: true } }
+  _count: {
+    select: {
+      bookCopies: { where: { status: { not: BOOK_COPY_STATUS.REMOVED } } }
+    }
+  }
 } as const
 
 type BookReportRow = Prisma.BookGetPayload<{ include: typeof bookReportInclude }>
+
+// R-6: breakdown per-judul — per dimensi (status vs condition), boleh overlap
+// (keputusan PO G-5). available+borrowed+lost = copyCount; damagedCount terpisah.
+export interface BookReportRowWithCounts extends BookReportRow {
+  availableCount: number
+  borrowedCount: number
+  lostCount: number
+  damagedCount: number
+}
 
 export interface ReturnedLateRawRow {
   detailId: string
@@ -501,9 +518,7 @@ export class ReportRepository extends BaseRepository {
   async findBookReportRows(query: BookReportQuery) {
     const { skip, take } = getPaginationParams({ page: query.page, limit: query.limit })
 
-    const where: Prisma.BookWhereInput = {}
-    if (query.categoryId) where.categoryId = query.categoryId
-    if (query.search) where.title = { contains: query.search }
+    const where = buildBookReportWhere(query)
 
     const [data, total] = await Promise.all([
       this.prisma.book.findMany({
@@ -516,12 +531,60 @@ export class ReportRepository extends BaseRepository {
       this.prisma.book.count({ where })
     ])
 
-    return toPaginatedResult<BookReportRow>(data, total, { page: query.page, limit: query.limit })
+    // R-6: breakdown status/condition per-judul via groupBy pada halaman ini
+    // (bukan fetch-all — anti-pola B1). available+borrowed+lost = copyCount.
+    const ids = data.map((b) => b.id)
+    const [statusGroups, damagedGroups] = ids.length
+      ? await Promise.all([
+          this.prisma.bookCopy.groupBy({
+            by: ['bookId', 'status'],
+            where: { bookId: { in: ids }, status: { not: BOOK_COPY_STATUS.REMOVED } },
+            _count: { _all: true }
+          }),
+          this.prisma.bookCopy.groupBy({
+            by: ['bookId'],
+            where: {
+              bookId: { in: ids },
+              status: { not: BOOK_COPY_STATUS.REMOVED },
+              condition: { in: [BookCopyCondition.LIGHT_DAMAGE, BookCopyCondition.HEAVY_DAMAGE] }
+            },
+            _count: { _all: true }
+          })
+        ])
+      : [[], []]
+
+    const statusMap = new Map<string, Map<string, number>>()
+    for (const g of statusGroups) {
+      const byBook = statusMap.get(g.bookId) ?? new Map<string, number>()
+      byBook.set(g.status, g._count._all)
+      statusMap.set(g.bookId, byBook)
+    }
+    const damagedMap = new Map<string, number>()
+    for (const g of damagedGroups) damagedMap.set(g.bookId, g._count._all)
+
+    const rows: BookReportRowWithCounts[] = data.map((b) => {
+      const byStatus = statusMap.get(b.id) ?? new Map<string, number>()
+      return {
+        ...b,
+        availableCount: byStatus.get(BOOK_COPY_STATUS.AVAILABLE) ?? 0,
+        borrowedCount: byStatus.get(BOOK_COPY_STATUS.BORROWED) ?? 0,
+        lostCount: byStatus.get(BOOK_COPY_STATUS.LOST) ?? 0,
+        damagedCount: damagedMap.get(b.id) ?? 0
+      }
+    })
+
+    return toPaginatedResult<BookReportRowWithCounts>(rows, total, { page: query.page, limit: query.limit })
   }
 
-  async getCollectionSummary(categoryId?: string) {
-    const bookWhere: Prisma.BookWhereInput = categoryId ? { categoryId } : {}
-    const copyWhere: Prisma.BookCopyWhereInput = categoryId ? { book: { categoryId } } : {}
+  // R-6: getCollectionSummary kini menerima search (opsional) & mengeksklusi REMOVED
+  // dari totalCopies/byStatus/byCondition (keputusan PO G-4). Ringkasan mengikuti
+  // filter sehingga konsisten dengan rows (pola R-2..R-5).
+  async getCollectionSummary(categoryId?: string, search?: string) {
+    const bookWhere = buildBookReportWhere({ categoryId, search })
+    const copyWhere: Prisma.BookCopyWhereInput = {
+      status: { not: BOOK_COPY_STATUS.REMOVED },
+      book: bookWhere
+    }
 
     const [totalTitles, totalCopies, assetAgg, byStatus, byCondition] = await Promise.all([
       this.prisma.book.count({ where: bookWhere }),
@@ -539,4 +602,22 @@ export class ReportRepository extends BaseRepository {
       byCondition: byCondition.map((g) => ({ condition: g.condition, count: g._count._all }))
     }
   }
+}
+
+// R-6 (G-6): search laporan koleksi = OR atas title, isbn, author.name, publisher.name
+// (bukan hanya title contains). Dipakai findBookReportRows + getCollectionSummary agar
+// ringkasan konsisten dengan rows.
+function buildBookReportWhere(query: Pick<BookReportQuery, 'categoryId' | 'search'>): Prisma.BookWhereInput {
+  const where: Prisma.BookWhereInput = {}
+  if (query.categoryId) where.categoryId = query.categoryId
+  if (query.search) {
+    const s = query.search
+    where.OR = [
+      { title: { contains: s } },
+      { isbn: { contains: s } },
+      { author: { name: { contains: s } } },
+      { publisher: { name: { contains: s } } }
+    ]
+  }
+  return where
 }

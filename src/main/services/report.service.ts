@@ -312,7 +312,7 @@ export class ReportService {
   async getCollectionReport(filter: CollectionReportFilter): Promise<CollectionReportDTO> {
     const [result, summary] = await Promise.all([
       this.reportRepository.findBookReportRows(filter),
-      this.reportRepository.getCollectionSummary(filter.categoryId)
+      this.reportRepository.getCollectionSummary(filter.categoryId, filter.search)
     ])
 
     const rows: CollectionReportRowDTO[] = result.data.map((b) => ({
@@ -322,7 +322,11 @@ export class ReportService {
       publisherName: b.publisher?.name ?? null,
       categoryName: b.category?.name ?? null,
       publicationYear: b.publicationYear,
-      copyCount: b._count.bookCopies
+      copyCount: b._count.bookCopies,
+      availableCount: b.availableCount,
+      borrowedCount: b.borrowedCount,
+      lostCount: b.lostCount,
+      damagedCount: b.damagedCount
     }))
 
     return {

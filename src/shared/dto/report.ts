@@ -227,7 +227,16 @@ export interface CollectionReportRowDTO {
   publisherName: string | null
   categoryName: string | null
   publicationYear: number | null
+  // R-6 (aditif): total eksemplar NON-REMOVED (keputusan PO G-4).
   copyCount: number
+  // R-6 (aditif): breakdown status per judul — per dimensi (keputusan PO G-5,
+  // boleh overlap: eksemplar BORROWED/LOST juga bisa ber-condition rusak).
+  availableCount: number
+  borrowedCount: number
+  lostCount: number
+  // R-6 (aditif): eksemplar dgn condition LIGHT_DAMAGE / HEAVY_DAMAGE
+  // (keputusan PO G-2) — NON-REMOVED, boleh overlap dengan status lain.
+  damagedCount: number
 }
 
 export interface CollectionStatusAggregateDTO {
