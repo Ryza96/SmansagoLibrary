@@ -22,6 +22,7 @@ import InventoryDetailPage from '../pages/InventoryDetailPage'
 import ReportsPage from '../pages/ReportsPage'
 import BorrowingReportPage from '../pages/report/BorrowingReportPage'
 import ReturnReportPage from '../pages/report/ReturnReportPage'
+import OverdueReportPage from '../pages/report/OverdueReportPage'
 import SettingsPage from '../pages/SettingsPage'
 import AuthorListPage from '../pages/master/AuthorListPage'
 import AuthorFormPage from '../pages/master/AuthorFormPage'
@@ -82,6 +83,7 @@ export const router = createHashRouter([
       { path: 'reports', element: <ReportsPage /> },
       { path: 'reports/borrowings', element: <BorrowingReportPage /> },
       { path: 'reports/returns', element: <ReturnReportPage /> },
+      { path: 'reports/overdues', element: <OverdueReportPage /> },
       { path: 'settings', element: <SettingsPage /> },
       { path: 'master/authors', element: <AuthorListPage /> },
       { path: 'master/authors/new', element: <AuthorFormPage /> },

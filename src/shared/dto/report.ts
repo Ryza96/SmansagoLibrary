@@ -121,6 +121,9 @@ export type OverdueCategory = 'ACTIVE' | 'RETURNED'
 export interface OverdueReportFilter {
   from: string
   to: string
+  // Pencarian server-side (R-4, aditif non-breaking): cocok di nomor
+  // transaksi, nomor/nama anggota (snapshot), dan judul buku.
+  search?: string
   page?: number
   limit?: number
 }

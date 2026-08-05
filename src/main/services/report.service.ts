@@ -65,6 +65,26 @@ function toReportPagination(p: { page: number; limit: number; total: number; tot
   return { page: p.page, limit: p.limit, total: p.total, totalPages: p.totalPages }
 }
 
+// Alokasi slice per-kategori untuk Laporan Keterlambatan (R-4): daftar gabungan
+// = [active (MASIH TERLAMBAT) ... , returned (SUDAH DIKEMBALIKAN TERLAMBAT) ...]
+// yang DIBUAT dari dua query terpisah. Pagination gabungan menghitung posisi
+// skip/take di DAFTAR GABUNGAN lalu memecahnya ke tiap kategori — setiap halaman
+// berisi limit baris (kecuali halaman terakhir). Murni → diuji smoke.
+function computeOverdueSlice(
+  page: number,
+  limit: number,
+  activeTotal: number,
+  returnedTotal: number
+): { activeSkip: number; activeTake: number; returnedSkip: number; returnedTake: number } {
+  const start = (page - 1) * limit
+  const end = page * limit
+  const activeSkip = Math.min(start, activeTotal)
+  const activeTake = Math.max(0, Math.min(end, activeTotal) - activeSkip)
+  const returnedSkip = Math.min(Math.max(0, start - activeTotal), returnedTotal)
+  const returnedTake = Math.max(0, Math.min(end, activeTotal + returnedTotal) - activeTotal - returnedSkip)
+  return { activeSkip, activeTake, returnedSkip, returnedTake }
+}
+
 export class ReportService {
   constructor(private readonly reportRepository: ReportRepository) {}
 
@@ -164,23 +184,47 @@ export class ReportService {
   async getOverdueReport(filter: OverdueReportFilter): Promise<OverdueReportDTO> {
     const { from, to } = parseRange(filter.from, filter.to)
     const now = new Date()
+    const page = Math.max(1, filter.page ?? 1)
+    const limit = Math.min(100, Math.max(1, filter.limit ?? 10))
+
+    // Ringkasan & pagination gabungan: hitung dulu TOTAL tiap kategori (search
+    // ikut terfilter, pola R-2/R-3), lalu alokasikan slice per kategori untuk
+    // halaman yang diminta.
+    const [activeTotal, returnedTotal] = await Promise.all([
+      this.reportRepository.countActiveOverdueDetails({ asOf: now, search: filter.search }),
+      this.reportRepository.countReturnedLateBetween(from, to, filter.search)
+    ])
+    const slice = computeOverdueSlice(page, limit, activeTotal, returnedTotal)
 
     const [active, returned] = await Promise.all([
-      this.reportRepository.findActiveOverdue(now, filter.page, filter.limit),
-      this.reportRepository.findReturnedLateBetween({ from, to, page: filter.page, limit: filter.limit })
+      this.reportRepository.findActiveOverdueDetails({
+        asOf: now,
+        search: filter.search,
+        skip: slice.activeSkip,
+        take: slice.activeTake
+      }),
+      this.reportRepository.findReturnedLateBetween({
+        from,
+        to,
+        search: filter.search,
+        skip: slice.returnedSkip,
+        take: slice.returnedTake
+      })
     ])
 
-    const activeRows: OverdueReportRowDTO[] = active.data.map((b) => ({
+    // 1 baris = 1 buku (pola R-2/R-3). Status: category ACTIVE = MASIH TERLAMBAT,
+    // RETURNED = SUDAH DIKEMBALIKAN TERLAMBAT. lateDays dihitung di Service.
+    const activeRows: OverdueReportRowDTO[] = active.data.map((d) => ({
       category: 'ACTIVE',
-      borrowNumber: b.borrowNumber,
-      borrowDate: iso(b.borrowDate),
-      memberNumber: b.memberNumber,
-      memberName: b.memberName,
-      className: b.className,
-      bookTitle: b.details.map((d) => d.bookTitle).join(', '),
-      dueDate: iso(b.dueDate),
+      borrowNumber: d.borrow.borrowNumber,
+      borrowDate: iso(d.borrow.borrowDate),
+      memberNumber: d.borrow.memberNumber,
+      memberName: d.borrow.memberName,
+      className: d.borrow.className,
+      bookTitle: d.bookTitle,
+      dueDate: iso(d.borrow.dueDate),
       returnDate: null,
-      lateDays: diffDays(now, b.dueDate)
+      lateDays: diffDays(now, d.borrow.dueDate)
     }))
 
     const returnedRows: OverdueReportRowDTO[] = returned.data.map((r) => ({
@@ -199,12 +243,12 @@ export class ReportService {
     return {
       rows: [...activeRows, ...returnedRows],
       pagination: {
-        page: filter.page ?? 1,
-        limit: filter.limit ?? 10,
-        total: active.total + returned.total,
-        totalPages: Math.max(active.totalPages, returned.totalPages)
+        page,
+        limit,
+        total: activeTotal + returnedTotal,
+        totalPages: Math.ceil((activeTotal + returnedTotal) / limit)
       },
-      summary: { active: active.total, returned: returned.total }
+      summary: { active: activeTotal, returned: returnedTotal }
     }
   }
 

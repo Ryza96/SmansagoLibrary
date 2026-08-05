@@ -25,6 +25,9 @@ export interface ReturnReportQuery {
   search?: string
   page?: number
   limit?: number
+  // Override slice untuk pagination gabungan (Laporan Keterlambatan R-4).
+  skip?: number
+  take?: number
 }
 
 export interface MemberReportQuery {
@@ -34,6 +37,18 @@ export interface MemberReportQuery {
   search?: string
   page?: number
   limit?: number
+}
+
+// Kueri Laporan Keterlambatan — bagian MASIH TERLAMBAT (borrow belum kembali,
+// dueDate < asOf). 1 baris = 1 buku (BorrowDetail), search snapshot R-4.
+export interface OverdueActiveQuery {
+  asOf: Date
+  search?: string
+  page?: number
+  limit?: number
+  // Override slice untuk pagination gabungan (Laporan Keterlambatan R-4).
+  skip?: number
+  take?: number
 }
 
 export interface BookReportQuery {
@@ -140,6 +155,44 @@ function buildReturnReportWhere(query: ReturnReportQuery): Prisma.BorrowDetailWh
   return where
 }
 
+// Where untuk Laporan Keterlambatan — bagian MASIH TERLAMBAT (1 baris = 1 buku):
+// detail belum dikembalikan dari borrow yang returnDate null + dueDate < asOf.
+// Search R-4 memakai SNAPSHOT — seluruh term OR berada di LEVEL DETAIL
+// (relation field filter `borrow: { ... }`), bukan bercabang di level borrow,
+// agar `(borrowNumber | memberNumber | memberName | bookTitle)` adalah satu
+// kelompok OR yang sama (pola buildReturnReportWhere).
+function buildActiveOverdueWhere(asOf: Date, search?: string): Prisma.BorrowDetailWhereInput {
+  const where: Prisma.BorrowDetailWhereInput = {
+    returnedAt: null,
+    borrow: { returnDate: null, dueDate: { lt: asOf } }
+  }
+  if (search) {
+    const s = search
+    where.OR = [
+      { bookTitle: { contains: s } },
+      { borrow: { borrowNumber: { contains: s } } },
+      { borrow: { memberNumber: { contains: s } } },
+      { borrow: { memberName: { contains: s } } }
+    ]
+  }
+  return where
+}
+
+// SQL AND-clause untuk search SUDAH DIKEMBALIKAN TERLAMBAT (raw SQL join).
+// Dipakai oleh findReturnedLateBetween (row + count) dan countReturnedLate —
+// satu sumber agar filter konsisten. Empty bila search kosong.
+function buildReturnedLateSearchSql(search?: string): Prisma.Sql {
+  const s = search?.trim()
+  return s
+    ? Prisma.sql`AND (
+        b.borrowNumber LIKE ${'%' + s + '%'}
+        OR b.memberNumber LIKE ${'%' + s + '%'}
+        OR b.memberName LIKE ${'%' + s + '%'}
+        OR bd.bookTitle LIKE ${'%' + s + '%'}
+      )`
+    : Prisma.empty
+}
+
 export class ReportRepository extends BaseRepository {
   // -------------------------------------------------------------------------
   // Laporan Peminjaman
@@ -220,7 +273,6 @@ export class ReportRepository extends BaseRepository {
   }
 
   private async countReturnedLate(from: Date, to: Date, search?: string): Promise<number> {
-    const s = search?.trim()
     const rows = await this.prisma.$queryRaw<Array<{ c: number | bigint }>>(Prisma.sql`
       SELECT COUNT(*) AS c
       FROM BorrowDetail bd
@@ -229,14 +281,15 @@ export class ReportRepository extends BaseRepository {
         AND bd.returnedAt >= ${from}
         AND bd.returnedAt <= ${to}
         AND bd.returnedAt > b.dueDate
-        ${s ? Prisma.sql`AND (
-          b.borrowNumber LIKE ${'%' + s + '%'}
-          OR b.memberNumber LIKE ${'%' + s + '%'}
-          OR b.memberName LIKE ${'%' + s + '%'}
-          OR bd.bookTitle LIKE ${'%' + s + '%'}
-        )` : Prisma.empty}
+        ${buildReturnedLateSearchSql(search)}
     `)
     return Number(rows[0]?.c ?? 0)
+  }
+
+  // Count SUDAH DIKEMBALIKAN TERLAMBAT (R-4) — untuk pagination gabungan
+  // Service; filter identik findReturnedLateBetween.
+  async countReturnedLateBetween(from: Date, to: Date, search?: string): Promise<number> {
+    return this.countReturnedLate(from, to, search)
   }
 
   // -------------------------------------------------------------------------
@@ -244,6 +297,8 @@ export class ReportRepository extends BaseRepository {
   // -------------------------------------------------------------------------
 
   // Masih terlambat: belum dikembalikan DAN dueDate < asOf.
+  // (per-Borrow, legacy R-1 — dipakai regression smoke; Service memakai
+  // findActiveOverdueDetails untuk 1 baris = 1 buku)
   async findActiveOverdue(asOf: Date, page?: number, limit?: number) {
     const { skip, take } = getPaginationParams({ page, limit })
     const where: Prisma.BorrowWhereInput = { returnDate: null, dueDate: { lt: asOf } }
@@ -262,11 +317,46 @@ export class ReportRepository extends BaseRepository {
     return toPaginatedResult<BorrowReportRow>(data, total, { page, limit })
   }
 
+  // Masih terlambat, 1 baris = 1 buku (R-4): detail dari borrow yang returnDate
+  // null + dueDate < asOf. Search R-4 memakai snapshot borrowNumber/memberNumber/
+  // memberName pada Borrow + bookTitle pada detail (pola R-3, satu grup OR).
+  async findActiveOverdueDetails(query: OverdueActiveQuery) {
+    const { skip, take } =
+      query.skip != null && query.take != null
+        ? { skip: query.skip, take: query.take }
+        : getPaginationParams({ page: query.page, limit: query.limit })
+    const where = buildActiveOverdueWhere(query.asOf, query.search)
+
+    const [data, total] = await Promise.all([
+      this.prisma.borrowDetail.findMany({
+        where,
+        skip,
+        take,
+        orderBy: { borrow: { dueDate: 'asc' } },
+        include: { borrow: true }
+      }),
+      this.prisma.borrowDetail.count({ where })
+    ])
+
+    return toPaginatedResult(data, total, { page: query.page, limit: query.limit })
+  }
+
+  // Count MASIH TERLAMBAT (R-4) — untuk pagination gabungan Service; filter
+  // identik findActiveOverdueDetails (buildActiveOverdueWhere).
+  async countActiveOverdueDetails(query: OverdueActiveQuery): Promise<number> {
+    return this.prisma.borrowDetail.count({ where: buildActiveOverdueWhere(query.asOf, query.search) })
+  }
+
   // Pernah terlambat: sudah dikembalikan DAN returnedAt > dueDate.
   // Perbandingan dua kolom (bd.returnedAt vs b.dueDate) TIDAK bisa diekspresikan
   // sebagai Prisma relation filter → pakai SQL join eksplisit (indexed filter range).
+  // Search R-4 (server-side) memakai snapshot, filter sama di row query & count.
   async findReturnedLateBetween(query: ReturnReportQuery) {
-    const { skip, take } = getPaginationParams({ page: query.page, limit: query.limit })
+    const { skip, take } =
+      query.skip != null && query.take != null
+        ? { skip: query.skip, take: query.take }
+        : getPaginationParams({ page: query.page, limit: query.limit })
+    const searchSql = buildReturnedLateSearchSql(query.search)
 
     const rows = await this.prisma.$queryRaw<ReturnedLateRawRow[]>(Prisma.sql`
       SELECT
@@ -287,6 +377,7 @@ export class ReportRepository extends BaseRepository {
         AND bd.returnedAt >= ${query.from}
         AND bd.returnedAt <= ${query.to}
         AND bd.returnedAt > b.dueDate
+        ${searchSql}
       ORDER BY bd.returnedAt ASC
       LIMIT ${take} OFFSET ${skip}
     `)
@@ -299,6 +390,7 @@ export class ReportRepository extends BaseRepository {
         AND bd.returnedAt >= ${query.from}
         AND bd.returnedAt <= ${query.to}
         AND bd.returnedAt > b.dueDate
+        ${searchSql}
     `)
 
     const total = Number(countRows[0]?.c ?? 0)
