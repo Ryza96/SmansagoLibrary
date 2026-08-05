@@ -22,6 +22,7 @@
   "dependencies": {
     "@prisma/client": "^5.22.0",
     "bwip-js": "^4.11.2",
+    "dotenv": "16.6.1",
     "lucide-react": "^1.27.0",
     "react-router-dom": "^7.18.2",
     "read-excel-file": "^9.3.5"

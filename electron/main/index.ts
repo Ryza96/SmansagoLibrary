@@ -1,9 +1,13 @@
 import { app, BrowserWindow } from 'electron'
 import path from 'path'
+import dotenv from 'dotenv'
 import { initDatabase, closeDatabase } from './database'
 import { createContainer } from './bootstrap'
 import { registerAllHandlers } from '../ipc/index'
 import { databaseReconciliationService } from '../../src/main/services/database-reconciliation.service'
+
+dotenv.config({ path: path.resolve(__dirname, '../../.env') })
+dotenv.config()
 
 let mainWindow: BrowserWindow | null = null
 

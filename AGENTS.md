@@ -1001,4 +1001,21 @@ pm run build PASS (main 1,819.55 kB ï¿½ preload 9.02 kB ï¿½ renderer 1,044
 - **`condition` string bebas di schema** — interpretasi "Rusak" = `LIGHT_DAMAGE` + `HEAVY_DAMAGE` ditetapkan PO (G-2) dan hidup di repository groupBy; UI renderer hanya label/ikon.
 - Smoke R-6: compile `--module commonjs --moduleResolution node` (tanpa bwip-js) + fresh DB temp per suite + `NODE_PATH`; bukti G-4 dengan seed copy REMOVED bernilai asset 999999 (harus di-exclude dari totalAssetValue); bukti G-6 dengan search ISBN unik (`978-9-<i>`) & nama author/publisher yang HANYA match lewat relasi.
 
+---
+
+## DATABASE_URL Startup Fix (COMPLETE — READY review PO)
+
+### Ringkasan
+- **Bug:** `npm run dev` gagal start — `Environment variable not found: DATABASE_URL` padahal `.env` ada di root. Audit `DATABASE_URL_STARTUP_AUDIT.md` menemukan root cause: **`DATABASE_URL` TIDAK pernah dimuat ke `process.env` aplikasi** — (1) `dotenv.config()` tidak pernah ada di source; (2) electron-vite tidak memuat `.env` ke proses main (hanya prefix `VITE_*`); (3) Prisma runtime 5.22 auto-load `.env` hanya via `relativeEnvPaths` yang di-embed di generated client — di sini `rootEnvPath: null` (generate terakhir dari workdir `prisma/` saat smoke). Aplikasi selama ini bergantung pada `DATABASE_URL` di env OS/terminal (sisa sesi smoke).
+- **Fix (3 baris source + 1 dependency):** `electron/main/index.ts` module scope + `dotenv.config({ path: path.resolve(__dirname, '../../.env') })` + `dotenv.config()` (fallback CWD) — berjalan SEBELUM `initDatabase()` (yang hanya dipanggil di `app.whenReady().then()`); `package.json`/lockfile +`"dotenv": "16.6.1"` (sudah transitif di node_modules → lockfile berubah minimal).
+- **TIDAK diubah:** schema, migration, Report, Dashboard, Repository, Service, UI.
+- **Validation PASS:** `npm run dev` di sesi BERSIH (tanpa setenv) → `[DB] SQLite connected successfully` + `[RECONCILE] InventorySequence lastNumber=28`; `npm run build` PASS (main 1,882.54 kB · preload 9.95 kB · renderer 1,137.66 kB **identik baseline R-6**); `prisma migrate diff` = "No difference detected."
+- **Laporan:** `WORK_ORDER_DATABASE_URL_FIX_IMPLEMENTATION.md`, `DATABASE_URL_FIX_FINAL_REVIEW.md`, `DATABASE_URL_FIX_RELEASE.md`. Status: **DONE - menunggu review PO**.
+
+### Pelajaran (retain)
+- **App runtime TIDAK pernah membaca `.env` secara otomatis** — electron-vite tidak load env ke main, dan Prisma runtime auto-load `.env` HANYA jika `relativeEnvPaths` ter-embed di generated client (null bila `prisma generate` dijalankan dari workdir `prisma/`). Fix baku: panggil `dotenv.config()` eksplisit di entry main SEBELUM `initDatabase()`, dengan path eksplisit `path.resolve(__dirname, '../../.env')` (tidak bergantung CWD) + fallback `dotenv.config()` (dotenv tidak menimpa env yang sudah ter-set).
+- **`npm run dev` validasi harus di sesi terminal BERSIH** (tanpa `$env:DATABASE_URL` tersisa dari smoke) — hanya itu yang membuktikan `.env` benar-benar dimuat. Log sukses: `[DB] SQLite connected successfully`.
+- **Dependency yang sudah ada transitif boleh di-*promote* ke dependency langsung** dengan versi eksak (`dotenv: 16.6.1`) — lockfile berubah minimal (hanya pindah blok), bukan reinstall penuh.
+- **Semua PrismaClient dibuat di module-scope-safe path**: `initDatabase()` dan `getPrisma()` singleton keduanya lazy — PrismaClient membaca `process.env.DATABASE_URL` saat konstruksi, sehingga dotenv di module scope index.ts selalu lebih dulu.
+
 
