@@ -9,7 +9,7 @@
 //   4. Search berjalan (server-side: nomor anggota / nama).
 //   5. Filter berjalan (Status Keanggotaan + Kelas, kombinasi).
 //   6. Statistik mengikuti hasil filter (total/active/nonActive + students/teachers/general).
-// Plus: joinedAt = Member.createdAt (Tanggal Bergabung), pagination + skala.
+// Plus: joinedAt = fallback Member.createdAt (domain belum punya field khusus), pagination + skala.
 import { ReportService } from '../src/main/services/report.service'
 import { ReportRepository } from '../src/main/repositories/report.repository'
 import { getPrisma } from '../src/main/repositories/base/prisma'
@@ -68,7 +68,6 @@ async function main(): Promise<void> {
   const dbTotal = await prisma.member.count()
   const dbActiveEver = await prisma.member.count({ where: { memberEnrollments: { some: {} } } })
   const dbNonActiveEver = await prisma.member.count({ where: { memberEnrollments: { none: {} } } })
-
   console.log('--- STEP 1: jumlah anggota sesuai database ---')
   const all = await reportService.getMemberReport({})
   check('pagination.total == count(member) = 6', all.pagination.total === 6 && all.pagination.total === dbTotal, `${all.pagination.total}/${dbTotal}`)
@@ -100,7 +99,7 @@ async function main(): Promise<void> {
   check('m2 className = null (enrollment DROPPED BUKAN ACTIVE)', rowM2?.className === null, String(rowM2?.className))
   check('m3/m5 className = null (tanpa enrollment)', rowM3?.className === null && rowM5?.className === null, `${String(rowM3?.className)}/${String(rowM5?.className)}`)
 
-  console.log('--- STEP 4: Tanggal Bergabung = Member.createdAt ---')
+  console.log('--- STEP 4: Tanggal Bergabung = fallback Member.createdAt (domain belum punya field khusus) ---')
   check('m1 joinedAt == m1.createdAt ISO', rowM1?.joinedAt === iso(m1.createdAt), `${rowM1?.joinedAt} vs ${iso(m1.createdAt)}`)
   check('m4 joinedAt == m4.createdAt ISO', rowM4?.joinedAt === iso(m4.createdAt), `${rowM4?.joinedAt} vs ${iso(m4.createdAt)}`)
 

@@ -185,7 +185,10 @@ export interface MemberReportRowDTO {
   // Status Keanggotaan (R-5, turunan): ACTIVE = pernah memiliki MemberEnrollment
   // (status apa pun); INACTIVE = tidak pernah memiliki. Bukan dari pinjaman aktif.
   membershipStatus: 'ACTIVE' | 'INACTIVE'
-  // Tanggal Bergabung (R-5) = Member.createdAt (kolom Tanggal Bergabung).
+  // Tanggal Bergabung (R-5). Catatan kontrak: Member.createdAt BUKAN definisi
+  // bisnis "Tanggal Bergabung" — saat ini hanya dipakai sebagai FALLBACK karena
+  // domain belum memiliki field khusus. Saat field khusus ditambahkan, ganti sumber
+  // nilai di ReportService tanpa mengubah kontrak DTO ini.
   joinedAt: string
 }
 

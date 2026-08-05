@@ -282,6 +282,9 @@ export class ReportService {
         // Status Keanggotaan (R-5): ACTIVE = pernah memiliki MemberEnrollment
         // (status apa pun — _count seluruh enrollment); bukan dari pinjaman aktif.
         membershipStatus: m._count.memberEnrollments > 0 ? 'ACTIVE' : 'INACTIVE',
+        // Tanggal Bergabung = Member.createdAt. CATATAN: ini FALLBACK sementara —
+        // createdAt bukan definisi bisnis "Tanggal Bergabung"; domain belum punya
+        // field khusus. Ganti ke field khusus saat tersedia.
         joinedAt: iso(m.createdAt)
       }
     })

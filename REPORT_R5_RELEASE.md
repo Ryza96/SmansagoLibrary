@@ -14,7 +14,7 @@
 ## Fitur (UI)
 - Filter **Status Keanggotaan** (Semua / Aktif / Nonaktif) + **Kelas** (dropdown, server-side) + **Pencarian** (nomor anggota / nama) — server-side.
 - 3 kartu statistik dari `summary` DTO: **Total Anggota · Aktif · Nonaktif**.
-- Tabel 5 kolom: Nomor Anggota · Nama · Kelas (SSOT `MemberEnrollment` ACTIVE) · **Status Keanggotaan (badge Aktif / Nonaktif)** · **Tanggal Bergabung** (`Member.createdAt`).
+- Tabel 5 kolom: Nomor Anggota · Nama · Kelas (SSOT `MemberEnrollment` ACTIVE) · **Status Keanggotaan (badge Aktif / Nonaktif)** · **Tanggal Bergabung** (fallback `Member.createdAt` — domain belum punya field khusus).
 - Pagination server-side (20/halaman), loading & empty state.
 
 ## Akses
@@ -25,6 +25,7 @@
 - **NONAKTIF** = tidak pernah memiliki `MemberEnrollment`.
 - **Bukan** dari `Member.status` dan **bukan** dari pinjaman aktif (dibuktikan smoke: `status=ACTIVE` tanpa enrollment → NONAKTIF; tanpa enrollment + pinjaman aktif → NONAKTIF).
 - Kelas = `MemberEnrollment` dengan `status=ACTIVE && leftAt=null`; enrollment terminal → kelas kosong.
+- **Tanggal Bergabung = FALLBACK `Member.createdAt`** — createdAt bukan definisi bisnis "Tanggal Bergabung"; dipakai sementara karena domain belum memiliki field khusus (dikomentari di DTO/Service/smoke).
 
 ## Regression
 - `report_r5_smoke` **46/46** · `report_r1_smoke` **46/46** · `report_r1_service_smoke` **52/52** · `report_r2_smoke` **35/35** · `report_r3_smoke` **41/41** · `report_r4_smoke` **40/40** · `member_class_display` **18/18** · `membership_first_borrow` **20/20** · `wo13_e1` **39/39** · `wo15_e3` **78/78** · `wo16_e4` **45/45** · `it1_borrow_return` **34/34** · `it_borrow_eligibility` **7/7** · `wo14_e2` **36/36** · `dashboard_phase1` **30/30** (fresh DB temp) — **567 PASS, 0 FAIL**.

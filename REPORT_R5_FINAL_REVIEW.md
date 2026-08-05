@@ -7,6 +7,7 @@
 
 ## Arsitektur (pola konsisten repo)
 - **Renderer TIDAK menurunkan angka** — `membershipStatus`, `className`, `joinedAt`, `summary.total/active/nonActive` seluruhnya dihitung `ReportService`; renderer hanya memformat tanggal & badge. Filter dikirim sebagai `{search, status, classId, page, limit}` ke channel `reports.members`.
+- **Tanggal Bergabung = FALLBACK `Member.createdAt`** — createdAt BUKAN definisi bisnis "Tanggal Bergabung"; domain belum memiliki field khusus, sehingga nilai ini hanya dipakai sementara (dikomentari di DTO, Service, dan smoke). Saat field khusus ditambahkan, ganti sumber nilai di `ReportService` tanpa mengubah kontrak DTO.
 - **1 IPC `reports.members` reused** — TIDAK ada channel/preload/env.d.ts/bootstrap baru; DTO aditif auto-flow ke kontrak renderer.
 - **Server-side search memakai kolom member** (`memberNumber`/`fullName` `contains`) pada `buildMemberReportWhere` — satu builder dipakai baris, ringkasan (`countMemberMembershipSummary`), dan jumlah per-tipe (`countMembersByType`), sehingga statistik konsisten dengan hasil pencarian.
 - **Status Keanggotaan = `_count.memberEnrollments > 0`** — `memberReportInclude._count` (independen terhadap filter) dipakai Service untuk turunkan badge; ringkasan `active/nonActive` memakai count dengan builder yang sama.
@@ -24,6 +25,7 @@
 
 ## Risiko / Catatan
 - **Status Keanggotaan ≠ `Member.status`** — AKTIF berarti *pernah* memiliki `MemberEnrollment`; `Member.status` tidak dipakai sama sekali (seed membuktikan: `status=ACTIVE` tanpa enrollment → NONAKTIF; `status=INACTIVE` dengan enrollment → AKTIF). Ini kontrak yang disepakati dan berbeda dari "membership status" yang di-trigger by-borrow (WO Membership First Borrow) — dua domain berbeda.
+- **Tanggal Bergabung masih FALLBACK `Member.createdAt`** — createdAt bukan definisi bisnis; pemakaian sementara sampai domain menyediakan field khusus (mis. `joinedDate`). Dikomentari di DTO, Service, dan smoke; jangan diangkat menjadi "definisi" di dokumentasi.
 - **Kelas = SSOT `MemberEnrollment` ACTIVE**, bukan `Member.classId` legacy (yang sudah tidak ditulis import MI-2+). Enrollment terminal (DROPPED/GRADUATED) → `className null` walau membershipStatus AKTIF.
 - **Ringkasan memakai 2 query count + 1 groupBy count** dengan builder yang sama — anti-pola B1 (fetch-all) dihindari; skala 21 baris + page 3 dibuktikan.
 - **Kombinasi filter NONAKTIF + Kelas = 0 baris** adalah konsekuensi logika (some+none) — bukan bug; UI tidak memakainya sebagai kombinasi bermakna.

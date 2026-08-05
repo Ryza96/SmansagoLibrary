@@ -10,7 +10,7 @@ Halaman **Laporan Anggota** dibangun end-to-end di atas fondasi R-1 (`ReportServ
 2. **Kolom tabel = 5**: Nomor Anggota · Nama · Kelas · Status Keanggotaan · Tanggal Bergabung.
 3. **Statistik minimal 3 kartu**: Total Anggota · Aktif · Nonaktif (ditambah turunan jumlah per tipe: Siswa/Guru/Umum pada DTO, kartu menampilkan 3 utama).
 4. **TIDAK ADA kolom Petugas** (K1) dan **TIDAK ADA nominal denda** (K2) — tidak relevan untuk laporan anggota.
-5. **Status Keanggotaan** = AKTIF bila pernah memiliki `MemberEnrollment` (status apa pun termasuk terminal), NONAKTIF bila tidak pernah; **Kelas** = `MemberEnrollment` ACTIVE (bukan `Member.classId` legacy, bukan enrollment terminal); **Tanggal Bergabung** = `Member.createdAt`.
+5. **Status Keanggotaan** = AKTIF bila pernah memiliki `MemberEnrollment` (status apa pun termasuk terminal), NONAKTIF bila tidak pernah; **Kelas** = `MemberEnrollment` ACTIVE (bukan `Member.classId` legacy, bukan enrollment terminal); **Tanggal Bergabung** = saat ini memakai `Member.createdAt` **sebagai FALLBACK** (domain belum memiliki field khusus — createdAt BUKAN definisi bisnis "Tanggal Bergabung").
 
 ## Perubahan
 
@@ -19,7 +19,7 @@ Halaman **Laporan Anggota** dibangun end-to-end di atas fondasi R-1 (`ReportServ
 |------|-----------|
 | `src/shared/dto/report.ts` | `MemberReportFilter` + `status?: 'ACTIVE' | 'INACTIVE'`; `MemberReportRowDTO` + `membershipStatus: 'ACTIVE' | 'INACTIVE'` + `joinedAt: string`; `MemberReportSummaryDTO` + `active: number` + `nonActive: number` (kontrak existing `total/students/teachers/general` tidak berubah; `total == active + nonActive`) |
 | `src/main/repositories/report.repository.ts` | `MemberReportQuery` + `status?`; `memberReportInclude` + `_count: { select: { memberEnrollments: true } }` (independen terhadap filter — dipakai Service untuk turunkan `membershipStatus`); **baru** `buildMemberReportWhere(query)` — `OR` search (`memberNumber`/`fullName` `contains`), `memberType`, `classId`/`academicYearId` via `memberEnrollments: { some: { status: ACTIVE, leftAt: null, ... } }`, status ACTIVE → `some: {}` (hanya bila belum ada constraint kelas), status INACTIVE → `none: {}`; `findMembersReport` pakai builder; `countMembersByType(query?)` kini filter-aware; **baru** `countMemberMembershipSummary(query)` → `{ active, nonActive }` |
-| `src/main/services/report.service.ts` | `getMemberReport` kini `Promise.all`(findMembersReport, countMemberMembershipSummary, countMembersByType); row `membershipStatus = m._count.memberEnrollments > 0 ? 'ACTIVE' : 'INACTIVE'`; `joinedAt = iso(m.createdAt)`; summary memuat `active`/`nonActive` |
+| `src/main/services/report.service.ts` | `getMemberReport` kini `Promise.all`(findMembersReport, countMemberMembershipSummary, countMembersByType); row `membershipStatus = m._count.memberEnrollments > 0 ? 'ACTIVE' : 'INACTIVE'`; `joinedAt = iso(m.createdAt)` (**fallback sementara** — createdAt bukan definisi bisnis "Tanggal Bergabung", domain belum punya field khusus); summary memuat `active`/`nonActive` |
 
 ### Renderer (UI)
 | File | Perubahan |
@@ -38,7 +38,7 @@ Halaman **Laporan Anggota** dibangun end-to-end di atas fondasi R-1 (`ReportServ
 ## Kontrak Data (R-1, dikonfirmasi di smoke)
 - **Status Keanggotaan**: AKTIF = pernah memiliki `MemberEnrollment` (status apa pun — enrollment terminal seperti DROPPED tetap AKTIF); NONAKTIF = tidak pernah memiliki. **TIDAK** diturunkan dari `Member.status` (seed: member `status=ACTIVE` tanpa enrollment → NONAKTIF) dan **TIDAK** dari pinjaman aktif (seed: member NONAKTIF dengan pinjaman aktif → tetap NONAKTIF).
 - **Kelas = SSOT `MemberEnrollment` ACTIVE** (`status=ACTIVE && leftAt=null`); enrollment terminal → `className null`; tanpa enrollment → `className null`.
-- **Tanggal Bergabung = `Member.createdAt`** (ISO).
+- **Tanggal Bergabung** = saat ini **FALLBACK `Member.createdAt`** (ISO) — createdAt **bukan** definisi bisnis "Tanggal Bergabung"; domain belum memiliki field khusus, sehingga nilai ini boleh dipakai sementara dan wajib diganti ke field khusus saat tersedia (lihat komentar kontrak di `src/shared/dto/report.ts`).
 - **Ringkasan mengikuti filter** (search + status + kelas): `summary.total == summary.active + summary.nonActive == pagination.total`; `students/teachers/general` dari `countMembersByType` dengan filter yang sama; pagination murni view (summary stabil antar-halaman).
 - **Kombinasi NONAKTIF + Kelas mengembalikan 0** (anggota dengan enrollment ACTIVE di kelas pasti pernah memiliki enrollment → tidak mungkin NONAKTIF; `some` + `none` di-AND Prisma).
 
@@ -69,7 +69,7 @@ Halaman **Laporan Anggota** dibangun end-to-end di atas fondasi R-1 (`ReportServ
 1. **Jumlah anggota sesuai database**: `pagination.total == prisma.member.count()`; `rows.length == total`; `summary.total == active + nonActive`.
 2. **Status Keanggotaan sesuai kontrak**: `summary.active == count(memberEnrollments some {})`; m2 (enrollment DROPPED/terminal) → AKTIF (pernah); m3 (tanpa enrollment + **pinjaman aktif**) → NONAKTIF (bukan dari pinjaman); m5 (tanpa enrollment) → NONAKTIF.
 3. **Kelas dari SSOT**: m1/m6 → `X Merdeka 1`, m4 → `XI Merdeka 2`; m2 (DROPPED) → null; m3/m5 → null.
-4. **Tanggal Bergabung**: `joinedAt == createdAt.toISOString()`.
+4. **Tanggal Bergabung (fallback)**: `joinedAt == createdAt.toISOString()` — membuktikan fallback sementara; saat field khusus ditambahkan, smoke diarahkan ke field tersebut.
 5. **Search server-side**: nama ("Sari", "Guru") & nomor ("G-0001"); tanpa match → 0 baris + summary nol.
 6. **Filter Status**: AKTIF → 4 (m1,m2,m4,m6), semua badge ACTIVE; NONAKTIF → 2 (m3,m5); summary konsisten.
 7. **Filter Kelas**: X → 2 (m1,m6) semua `X Merdeka 1`; XI → 1 (m4).
