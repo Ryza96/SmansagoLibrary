@@ -133,7 +133,7 @@ export class PrintService {
 
       printWindow.webContents.on('did-finish-load', async () => {
         try {
-          const pdf = await printWindow.webContents.printToPDF({ printBackground: true })
+          const pdf = await printWindow.webContents.printToPDF({ printBackground: true, preferCSSPageSize: true })
           resolve(pdf)
         } catch (error) {
           reject(error)

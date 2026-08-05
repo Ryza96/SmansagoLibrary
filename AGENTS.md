@@ -1076,5 +1076,24 @@ pm run build PASS (main 1,819.55 kB ï¿½ preload 9.02 kB ï¿½ renderer 1,044
 - **Bug "UI tidak tampil tapi build hijau"** → selalu cek apakah komponen di bawah globs Tailwind content; purge Tailwind bersifat diam-diam (tidak error). Folder baru untuk komponen React WAJIB ditambahkan ke `content` `tailwind.config.js` (saat ini: renderer/components/pages/routes/notification).
 - **Toast tidak terlihat ≠ toast tidak masuk state** — dispatch `notify.success` sinkron sebelum `navigate`; provider di atas router + viewport portal body → toast TETAP tampil di halaman tujuan. Navigasi bukan penyebab; verifikasi posisi CSS dulu.
 
+---
+
+## BORROW CARD PDF FIX: Save PDF 110×60mm via preferCSSPageSize (COMPLETE - READY review PO)
+
+### Ringkasan
+- **Bug:** Simpan PDF Kartu Peminjaman menghasilkan halaman A4/Letter dengan kartu kecil, padahal Preview benar. Root cause dari `PRINT_PIPELINE_INVESTIGATION.md` (APPROVED): `renderPdf()` memanggil `printToPDF({ printBackground: true })` **tanpa** `preferCSSPageSize` (default `false`) sehingga `@page { size: 110mm 60mm }` pada template kartu diabaikan oleh Chromium.
+- **Fix (1 baris, jalur Save PDF SAJA):** `electron/main/services/print.service.ts:136` → `printToPDF({ printBackground: true, preferCSSPageSize: true })`. CSS `@page` di template menjadi SSOT ukuran halaman PDF.
+- **TIDAK diubah:** template kartu (`borrow-card.service.ts`), layout, Preview (`BorrowReceiptPreviewPage.tsx`), Print (`webContents.print()` di `printBorrowCard`/`printHtml`), schema/migration/IPC/preload/env/bootstrap/renderer/UI. WO PRINT tidak dibuka.
+- **Validation PASS:** (1) lint; (2) build (main 1,882.57 kB +0.03 · preload 9.95 kB identik · renderer 1,147.66 kB identik); (3) `prisma migrate diff` = "This is an empty migration."; (4) **PDF via `renderPdf` asli** — MediaBox `[0 0 312.000 169.920]` pt = **110.067 × 59.944 mm** (ekspektasi 311.811×170.079 pt; Chromium membulatkan ke kelipatan 0.08pt); **kontrol tanpa flag = Letter 792×612 pt** — bukti flag penyebab.
+- **Smoke Electron headless:** `borrow_card_pdf_fix_smoke/main.cjs` memanggil `PrintService.renderPdf()` ASLI (compiled) pada HTML kartu asli (`generateBorrowCardHtml` + QR `generateQrCodeSvg`) → 6/6 PASS; kontrol negatif `printToPDF(..., false)`.
+- **Laporan:** `WORK_ORDER_BORROW_CARD_PDF_FIX.md`, `BORROW_CARD_PDF_FIX_FINAL_REVIEW.md`, `BORROW_CARD_PDF_FIX_RELEASE.md`. Status: **DONE - READY review PO** (tidak membuka WO PRINT). Commit: satu final commit + push.
+
+### Pelajaran (retain)
+- **`preferCSSPageSize: true` wajib pada `printToPDF` bila kartu/lembar memakai `@page { size: ... }`** — tanpa flag, Chromium default Letter/A4 dan CSS `@page` diabaikan. Ini jalur Save PDF; jalur print fisik (`webContents.print()`) butuh `pageSize` di opsi cetak (WO terpisah, TIDAK dibuka).
+- **Verifikasi ukuran PDF = ekstraksi `/MediaBox` dari file PDF** (`/MediaBox [0 0 w h]` dalam **point**): 110mm = 311.811pt, 60mm = 170.079pt; Chromium membulatkan ke kelipatan 0.08pt (312.000 × 169.920). Kontrol negatif (flag `false`) → Letter 792×612 pt membuktikan perbedaan berasal dari flag, bukan printer/default.
+- **Smoke Electron runtime:** `require('electron')` tersedia di script yang dijalankan `electron <script>`; `app.whenReady()` dulu sebelum `new BrowserWindow`. **`NODE_PATH` TIDAK dibaca Electron** untuk resolusi module di luar repo → compile output ke temp DI DALAM repo (`<wo>_smoke/out/`) agar `require('bwip-js/node')` ter-resolve ke `node_modules` root. Tambah guard `process.on('uncaughtException', ... app.exit(1))` agar proses tidak menggantung (default: error load → app tidak exit).
+- **Private method TS bisa dipanggil di runtime JS** — `new PrintService(null, null).renderPdf(html)` memanggil implementasi produksi persis (private hanya compile-time), sehingga smoke membuktikan file nyata bukan duplikat kode. Constructor deps (`BorrowRepository`/`SettingService`) tak dipakai `renderPdf` → `null` aman.
+- **Fix 1 baris = bukti scope**: bundle preload/renderer byte-identik baseline; delta main hanya +0.03 kB; `git status` hanya 1 file M. Jangan sentuh `webContents.print()` dalam WO yang hanya menargetkan printToPDF.
+
 
 
