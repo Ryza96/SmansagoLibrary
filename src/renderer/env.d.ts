@@ -232,6 +232,13 @@ interface ElectronAPI {
     match: (canonicalRows: import('../types/import').CanonicalRow[]) => Promise<import('../types/import').ImportResultDTO>,
     downloadTemplate: () => Promise<import('../types/import').DownloadTemplateResult>,
   }
+  reports: {
+    borrowings: (filter: import('../../src/shared/dto/report').BorrowReportFilter) => Promise<import('../../src/shared/dto/report').BorrowingReportDTO>,
+    returns: (filter: import('../../src/shared/dto/report').ReturnReportFilter) => Promise<import('../../src/shared/dto/report').ReturnReportDTO>,
+    overdues: (filter: import('../../src/shared/dto/report').OverdueReportFilter) => Promise<import('../../src/shared/dto/report').OverdueReportDTO>,
+    members: (filter: import('../../src/shared/dto/report').MemberReportFilter) => Promise<import('../../src/shared/dto/report').MemberReportDTO>,
+    collections: (filter: import('../../src/shared/dto/report').CollectionReportFilter) => Promise<import('../../src/shared/dto/report').CollectionReportDTO>,
+  }
   settings: {
     get: () => Promise<{
       id: string

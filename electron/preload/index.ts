@@ -18,6 +18,7 @@ import { assetEventAPI } from './asset-event.preload'
 import { settingAPI } from './setting.preload'
 import { bookImportAPI } from './book-import.preload'
 import { dashboardAPI } from './dashboard.preload'
+import { reportAPI } from './report.preload'
 
 const electronAPI = {
   ...appAPI,
@@ -38,7 +39,8 @@ const electronAPI = {
   ...assetEventAPI,
   ...settingAPI,
   ...bookImportAPI,
-  ...dashboardAPI
+  ...dashboardAPI,
+  ...reportAPI
 }
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI)
