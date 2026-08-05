@@ -35,5 +35,5 @@
 ## Komit
 - `7a2a4ab` — R-4 fitur (source + smoke + 3 laporan).
 - `d42610c` — defensive hardening + audit docs.
-- `<FINAL>` — release doc + `electron-builder.yml` (signAndEditExecutable) + AGENTS.md.
+- `ea16758` — release doc + `electron-builder.yml` (signAndEditExecutable) + AGENTS.md.
 - File untracked milik WO lain TIDAK diikutkan.
