@@ -35,6 +35,9 @@ export interface MemberReportQuery {
   academicYearId?: string
   classId?: string
   search?: string
+  // R-5: Status Keanggotaan. ACTIVE = pernah memiliki MemberEnrollment;
+  // INACTIVE = tidak pernah. Bukan dari Member.status maupun pinjaman aktif.
+  status?: 'ACTIVE' | 'INACTIVE'
   page?: number
   limit?: number
 }
@@ -72,6 +75,9 @@ const borrowReportInclude = {
 type BorrowReportRow = Prisma.BorrowGetPayload<{ include: typeof borrowReportInclude }>
 
 // SSOT penempatan kelas = MemberEnrollment ACTIVE (pola member.repository.findMany).
+// _count.memberEnrollments = JUMLAH SELURUH enrollment (status apa pun) — independen
+// dari filter include; dipakai Laporan Anggota R-5 untuk menurunkan membershipStatus
+// ("pernah memiliki MemberEnrollment").
 const memberReportInclude = {
   memberEnrollments: {
     where: { status: ACADEMIC_STATUS.active, leftAt: null },
@@ -80,7 +86,8 @@ const memberReportInclude = {
       academicYear: true
     },
     orderBy: { enrolledAt: 'desc' }
-  }
+  },
+  _count: { select: { memberEnrollments: true } }
 } as const
 
 type MemberReportRow = Prisma.MemberGetPayload<{ include: typeof memberReportInclude }>
@@ -194,6 +201,45 @@ function buildReturnedLateSearchSql(search?: string): Prisma.Sql {
         OR bd.bookTitle LIKE ${'%' + s + '%'}
       )`
     : Prisma.empty
+}
+
+// Where untuk Laporan Anggota (R-1 + R-5). Search cocok di nomor anggota & nama
+// (server-side). Kelas filter memakai SSOT MemberEnrollment ACTIVE. Status Keanggotaan
+// (R-5): ACTIVE = pernah memiliki MemberEnrollment (some {}), INACTIVE = tidak pernah
+// (none {}). Kombinasi `some` + `none` di relation filter di-AND Prisma — untuk
+// status INACTIVE + kelas, hasilnya kosong (anggota berkelas pasti pernah enrollment).
+function buildMemberReportWhere(query: MemberReportQuery): Prisma.MemberWhereInput {
+  const where: Prisma.MemberWhereInput = {}
+
+  if (query.search) {
+    where.OR = [
+      { memberNumber: { contains: query.search } },
+      { fullName: { contains: query.search } }
+    ]
+  }
+  if (query.memberType) where.memberType = query.memberType
+
+  const enrollmentFilter: Prisma.MemberEnrollmentWhereInput = {
+    status: ACADEMIC_STATUS.active,
+    leftAt: null
+  }
+  if (query.classId) enrollmentFilter.classId = query.classId
+  if (query.academicYearId) enrollmentFilter.academicYearId = query.academicYearId
+  if (query.classId || query.academicYearId) {
+    where.memberEnrollments = { some: enrollmentFilter }
+  }
+
+  if (query.status === 'ACTIVE') {
+    const existing = where.memberEnrollments as Prisma.MemberEnrollmentListRelationFilter | undefined
+    // Kelas/tahun sudah membatasi via some → implies "pernah memiliki"; hindari
+    // menimpa predicate kelas.
+    where.memberEnrollments = existing?.some ? existing : { ...(existing ?? {}), some: {} }
+  } else if (query.status === 'INACTIVE') {
+    const existing = (where.memberEnrollments as Prisma.MemberEnrollmentListRelationFilter | undefined) ?? {}
+    where.memberEnrollments = { ...existing, none: {} }
+  }
+
+  return where
 }
 
 export class ReportRepository extends BaseRepository {
@@ -406,25 +452,7 @@ export class ReportRepository extends BaseRepository {
 
   async findMembersReport(query: MemberReportQuery) {
     const { skip, take } = getPaginationParams({ page: query.page, limit: query.limit })
-
-    const where: Prisma.MemberWhereInput = {}
-    if (query.search) {
-      where.OR = [
-        { memberNumber: { contains: query.search } },
-        { fullName: { contains: query.search } }
-      ]
-    }
-    if (query.memberType) where.memberType = query.memberType
-
-    const enrollmentFilter: Prisma.MemberEnrollmentWhereInput = {
-      status: ACADEMIC_STATUS.active,
-      leftAt: null
-    }
-    if (query.classId) enrollmentFilter.classId = query.classId
-    if (query.academicYearId) enrollmentFilter.academicYearId = query.academicYearId
-    if (query.classId || query.academicYearId) {
-      where.memberEnrollments = { some: enrollmentFilter }
-    }
+    const where = buildMemberReportWhere(query)
 
     const [data, total] = await Promise.all([
       this.prisma.member.findMany({
@@ -440,9 +468,30 @@ export class ReportRepository extends BaseRepository {
     return toPaginatedResult<MemberReportRow>(data, total, { page: query.page, limit: query.limit })
   }
 
-  async countMembersByType() {
-    const grouped = await this.prisma.member.groupBy({ by: ['memberType'], _count: { _all: true } })
+  // Ringkasan jumlah per tipe anggota (R-1) — kini mengikuti filter (search/kelas/
+  // status) sehingga konsisten dengan ringkasan lain (R-5: "statistik ikut filter").
+  async countMembersByType(query?: MemberReportQuery) {
+    const where = query ? buildMemberReportWhere(query) : {}
+    const grouped = await this.prisma.member.groupBy({ by: ['memberType'], where, _count: { _all: true } })
     return grouped.map((g) => ({ memberType: g.memberType, count: g._count._all }))
+  }
+
+  // Ringkasan Status Keanggotaan (R-5): ACTIVE = pernah memiliki MemberEnrollment
+  // (memberEnrollments some {}), NONAKTIF = tidak pernah (none {}). Seluruh predikat
+  // filter (search/kelas/status) tetap diberlakukan di atasnya — kombinasi some+none
+  // di-AND Prisma sehingga `active + nonActive === total` konsisten dengan pagination.
+  async countMemberMembershipSummary(query: MemberReportQuery) {
+    const base = buildMemberReportWhere(query)
+    const baseEnroll = (base.memberEnrollments as Prisma.MemberEnrollmentListRelationFilter | undefined) ?? {}
+    const [active, nonActive] = await Promise.all([
+      this.prisma.member.count({
+        where: { ...base, memberEnrollments: { ...baseEnroll, some: baseEnroll.some ?? {} } }
+      }),
+      this.prisma.member.count({
+        where: { ...base, memberEnrollments: { ...baseEnroll, none: {} } }
+      })
+    ])
+    return { active, nonActive }
   }
 
   // -------------------------------------------------------------------------

@@ -262,9 +262,10 @@ export class ReportService {
   // -------------------------------------------------------------------------
 
   async getMemberReport(filter: MemberReportFilter): Promise<MemberReportDTO> {
-    const [result, typeCounts] = await Promise.all([
+    const [result, membership, typeCounts] = await Promise.all([
       this.reportRepository.findMembersReport(filter),
-      this.reportRepository.countMembersByType()
+      this.reportRepository.countMemberMembershipSummary(filter),
+      this.reportRepository.countMembersByType(filter)
     ])
 
     const rows: MemberReportRowDTO[] = result.data.map((m) => {
@@ -277,7 +278,11 @@ export class ReportService {
         phone: m.phone,
         email: m.email,
         className: enrollment ? `${enrollment.class.educationLevel} ${enrollment.class.parallel}` : null,
-        status: m.status
+        status: m.status,
+        // Status Keanggotaan (R-5): ACTIVE = pernah memiliki MemberEnrollment
+        // (status apa pun — _count seluruh enrollment); bukan dari pinjaman aktif.
+        membershipStatus: m._count.memberEnrollments > 0 ? 'ACTIVE' : 'INACTIVE',
+        joinedAt: iso(m.createdAt)
       }
     })
 
@@ -290,7 +295,9 @@ export class ReportService {
         total: result.total,
         students: countByType.get(MEMBER_TYPES.student.code) ?? 0,
         teachers: countByType.get(MEMBER_TYPES.teacher.code) ?? 0,
-        general: countByType.get(MEMBER_TYPES.general.code) ?? 0
+        general: countByType.get(MEMBER_TYPES.general.code) ?? 0,
+        active: membership.active,
+        nonActive: membership.nonActive
       }
     }
   }

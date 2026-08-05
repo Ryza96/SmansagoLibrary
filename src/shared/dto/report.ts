@@ -161,7 +161,12 @@ export interface MemberReportFilter {
   memberType?: string
   academicYearId?: string
   classId?: string
+  // Pencarian server-side (R-2, aditif non-breaking): cocok di nomor anggota & nama.
   search?: string
+  // Status Keanggotaan (R-5, aditif non-breaking). Aturan PO: AKTIF = pernah
+  // memiliki MemberEnrollment (status apa pun); NONAKTIF = tidak pernah memiliki
+  // MemberEnrollment. BUKAN berdasarkan Member.status maupun pinjaman aktif.
+  status?: 'ACTIVE' | 'INACTIVE'
   page?: number
   limit?: number
 }
@@ -175,7 +180,13 @@ export interface MemberReportRowDTO {
   email: string | null
   // Kelas saat ini (SSOT MemberEnrollment ACTIVE) atau null.
   className: string | null
+  // Kolom Member.status (keanggotaan sistem). TIDAK sama dengan membershipStatus.
   status: string
+  // Status Keanggotaan (R-5, turunan): ACTIVE = pernah memiliki MemberEnrollment
+  // (status apa pun); INACTIVE = tidak pernah memiliki. Bukan dari pinjaman aktif.
+  membershipStatus: 'ACTIVE' | 'INACTIVE'
+  // Tanggal Bergabung (R-5) = Member.createdAt (kolom Tanggal Bergabung).
+  joinedAt: string
 }
 
 export interface MemberReportSummaryDTO {
@@ -183,6 +194,10 @@ export interface MemberReportSummaryDTO {
   students: number
   teachers: number
   general: number
+  // R-5 (aditif): Aktif = pernah memiliki MemberEnrollment; Nonaktif = tidak
+  // pernah. total === active + nonActive; seluruh ringkasan mengikuti filter.
+  active: number
+  nonActive: number
 }
 
 export interface MemberReportDTO {

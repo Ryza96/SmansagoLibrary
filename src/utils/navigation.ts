@@ -24,6 +24,7 @@ export const ROUTES = {
   REPORT_BORROWINGS: '/reports/borrowings',
   REPORT_RETURNS: '/reports/returns',
   REPORT_OVERDUES: '/reports/overdues',
+  REPORT_MEMBERS: '/reports/members',
   SETTINGS: '/settings',
   MASTER_AUTHORS: '/master/authors',
   MASTER_AUTHOR_NEW: '/master/authors/new',

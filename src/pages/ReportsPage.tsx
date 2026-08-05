@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { FileText, Undo2, TriangleAlert, ChevronRight } from 'lucide-react'
+import { FileText, Undo2, TriangleAlert, Users, ChevronRight } from 'lucide-react'
 import { LABELS } from '../utils/labels'
 
 export default function ReportsPage() {
@@ -49,6 +49,20 @@ export default function ReportsPage() {
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-slate-800">{LABELS.REPORT.OVERDUES}</p>
             <p className="text-xs text-slate-500 mt-0.5">{LABELS.REPORT.OVERDUES_DESC}</p>
+          </div>
+          <ChevronRight size={18} className="text-slate-300 shrink-0" />
+        </button>
+
+        <button
+          onClick={() => navigate('/reports/members')}
+          className="flex items-center gap-5 p-5 rounded-xl border border-slate-200 bg-white hover:shadow-lg hover:-translate-y-0.5 hover:border-slate-300 transition-all duration-200 text-left w-full"
+        >
+          <div className="p-3 rounded-xl shrink-0 text-indigo-600 bg-indigo-50">
+            <Users size={24} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-slate-800">{LABELS.REPORT.MEMBERS}</p>
+            <p className="text-xs text-slate-500 mt-0.5">{LABELS.REPORT.MEMBERS_DESC}</p>
           </div>
           <ChevronRight size={18} className="text-slate-300 shrink-0" />
         </button>
