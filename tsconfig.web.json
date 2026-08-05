@@ -20,6 +20,7 @@
     "src/types/**/*",
     "src/utils/**/*",
     "src/routes/**/*",
+    "src/notification/**/*",
     "src/shared/**/*",
     "src/config/**/*",
     "src/contexts/**/*",

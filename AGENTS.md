@@ -1018,4 +1018,26 @@ pm run build PASS (main 1,819.55 kB ï¿½ preload 9.02 kB ï¿½ renderer 1,044
 - **Dependency yang sudah ada transitif boleh di-*promote* ke dependency langsung** dengan versi eksak (`dotenv: 16.6.1`) — lockfile berubah minimal (hanya pindah blok), bukan reinstall penuh.
 - **Semua PrismaClient dibuat di module-scope-safe path**: `initDatabase()` dan `getPrisma()` singleton keduanya lazy — PrismaClient membaca `process.env.DATABASE_URL` saat konstruksi, sehingga dotenv di module scope index.ts selalu lebih dulu.
 
+---
+
+## NS-1 (Notification Foundation): Provider + Reducer + Toast + ConfirmDialog (COMPLETE - READY review PO)
+
+### Ringkasan
+- Source of Truth: `NOTIFICATION_UX_AUDIT.md` (read-only, 53 match) + `NOTIFICATION_SYSTEM_ARCHITECTURE.md` (**DISETUJUI PO dengan 11 revisi**). Scope NS-1: **fondasi Notification System v1.0** — Provider, Reducer, Toast, ToastViewport, ConfirmDialog, Configuration, Smoke Test. **BELUM** migrasi `alert()`/`confirm()`, **BELUM** mengubah halaman/routes, **ZERO dependency** (dilarang library toast).
+- **File baru (8):** `src/shared/config/notification.ts` (`NOTIFICATION_DURATION` success 3000/info 4000/warning 5000/error 6000 — semua auto-dismiss, `NOTIFICATION_MAX_TOASTS=3`, `NOTIFICATION_Z_INDEX` toast 90/confirm 100), `src/notification/types.ts` (`ToastType`/`ToastItem`/`ConfirmDescriptor`/`ConfirmOptions`/`Notify`), `src/notification/notification-reducer.ts` (**reducer PURE** — aksi `toast/add|dismiss|dismissAll|confirm/open|resolve`; `toast/add` slice ke maks 3 = evict toast tertua; id dibangkitkan caller `crypto.randomUUID` agar reducer tetap murni), `src/notification/NotificationContext.tsx` (provider + `useNotification()` pola `BookImportContext`; timer auto-dismiss per-id di provider, cleanup unmount; `confirm()` Promise — jika dialog kedua dibuka, promise pertama di-resolve `false`), `src/notification/ToastItem.tsx` (ikon per tipe via lucide, bar warna kiri, dismiss button, `aria-live`), `src/notification/ToastViewport.tsx` (`createPortal(document.body)`, `fixed top-14 right-4` = **TOP RIGHT** di bawah TopBar h-12, stack flex-col), `src/notification/ConfirmDialog.tsx` (`createPortal`, `role=alertdialog`, ikon TriangleAlert(danger)/HelpCircle, title+description, Cancel/Confirm, **fokus awal Cancel** + Tab trap + Esc=batal), `ns1_notification_smoke/smoke.ts` (**27/27 PASS** murni tanpa DB/Electron).
+- **Dimodifikasi (3):** `src/renderer/App.tsx` (`<NotificationProvider>` bungkus `<RouterProvider>`), `tsconfig.web.json` (+include `src/notification/**/*`), `src/renderer/assets/styles.css` (`@keyframes toast-enter` slide kanan 24px→0 + fade 0.22s).
+- **Revisi PO terimplementasi (11):** zero-dep; portal body; top-right; stack; maks 3 (ke-4 evict tertua); animasi slide+fade; durasi 3/4/5/6s semua auto-dismiss; **tidak ada persistent toast**; ConfirmDialog modern + danger variant; reducer pure; belum sentuh halaman.
+- **TIDAK diubah:** package.json (zero-dep), schema, migration, IPC/preload/env, halaman, routes.
+- **API:** `useNotification()` → `{ notify.success|error|warning|info(msg): id, notify.dismiss(id), notify.dismissAll(), confirm({title,message,confirmLabel?,cancelLabel?,danger?}): Promise<boolean> }`.
+- **Validation PASS:** smoke 27/27; `npm run lint` PASS; `npm run build` PASS (main **1,882.54 kB identik baseline** · preload **9.95 kB identik** · renderer **1,148.88 kB** +11.22 = modul notification); `prisma migrate diff` = "This is an empty migration."
+- **Laporan:** `WORK_ORDER_NS1_IMPLEMENTATION.md`, `NS1_FINAL_REVIEW.md`, `NS1_RELEASE.md`. Status: **DONE - READY review PO** (tidak membuka NS-2). Commit: Satu final commit NS-1 + push.
+
+### Pelajaran (retain)
+- **Reducer pure + id dari caller** — `crypto.randomUUID()` di context (caller), bukan reducer; durasi/tipe di payload → reducer bisa di-smoke headless tanpa IO; StrictMode double-invoke terbukti identik (smoke).
+- **Timer auto-dismiss = provider**, bukan reducer (waktu bukan kontrak state); map per-id, skip yang sudah ada, cleanup pada unmount; reducer tetap murni.
+- **Posisi top-right `top-14`** = offset TopBar `h-12` + gap 8px; z-index terpusat di config (toast 90, confirm 100 — di atas semua modal eksisting z-50).
+- **Confirm bertumpuk**: panggilan kedua `confirm()` saat dialog masih terbuka → promise pertama di-resolve `false` (menggantikan perilaku window.confirm yang mengabaikan panggilan lama); satu `pendingConfirmResolveRef` di provider.
+- **Constrain scope = bukti bundle identik**: main & preload byte-identik baseline membuktikan tidak ada wiring lain; satu-satunya delta renderer +11.22 kB = modul notification. Jika WO menyentuh hanya renderer, delta renderer-lah yang wajar.
+- **Smoke pure tanpa DB/Electron**: compile `npx tsc --module commonjs --target es2022 --moduleResolution node --esModuleInterop --skipLibCheck --rootDir . --outDir <tmp>\out ns1_notification_smoke/smoke.ts` lalu `node <tmp>\out\ns1_notification_smoke\smoke.js` (tanpa bwip-js → pola commonjs+node, bukan node16).
+
 
