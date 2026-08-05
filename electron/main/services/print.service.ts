@@ -5,7 +5,7 @@ import { AppError } from '../errorHandler'
 import { BorrowRepository } from '../../../src/main/repositories/borrow.repository'
 import { SettingService } from './setting.service'
 import { generateLabelsHtml } from '../../../src/main/services/label.service'
-import { buildBorrowCardData, generateBorrowCardHtml } from '../../../src/main/services/borrow-card.service'
+import { BORROW_CARD_LAYOUT, buildBorrowCardData, generateBorrowCardHtml } from '../../../src/main/services/borrow-card.service'
 import type { BorrowReceiptData, ReturnReceiptData, BookLabelData } from '../../../src/shared/dto/print'
 
 // WO-2 — nama file PDF Kartu Peminjaman (FINAL PREVIEW DESIGN DECISION F5).
@@ -88,7 +88,16 @@ export class PrintService {
 
   async printBorrowCard(borrowingId: string): Promise<void> {
     const html = await this.buildBorrowCardHtml(borrowingId)
-    await this.printHtml(html, { margins: { marginType: 'none' } })
+    await this.printHtml(html, {
+      margins: { marginType: 'none' },
+      // WO BORROW CARD PRINT PIPELINE FIX — default paper size cetak 110×60mm
+      // (bukan A4/default). Satuan Size = mikron (110mm=110000, 60mm=60000).
+      // Nilai diambil dari BORROW_CARD_LAYOUT agar SSOT dimensi kartu tetap 1 tempat.
+      pageSize: {
+        width: BORROW_CARD_LAYOUT.pageWidthMm * 1000,
+        height: BORROW_CARD_LAYOUT.pageHeightMm * 1000
+      }
+    })
   }
 
   async saveBorrowCardPdf(borrowingId: string): Promise<{ saved: boolean; filePath?: string }> {

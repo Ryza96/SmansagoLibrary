@@ -1142,3 +1142,23 @@ pm run build PASS (main 1,819.55 kB ï¿½ preload 9.02 kB ï¿½ renderer 1,044
 - **Grep false-positive assertion**: `.book-row .inv { flex: 0 0 auto; margin-left: 5mm; ... }` harus dicocokkan dengan substring penuh (6.5pt monospace) agar tidak lolos dengan margin lama; gunakan `includes('.book-row { display: flex; gap: 3mm; font-size: 7.5pt;') && !includes('justify-content: space-between')` untuk membuktikan pembuangan space-between.
 - **Regression suite hidup**: `borrow_card_layout_v11_smoke/smoke.ts` STEP 5 CSS marker di-update ke nilai v1.2 (bukan membuat suite terpisah yang menduplikasi) — v1.1 & v1.2 diuji bersamaan; suite v12 baru menambah assertion gap/separator/kapasitas yang lebih spesifik.
 - Smoke compile & run mengikuti pola v1.1 (node16 untuk bwip-js, geometry via `electron ... <outDir>` in-repo, uat fresh DB temp).
+
+---
+
+## BORROW CARD PRINT PIPELINE FIX: Cetak default 110×60mm (COMPLETE - READY review PO)
+
+### Ringkasan
+- **WO:** perbaiki **jalur Print** kartu peminjaman agar default paper size = **110×60mm** (bukan A4/default). Source of Truth `PRINT_PIPELINE_INVESTIGATION.md` (APPROVED) — pola "parameter paper size tidak diteruskan ke API cetak" pada dua jalur: **PDF** sudah diperbaiki WO sebelumnya (`preferCSSPageSize: true`), **Print** diperbaiki WO ini. Scope: **HANYA jalur Print**; Preview/PDF/template/layout/business logic/DTO/Repository TIDAK disentuh.
+- **Modifikasi (1 file source):** `electron/main/services/print.service.ts` — `printBorrowCard()` kini meneruskan `pageSize: { width: BORROW_CARD_LAYOUT.pageWidthMm * 1000, height: BORROW_CARD_LAYOUT.pageHeightMm * 1000 }` (= `{ width: 110000, height: 60000 }` **mikron**) ke `printHtml` → `webContents.print`; import +`BORROW_CARD_LAYOUT` dari `borrow-card.service.ts` (read-only). `printHtml` TIDAK diubah (helper bersama label buku A4 & bukti legacy) — `pageSize` diteruskan per-jalur via `printOptions`.
+- **TIDAK diubah:** Preview, PDF (`renderPdf`/`preferCSSPageSize`), template `@page`, layout, IPC/preload/env.d.ts, schema/migration, jalur label buku & bukti (tetap A4).
+- **Validation PASS:** lint; build (main **1,883.46 kB** +0.41 · preload **9.95 kB identik** · renderer **1,147.66 kB identik**); `prisma migrate diff` = "This is an empty migration."; smoke Electron baru `borrow_card_print_fix_smoke/main.cjs` **11/11 PASS** (`PRINT_PAGE_SIZE=110000x60000`, label TANPA pageSize, PDF regression 312.000×169.920pt); regression wo1 **104** · v11 **60** · v12 **38** · uat **31** · pdf_fix **6** · geometry v11/v12 PASS → **250 + 2, 0 FAIL**.
+- **Laporan:** `WORK_ORDER_BORROW_CARD_PRINT_FIX.md`, `BORROW_CARD_PRINT_FINAL_REVIEW.md`, `BORROW_CARD_PRINT_RELEASE.md`. Status: **DONE - menunggu review PO** (tidak membuka WO baru).
+
+### Pelajaran (retain)
+- **`webContents.print` TIDAK punya `preferCSSPageSize`** (hanya `printToPDF`) — dialog cetak fisik diatur opsi `pageSize` (mikron), bukan `@page`. Template `@page` hanya untuk PDF/print-to-scale Chromium.
+- **`WebContentsPrintOptions.pageSize` = `string | Size`** — custom size memakai `Size { width, height }` dalam **mikron** (110mm=110000, 60mm=60000). Derive dari `BORROW_CARD_LAYOUT.pageWidthMm*1000` agar SSOT dimensi kartu tetap 1 tempat (jangan hardcode di print service).
+- **Ubah per-jalur, bukan helper global** — `printHtml` dipakai label buku (A4) & bukti legacy; `pageSize` diteruskan HANYA di `printBorrowCard` via `printOptions`, sehingga scope tetap dan tidak ada efek samping.
+- **Intercept `webContents.print` tanpa dialog:** patch `BrowserWindow.prototype.loadURL` → setelah `super`/webContents tersedia, set `wc.print = (opts, cb) => { capture; cb(true) }` — karena `printHtml` memanggil `loadURL` DULU lalu mendaftarkan `did-finish-load`, spy sudah terpasang sebelum `print` dipanggil. Jangan reassign `BrowserWindow` global (compiled module memegang `electron_1.BrowserWindow` — reassign tidak berefek).
+- **Bukti scope negatif:** smoke memanggil `printBookLabels` setelah `printBorrowCard` dan assert opsi label TIDAK memuat `pageSize` — membuktikan helper netral & perubahan terbatas kartu.
+- **Keterbatasan perangkat:** `pageSize` menyetel ukuran job print; hasil fisik bergantung driver/printer mendukung custom paper 110×60mm (printer label/kartu). Ini keterbatasan hardware, terdokumentasi investigasi.
+- Smoke compile: `npx tsc --module node16 --moduleResolution node16 ... electron\main\services\print.service.ts` → outDir in-repo (`<wo>_smoke/out/`, gitignored) → `electron main.cjs <outDir> <pdfPath>`; NODE_PATH tidak dibaca Electron.
