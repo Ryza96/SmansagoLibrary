@@ -22,12 +22,21 @@ import { generateQrCodeSvg } from './barcode.service'
 //  - Body dikurangi 20→18mm & footer 10→9mm untuk memberi ruang list.
 //  - Baris buku dirapatkan 3.4→2.8mm; judul diperkecil ke 8pt (dominant di list).
 //  Kapasitas: halaman 1 = 5 buku (sebelumnya 3), lanjutan = 13 (sebelumnya 10).
+// WO-1 BORROW CARD LAYOUT REFINEMENT v1.2 — penyempurnaan visual (tanpa mengubah
+// ukuran kartu / PDF / print pipeline / QR / header / logo / identitas anggota).
+//  - Judul buku diperkecil 8→7.5pt (tetap > teks identitas 6.5pt, tetap terbaca).
+//  - Inventory number mengikuti judul dengan jarak tetap ~13mm (bukan rata ke
+//    tepi kanan) — judul pendek → inv dekat; judul panjang → judul ter-ellipsis.
+//  - Garis pemisah tipis abu terang antara data anggota & daftar buku
+//    (border-bottom .body + margin-bottom 1mm) — jarak nyaman di atas & bawah.
+//  Kapasitas dipertahankan 5+13: body 18→17mm & baris 2.8→2.7mm memberi ruang
+//  pemisah tanpa mengurangi jumlah baris (pagination deterministik, D10).
 export const BORROW_CARD_LAYOUT = {
   pageWidthMm: 110,
   pageHeightMm: 60,
   paddingMm: 3,
-  bookRowHeightMm: 2.8,
-  pageOne: { headerMm: 12, bodyMm: 18, footerMm: 9 },
+  bookRowHeightMm: 2.7,
+  pageOne: { headerMm: 12, bodyMm: 17, footerMm: 9 },
   continuation: { headerMm: 8, footerMm: 9 }
 } as const
 
@@ -258,18 +267,18 @@ export function generateBorrowCardHtml(data: BorrowCardData): string {
   .header-info { flex: 0 0 auto; display: flex; flex-direction: column; align-items: flex-end; gap: 0.6mm; margin-left: 2mm; }
   .header-info .qty { font-size: 6.5pt; font-weight: 600; color: #1f2937; white-space: nowrap; }
   .header-info .badge { margin-top: 0; }
-  .body { display: flex; gap: 3mm; height: 18mm; margin-top: 0; align-items: stretch; }
-  .avatar { width: 18mm; height: 18mm; flex: 0 0 18mm; display: flex; align-items: center; justify-content: center; }
+  .body { display: flex; gap: 3mm; height: 17mm; margin-top: 0; margin-bottom: 1mm; align-items: stretch; border-bottom: 1px solid #e2e8f0; }
+  .avatar { width: 17mm; height: 17mm; flex: 0 0 17mm; display: flex; align-items: center; justify-content: center; }
   .avatar svg { width: 100%; height: 100%; }
   .col { flex: 1; min-width: 0; font-size: 6.5pt; display: flex; flex-direction: column; justify-content: center; gap: 1mm; }
   .row { display: flex; }
   .row b { flex: 0 0 21mm; font-weight: 600; color: #475569; }
   .row span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .books { flex: 1; min-height: 0; overflow: hidden; margin-top: 0; }
-  .book-row { display: flex; justify-content: space-between; gap: 3mm; font-size: 8pt; line-height: 2.8mm; margin-bottom: 0; }
-  .book-row .num { flex: 0 0 5mm; font-size: 6.5pt; color: #64748b; }
-  .book-row .title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .book-row .inv { flex: 0 0 auto; font-family: Consolas, 'Courier New', monospace; font-size: 6.5pt; }
+  .book-row { display: flex; font-size: 7.5pt; line-height: 2.7mm; margin-bottom: 0; }
+  .book-row .num { flex: 0 0 5mm; margin-right: 3mm; font-size: 6.5pt; color: #64748b; }
+  .book-row .title { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .book-row .inv { flex: 0 0 auto; margin-left: 13mm; font-family: Consolas, 'Courier New', monospace; font-size: 6.5pt; }
   .footer { display: flex; align-items: flex-end; gap: 4mm; height: 9mm; margin-top: 0.5mm; }
   .badge { display: inline-block; padding: 0.5mm 2mm; border-radius: 1mm; font-size: 6pt; font-weight: 700; letter-spacing: 0.3px; margin-top: 1mm; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .badge-active   { background: #dcfce7; color: #166534; }
