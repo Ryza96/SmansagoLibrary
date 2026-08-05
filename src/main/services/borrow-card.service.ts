@@ -16,13 +16,19 @@ import { generateQrCodeSvg } from './barcode.service'
 // Kapasitas baris buku dihitung dari mm yang SAMA dengan yang dipakai CSS,
 // sehingga pagination deterministik dan tidak ada overflow (D10).
 // ---------------------------------------------------------------------------
+// WO-1 BORROW CARD LAYOUT v1.1 — optimasi kapasitas daftar buku.
+//  - Jumlah + Status (AKTIF) pindah ke pojok kanan ATAS (header-info).
+//  - Footer kiri bawah dikosongkan → zona daftar buku bertambah.
+//  - Body dikurangi 20→18mm & footer 10→9mm untuk memberi ruang list.
+//  - Baris buku dirapatkan 3.4→2.8mm; judul diperkecil ke 8pt (dominant di list).
+//  Kapasitas: halaman 1 = 5 buku (sebelumnya 3), lanjutan = 13 (sebelumnya 10).
 export const BORROW_CARD_LAYOUT = {
   pageWidthMm: 110,
   pageHeightMm: 60,
   paddingMm: 3,
-  bookRowHeightMm: 3.4,
-  pageOne: { headerMm: 12, bodyMm: 20, footerMm: 10 },
-  continuation: { headerMm: 8, footerMm: 10 }
+  bookRowHeightMm: 2.8,
+  pageOne: { headerMm: 12, bodyMm: 18, footerMm: 9 },
+  continuation: { headerMm: 8, footerMm: 9 }
 } as const
 
 function escapeHtml(value: string): string {
@@ -123,6 +129,11 @@ function logoElementHtml(data: BorrowCardData): string {
   return generateLogoMonogramSvg(data.header.schoolName, data.header.libraryName)
 }
 
+function headerInfoHtml(data: BorrowCardData): string {
+  const status = borrowStatusConfig(data.footer.borrowStatus)
+  return `<div class="header-info"><span class="qty">Jumlah: ${data.footer.totalBooks}</span><span class="badge ${status.className}">${escapeHtml(status.label)}</span></div>`
+}
+
 function headerHtml(data: BorrowCardData, isFirst: boolean): string {
   const headerClass = isFirst ? 'header' : 'header continue'
   const logoClass = isFirst ? 'logo' : 'logo continue'
@@ -135,6 +146,7 @@ function headerHtml(data: BorrowCardData, isFirst: boolean): string {
     <div class="lib-name">${escapeHtml(data.header.libraryName)}</div>
     <div class="school-name">${escapeHtml(data.header.schoolName)}</div>
   </div>
+  ${headerInfoHtml(data)}
 </div>`
   }
   return `<div class="${headerClass}">
@@ -143,6 +155,7 @@ function headerHtml(data: BorrowCardData, isFirst: boolean): string {
     <div class="lib-name">${escapeHtml(data.header.libraryName)}</div>
     <div class="school-name"><span class="continue-label">LANJUTAN</span> &middot; ${escapeHtml(data.borrow.borrowNumber)}</div>
   </div>
+  ${headerInfoHtml(data)}
 </div>`
 }
 
@@ -180,12 +193,7 @@ function booksZoneHtml(data: BorrowCardData, page: BorrowCardPage): string {
 }
 
 function footerHtml(data: BorrowCardData): string {
-  const status = borrowStatusConfig(data.footer.borrowStatus)
   return `<div class="footer">
-  <div class="footer-left">
-    <div>Jumlah: ${data.footer.totalBooks}</div>
-    <div><span class="badge ${status.className}">${escapeHtml(status.label)}</span></div>
-  </div>
   <div class="qr">${data.footer.qrSvg}</div>
   <div class="sign"><div class="line"></div><div class="officer">(${escapeHtml(data.footer.officerName)})</div></div>
 </div>`
@@ -243,30 +251,32 @@ export function generateBorrowCardHtml(data: BorrowCardData): string {
   .logo.continue { width: 7mm; height: 7mm; flex-basis: 7mm; }
   .logo svg, .logo-img { width: 100%; height: 100%; }
   .logo-img { object-fit: contain; }
-  .header-text { line-height: 1.15; min-width: 0; }
+  .header-text { line-height: 1.15; min-width: 0; flex: 1; overflow: hidden; }
   .lib-name { font-size: 9pt; font-weight: 700; color: #1d4ed8; text-transform: uppercase; }
-  .school-name { font-size: 7pt; color: #475569; }
+  .school-name { font-size: 7pt; color: #475569; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .continue-label { font-size: 6pt; font-weight: 600; color: #64748b; }
-  .body { display: flex; gap: 3mm; height: 20mm; margin-top: 1mm; align-items: stretch; }
-  .avatar { width: 18mm; height: 20mm; flex: 0 0 18mm; display: flex; align-items: center; justify-content: center; }
+  .header-info { flex: 0 0 auto; display: flex; flex-direction: column; align-items: flex-end; gap: 0.6mm; margin-left: 2mm; }
+  .header-info .qty { font-size: 6.5pt; font-weight: 600; color: #1f2937; white-space: nowrap; }
+  .header-info .badge { margin-top: 0; }
+  .body { display: flex; gap: 3mm; height: 18mm; margin-top: 0; align-items: stretch; }
+  .avatar { width: 18mm; height: 18mm; flex: 0 0 18mm; display: flex; align-items: center; justify-content: center; }
   .avatar svg { width: 100%; height: 100%; }
   .col { flex: 1; min-width: 0; font-size: 6.5pt; display: flex; flex-direction: column; justify-content: center; gap: 1mm; }
   .row { display: flex; }
   .row b { flex: 0 0 21mm; font-weight: 600; color: #475569; }
   .row span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .books { flex: 1; min-height: 0; overflow: hidden; margin-top: 1mm; }
-  .book-row { display: flex; justify-content: space-between; gap: 3mm; line-height: 2.5mm; margin-bottom: 0.9mm; }
-  .book-row .num { flex: 0 0 5mm; color: #64748b; }
+  .books { flex: 1; min-height: 0; overflow: hidden; margin-top: 0; }
+  .book-row { display: flex; justify-content: space-between; gap: 3mm; font-size: 8pt; line-height: 2.8mm; margin-bottom: 0; }
+  .book-row .num { flex: 0 0 5mm; font-size: 6.5pt; color: #64748b; }
   .book-row .title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .book-row .inv { flex: 0 0 auto; font-family: Consolas, 'Courier New', monospace; }
-  .footer { display: flex; align-items: flex-end; gap: 4mm; height: 10mm; margin-top: 1mm; }
-  .footer-left { flex: 1; font-size: 6.5pt; line-height: 1.4; }
+  .book-row .inv { flex: 0 0 auto; font-family: Consolas, 'Courier New', monospace; font-size: 6.5pt; }
+  .footer { display: flex; align-items: flex-end; gap: 4mm; height: 9mm; margin-top: 0.5mm; }
   .badge { display: inline-block; padding: 0.5mm 2mm; border-radius: 1mm; font-size: 6pt; font-weight: 700; letter-spacing: 0.3px; margin-top: 1mm; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .badge-active   { background: #dcfce7; color: #166534; }
   .badge-returned { background: #e2e8f0; color: #334155; }
   .badge-overdue  { background: #fee2e2; color: #991b1b; }
   .badge-neutral  { background: #e2e8f0; color: #334155; }
-  .qr { width: 9mm; height: 9mm; flex: 0 0 9mm; }
+  .qr { width: 9mm; height: 9mm; flex: 0 0 9mm; margin-left: auto; }
   .qr svg { width: 100%; height: 100%; }
   .sign { font-size: 6pt; text-align: center; }
   .sign .line { border-top: 1px solid #1f2937; width: 18mm; }

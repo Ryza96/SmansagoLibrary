@@ -1097,3 +1097,25 @@ pm run build PASS (main 1,819.55 kB ï¿½ preload 9.02 kB ï¿½ renderer 1,044
 
 
 
+
+---
+
+## BORROW CARD LAYOUT v1.1: Optimasi Kapasitas Daftar Buku (COMPLETE - READY review PO)
+
+### Ringkasan
+- **WO:** Optimasi layout kartu 110×60mm agar memuat lebih banyak buku **TANPA mengubah ukuran kartu**, ukuran PDF, Preview, Print, QR, tanda tangan, identitas anggota, header/logo/border/style visual.
+- **Keputusan PO:** (1) **Jumlah + Status (AKTIF) pindah ke pojok kanan ATAS** (header-info) pada kartu utama & lanjutan; (2) **footer kiri-bawah dikosongkan** → zona daftar buku bertambah; (3) **judul buku diperkecil ke 8pt** (tetap dominan di list); (4) spasi baris dikurangi → target **5 buku nyaman di halaman 1** (sebelumnya 3), **13 di lanjutan** (sebelumnya 10); (5) nomor urut kiri, judul rata kiri, **inventory number rata kanan**; (6) QR & tanda tangan tetap kanan-bawah footer.
+- **SATU file source:** `src/main/services/borrow-card.service.ts` — `BORROW_CARD_LAYOUT` {bookRowHeightMm 3.4→**2.8**, pageOne {header 12, body 20→**18**, footer 10→**9**}, continuation {header 8, footer 10→**9**}}; helper baru `headerInfoHtml(data)`; `footerHtml` = QR + tanda tangan saja (elemen `.footer-left` dihapus total); CSS `.book-row` font-size 8pt + line-height 2.8mm + margin 0; `.num`/`.inv` 6.5pt; `.body` 18mm + margin-top 0; `.avatar` 18×18; `.footer` 9mm + margin-top 0.5mm; `.qr` margin-left:auto; `.header-text` flex:1 + overflow hidden; `.school-name` ellipsis.
+- **Geometri deterministik:** halaman 1 = 54 − (12+18+9+0.5) = 14.5mm → floor(14.5/2.8) = **5**; lanjutan = 54 − 17.5 = 36.5 → **13**. Maks 20 buku → 5+13+2 = 3 kartu.
+- **TIDAK diubah:** DTO (`borrow-card.ts`), Repository, Borrow/Return Service, IPC, preload, env.d.ts, schema, migration, `print.service.ts` (PDF fix WO sebelumnya), Preview/Print pipeline, renderer.
+- **Validation PASS:** lint; build (main **1,883.01 kB** +0.44 · preload **9.95 kB identik** · renderer **1,147.66 kB identik**); `prisma migrate diff` = "This is an empty migration."; smoke wo1 **104/104** (pagination 5+13+2, badge ×3 di header-info, `!footer-left`) · v11 **58/58** (pagination, preview 1/3/5, struktur baris, CSS marker, distribusi per halaman) · uat **31/31** fresh DB (header-info Jumlah:20 ×3, badge ×3, distribusi 5+13+2) · pdf **6/6** (MediaBox 312.000×169.920pt = 110.067×59.944mm — ukuran TIDAK berubah) · geometry **10/10** (render nyata Electron: 5 baris tanpa overlap + di dalam kartu + footer clear, QR & tanda tangan terpisah, header-info kanan-atas).
+- **Laporan:** `WORK_ORDER_BORROW_CARD_LAYOUT_V11_IMPLEMENTATION.md`, `BORROW_CARD_LAYOUT_V11_FINAL_REVIEW.md`, `BORROW_CARD_LAYOUT_V11_RELEASE.md`. Status: **DONE - menunggu review PO** (tidak membuka WO baru).
+
+### Pelajaran (retain)
+- **Optimasi kapasitas baris = kompromi mm antar zona.** Untuk menambah baris buku pada kartu fixed-size, kurangi zona yang bukan target: footer 10→9mm & body 20→18mm (avatar dekoratif menyesuaikan) — teks identitas/font/kolom TIDAK berubah. Padding frame (3mm) dipertahankan agar border tidak terkesan berubah.
+- **`footer-left` (informasi Jumlah/status) dihapus total dari footer; dipindah ke header-info** — pastikan grep `footer-left` = 0 di `src/` setelah refactor; label Jumlah kini tampil di KARTU UTAMA & LANJUTAN (tiap kartu dokumen sah, R4).
+- **Kapasitas pagination = fungsi murni mm yang SAMA dengan CSS** (bookRowHeightMm 2.8, body 18, footer 9, margin footer 0.5): halaman 1 = floor((54−(12+18+9+0.5))/2.8) = 5, lanjutan = floor((54−(8+9+0.5))/2.8) = 13. Bila margin CSS berubah, angka ini harus ikut — jangan hardcode 5/13.
+- **Bukti "tidak overlap / tidak terpotong" = ukur bounding box di render nyata (Electron `executeJavaScript`)** — `geometry.cjs`: baris berurutan `row[i].top >= row[i-1].bottom`, semua baris di dalam kartu, `lastRowBottom <= footer.top`; QR & tanda tangan `!overlaps`; header-info right edge ≈ tepi kartu. String-match HTML saja tidak cukup.
+- **Assertion span vs div**: baris buku = `<span class="num">`/`<span class="title">`/`<span class="inv">` (bukan div); badge di header-info = `class="badge badge-active"` (substring `class="badge-active"` TIDAK cocok karena atribut berisi dua class).
+- **Distribusi halaman untuk 20 buku** = [5, 13, 2] (halaman 2 memuat buku 6..18, bukan 6..13) — hitung ulang sebelum assert `!includes('Buku Ke-14')` dsb.
+- Smoke compile: v11 `smoke.ts` + geometry memakai `--module node16 --moduleResolution node16` (bwip-js transitif via barcode.service) + `NODE_PATH=<repo>\node_modules`; geometry dijalankan via `electron geometry.cjs <outDir>` dengan outDir hasil compile DI DALAM repo (Electron abaikan NODE_PATH). Dir `out/` hasil compile di-gitignore (pola `out/` cocok semua folder bernama out).

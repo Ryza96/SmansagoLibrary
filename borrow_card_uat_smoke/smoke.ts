@@ -115,9 +115,11 @@ async function main(): Promise<void> {
   check('20 buku -> 3 sheet (1 utama + 2 lanjutan)', sheetCount(preview2) === 3, `sheet=${sheetCount(preview2)}`)
   const rowCount2 = (preview2.match(/<div class="book-row">/g) ?? []).length
   check('seluruh 20 baris buku ter-render', rowCount2 === 20, `row=${rowCount2}`)
-  check('footer Jumlah: 20', preview2.includes('Jumlah: 20'))
+  check('Jumlah: 20 di header-info pojok kanan atas', preview2.includes('Jumlah: 20'))
+  check('badge AKTIF di header-info tiap kartu', (preview2.match(/<span class="badge badge-active">AKTIF<\/span>/g) ?? []).length === 3)
+  check('tidak ada footer-left (area kiri bawah bebas untuk list)', !preview2.includes('footer-left'))
   check('label LANJUTAN di halaman lanjutan', preview2.includes('LANJUTAN'))
-  check('distribusi halaman 3+10+7 tanpa buku hilang', preview2.includes('20.') && preview2.includes('1.'))
+  check('distribusi halaman 5+13+2 tanpa buku hilang', preview2.includes('20.') && preview2.includes('1.'))
 
   console.log('--- UAT #8: Status badge AKTIF ---')
   check('badge AKTIF (returnDate null + dueDate masa depan)', preview1.includes('<span class="badge badge-active">AKTIF</span>'))
