@@ -3,6 +3,7 @@ import os from 'os'
 import path from 'path'
 import { createAppPaths, appDirectoryList, DATABASE_FILENAME, AppPaths } from '../src/main/infrastructure/paths'
 import { DirectoryManager } from '../src/main/infrastructure/directory-manager'
+import { bootstrapDataInfrastructure } from '../electron/main/infrastructure/bootstrap'
 
 let passed = 0
 let failed = 0
@@ -149,6 +150,27 @@ async function main(): Promise<void> {
   {
     const p: AppPaths = createAppPaths(path.join(tmpRoot, 'user8'))
     assert(fs.existsSync(p.tempDir) === false, '36. createAppPaths murni: TIDAK membuat folder sendiri', p.tempDir)
+  }
+
+  // ---- bootstrapDataInfrastructure: memakai parameter testRoot (bukan env) ----
+  {
+    const testRoot = path.join(tmpRoot, 'bootstrap-root')
+    const result = await bootstrapDataInfrastructure(testRoot)
+
+    assert(result.root === testRoot, '37. bootstrapDataInfrastructure(testRoot) memakai testRoot sebagai root', result.root)
+    assert(result.newlyCreated.length === 12, '38. run pertama: 12 direktori dibuat', result.newlyCreated.length)
+    assert(result.alreadyExisted.length === 0, '39. run pertama: tidak ada yang sudah ada', result.alreadyExisted.length)
+    assert(fs.existsSync(result.paths.databaseFile) === false, '40. databaseFile belum tercipta (hanya direktori)', result.paths.databaseFile)
+    for (const dir of appDirectoryList(result.paths)) {
+      assert(fs.statSync(dir).isDirectory() === true, `41. tercipta: ${path.basename(dir)}`, dir)
+    }
+
+    const second = await bootstrapDataInfrastructure(testRoot)
+    assert(second.newlyCreated.length === 0, '42. idempoten: run kedua 0 baru', second.newlyCreated.length)
+    assert(second.alreadyExisted.length === 12, '43. idempoten: run kedua 12 existing', second.alreadyExisted.length)
+
+    const structure = fs.readdirSync(result.root, { withFileTypes: true }).map((e) => e.name).sort()
+    assert(JSON.stringify(structure) === JSON.stringify(['assets', 'backup', 'database', 'logs', 'settings', 'temp']), '44. struktur tingkat-1 <root> = database/backup/logs/temp/settings/assets', structure)
   }
 }
 

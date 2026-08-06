@@ -40,6 +40,7 @@ function createWindow(): void {
 
 app.whenReady().then(async () => {
   const infra = await bootstrapDataInfrastructure()
+  // TODO(WO Logging): console.log akan diganti Logging Framework pada Work Order Logging.
   console.log(`[DataInfra] Production data root: ${infra.root}`)
   console.log(`[DataInfra] Directories ensured: ${infra.newlyCreated.length} created, ${infra.alreadyExisted.length} existed`)
 
