@@ -420,6 +420,83 @@ check('isManifestJSON: files bukan array', !isManifestJSON({ ...validManifestJso
 }
 
 // =====================================================================
+// 13. Immutability (Revisi PO) — manifest.files & meta.createdAt
+// =====================================================================
+{
+  const meta = ManifestMetadata.of({
+    backupVersion: MANIFEST_BACKUP_VERSION,
+    appVersion: '1.0.0',
+    schemaVersion: SchemaVersion.of('20260731_adr002_initial'),
+    createdAt: new Date('2026-08-05T00:00:00.000Z'),
+    appName: 'APLibrary',
+    type: MANIFEST_BACKUP_TYPE_FULL,
+  })
+  const entry = ManifestEntry.of({
+    path: 'aplibrary.db',
+    sizeBytes: 4096,
+    sha256: Checksum.of(DB_SHA),
+    kind: MANIFEST_ENTRY_KINDS.DATABASE,
+  })
+  const manifest = Manifest.create({
+    format: MANIFEST_FORMAT,
+    meta,
+    files: [entry],
+    summary: ManifestSummary.of({ files: 1, totalBytes: 4096 }),
+    checksums: { manifestSha256: Checksum.of(MANIFEST_SHA) },
+  })
+
+  // createdAt getter → COPY (mutasi objek hasil getter tidak boleh menyentuh internal)
+  const dt = manifest.meta.createdAt
+  dt.setUTCFullYear(1999)
+  check('Immutability: createdAt diubah caller tidak mengubah state internal', manifest.meta.createdAt.getUTCFullYear() === 2026)
+  const dt2 = manifest.meta.createdAt
+  dt2.setTime(0)
+  check('Immutability: createdAt.setTime(0) tidak mengubah state internal', manifest.meta.createdAt.toISOString() === '2026-08-05T00:00:00.000Z')
+  check('Immutability: createdAt getter selalu instance baru', manifest.meta.createdAt !== manifest.meta.createdAt)
+
+  // createdAt input → COPY (mutasi Date sumber setelah of tidak boleh menyentuh internal)
+  const sourceDate = new Date('2026-08-05T00:00:00.000Z')
+  const metaFromSource = ManifestMetadata.of({
+    backupVersion: MANIFEST_BACKUP_VERSION,
+    appVersion: '1.0.0',
+    schemaVersion: SchemaVersion.of('20260731_adr002_initial'),
+    createdAt: sourceDate,
+    appName: 'APLibrary',
+    type: MANIFEST_BACKUP_TYPE_FULL,
+  })
+  sourceDate.setUTCFullYear(2000)
+  check('Immutability: createdAt input dimutasi caller tidak mengubah state internal', metaFromSource.createdAt.getUTCFullYear() === 2026)
+
+  // files getter → defensive copy (mutasi array hasil getter tidak boleh menyentuh internal)
+  const files = manifest.files
+  files.push(entry)
+  check('Immutability: files.push tidak mengubah state internal (length)', manifest.files.length === 1)
+  const files2 = manifest.files
+  files2.splice(0, 1)
+  check('Immutability: files.splice tidak mengubah state internal (length)', manifest.files.length === 1)
+  check('Immutability: files getter selalu array baru', manifest.files !== manifest.files)
+  check('Immutability: files elemen dipertahankan', manifest.files[0].path === 'aplibrary.db')
+
+  // files input → COPY (mutasi array sumber setelah create tidak boleh menyentuh internal)
+  const inputFiles = [entry]
+  const manifestFromInput = Manifest.create({
+    format: MANIFEST_FORMAT,
+    meta,
+    files: inputFiles,
+    summary: ManifestSummary.of({ files: 1, totalBytes: 4096 }),
+    checksums: { manifestSha256: Checksum.of(MANIFEST_SHA) },
+  })
+  inputFiles.push(entry)
+  check('Immutability: files input dimutasi caller tidak mengubah state internal', manifestFromInput.files.length === 1)
+
+  // checksums getter → objek baru (mutasi objek hasil getter tidak boleh menyentuh internal)
+  check('Immutability: checksums getter objek baru', manifest.checksums !== manifest.checksums)
+  const cs = manifest.checksums
+  ;(cs as unknown as Record<string, unknown>).manifestSha256 = 'hacked'
+  check('Immutability: checksums dimutasi caller tidak mengubah state internal', manifest.checksums.manifestSha256.value === MANIFEST_SHA)
+}
+
+// =====================================================================
 // Ringkasan
 // =====================================================================
 console.log(`\nWO-2 Manifest Domain smoke: ${passed} PASS, ${failed} FAIL`)

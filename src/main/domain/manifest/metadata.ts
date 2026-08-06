@@ -51,7 +51,12 @@ export class ManifestMetadata {
     if (!(props.createdAt instanceof Date) || Number.isNaN(props.createdAt.getTime())) {
       throw new ManifestDomainError('meta.createdAt wajib berupa tanggal valid')
     }
-    return new ManifestMetadata(props)
+    // Revisi PO (immutability): simpan COPY objek props + COPY Date —
+    // mutasi props/Date oleh caller setelah konstruksi tidak boleh mengubah state internal.
+    return new ManifestMetadata({
+      ...props,
+      createdAt: new Date(props.createdAt.getTime()),
+    })
   }
 
   get backupVersion(): number {
@@ -67,7 +72,8 @@ export class ManifestMetadata {
   }
 
   get createdAt(): Date {
-    return this._props.createdAt
+    // Revisi PO (immutability): kembalikan COPY Date, bukan instance internal.
+    return new Date(this._props.createdAt.getTime())
   }
 
   get appName(): string {

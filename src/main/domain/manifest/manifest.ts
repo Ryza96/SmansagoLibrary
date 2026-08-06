@@ -46,7 +46,13 @@ export class Manifest {
     if (!(props.checksums.manifestSha256 instanceof Checksum)) {
       throw new ManifestDomainError('manifest.checksums.manifestSha256 wajib berupa Checksum')
     }
-    return new Manifest(props)
+    // Revisi PO (immutability): simpan COPY array files + COPY objek checksums —
+    // mutasi array/objek milik caller setelah konstruksi tidak boleh mengubah state internal.
+    return new Manifest({
+      ...props,
+      files: [...props.files],
+      checksums: { manifestSha256: props.checksums.manifestSha256 },
+    })
   }
 
   get format(): string {
@@ -58,7 +64,8 @@ export class Manifest {
   }
 
   get files(): ManifestEntry[] {
-    return this._props.files
+    // Revisi PO (immutability): kembalikan COPY array, bukan referensi internal.
+    return [...this._props.files]
   }
 
   get summary(): ManifestSummary {
@@ -66,7 +73,8 @@ export class Manifest {
   }
 
   get checksums(): ManifestChecksums {
-    return this._props.checksums
+    // Revisi PO (immutability): kembalikan COPY objek, bukan referensi internal.
+    return { manifestSha256: this._props.checksums.manifestSha256 }
   }
 
   toJSON(): ManifestJSON {

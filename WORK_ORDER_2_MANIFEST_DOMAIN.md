@@ -95,10 +95,10 @@ Field **tak dikenal diabaikan** (K4) — `extraTop`, `extraMeta`, `extraEntry`, 
 |---|---|
 | `npm run lint` (tsc node + web) | PASS |
 | `npm run build` | PASS |
-| Smoke `wo2_manifest_domain_smoke/smoke.ts` | **167/167 PASS** |
+| Smoke `wo2_manifest_domain_smoke/smoke.ts` | **178/178 PASS** |
 | `prisma migrate diff` (dari workdir `prisma/`) | "This is an empty migration." (schema tidak disentuh) |
 | Grep bundle `out/main/index.js` | `aplibrary-backup`=0, `manifestSha256`=0, `ManifestValidator`=0 → modul TIDAK ter-wire (standalone) |
-| Bundle sizes | main 1,886.02 kB · preload 9.94 kB · renderer 1,148.25 kB (identik baseline — tidak ada wiring) |
+| Bundle sizes | main 1,841.82 kB · preload 9.71 kB · renderer 1,121.34 kB (manifest tidak masuk bundle — tidak ada wiring) |
 
 ### Cakupan smoke (167 assertions, murni tanpa DB/Electron)
 - **SchemaVersion (13)** — valid/trim/maks, kosong/spasi/kontrol/terlalu-panjang ditolak, `isValid`, `equals`.
@@ -113,6 +113,12 @@ Field **tak dikenal diabaikan** (K4) — `extraTop`, `extraMeta`, `extraEntry`, 
 - **Validator duplicate (5)** — dua path sama, path sama kind beda, 3 entri 1 duplikat, path unik diterima, pesan error menyebut path.
 - **Validator relative path (12)** — leading slash/backslash/traversal/drive-letter/URI/trailing-slash/kosong/double-slash/`./`/`.`/kontrol ditolak; nested valid diterima.
 - **Validator checksum format (10)** — entry/manifestSha pendek/non-hex/kosong ditolak; valid & uppercase diterima.
+
+### Cakupan smoke immutability (11, tambahan revisi PO)
+- **`meta.createdAt`** — getter mengembalikan COPY (`createdAt !== createdAt`, `setUTCFullYear(1999)`/`setTime(0)` pada hasil getter tidak mengubah state internal); input `Date` di-`of()` di-copy (mutasi Date sumber setelah konstruksi tidak mengubah state internal).
+- **`manifest.files`** — getter mengembalikan COPY (`files !== files`, `push`/`splice` pada hasil getter tidak mengubah state internal, elemen dipertahankan); input array di-`create()` di-copy (mutasi array sumber setelah konstruksi tidak mengubah state internal).
+- **`manifest.checksums`** — getter mengembalikan objek baru (mutasi objek hasil getter tidak mengubah state internal).
+- **Tanpa perubahan kontrak public** — hanya perbaikan immutability (copy pada getter Array/Date/objek + copy pada konstruksi).
 
 ---
 
@@ -134,3 +140,18 @@ Field **tak dikenal diabaikan** (K4) — `extraTop`, `extraMeta`, `extraEntry`, 
 ## Next
 
 - **BERHENTI — menunggu review PO.** Tidak membuka WO berikutnya (WO-3 Manifest Builder / Backup Engine) sebelum persetujuan.
+
+---
+
+## Revisi (Review PO — Immutability, COMPLETE)
+
+### Ringkasan
+- PO meminta Manifest Domain **benar-benar immutable**: getter yang mengembalikan Array harus defensive copy, getter yang mengembalikan Date harus copy Date, dan smoke wajib membuktikan `manifest.files` serta `createdAt` tidak bisa mengubah state internal.
+- **Perubahan (4 file source, tanpa mengubah kontrak public):**
+  - `src/main/domain/manifest/manifest.ts` — `create()` menyimpan COPY array `files` + COPY objek `checksums` (mutasi input caller tidak menyentuh internal); getter `files` mengembalikan `[...this._props.files]`; getter `checksums` mengembalikan objek baru.
+  - `src/main/domain/manifest/metadata.ts` — `of()` menyimpan COPY objek props + COPY `Date` `createdAt`; getter `createdAt` mengembalikan `new Date(...)`.
+  - `src/main/domain/manifest/entry.ts` — `of()` menyimpan COPY objek props.
+  - `src/main/domain/manifest/summary.ts` — `of()` menyimpan COPY objek props.
+- **Smoke (11 assertion baru, total 178):** section 13 "Immutability" — getter createdAt copy + mutasi caller tidak berpengaruh; input createdAt dimutasi tidak berpengaruh; getter files copy + push/splice tidak berpengaruh + elemen dipertahankan; input files dimutasi tidak berpengaruh; getter checksums objek baru + mutasi tidak berpengaruh.
+- **Validation PASS:** lint · build · smoke **178/178** · `prisma migrate diff` = empty (schema tidak disentuh) · grep bundle `aplibrary-backup`/`manifestSha256`/`ManifestValidator` = 0 (tetap unwired).
+- **Commit:** revisi immutability di-push. Status: **DONE — menunggu review PO** (tidak lanjut WO berikutnya).

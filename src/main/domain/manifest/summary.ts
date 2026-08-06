@@ -30,7 +30,9 @@ export class ManifestSummary {
     if (props.members !== undefined && !isNonNegativeInteger(props.members)) {
       throw new ManifestDomainError('summary.members wajib bilangan bulat >= 0')
     }
-    return new ManifestSummary(props)
+    // Revisi PO (immutability): simpan COPY objek props — mutasi objek milik
+    // caller setelah konstruksi tidak boleh mengubah state internal.
+    return new ManifestSummary({ ...props })
   }
 
   get files(): number {

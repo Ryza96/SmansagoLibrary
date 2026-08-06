@@ -63,7 +63,9 @@ export class ManifestEntry {
     if (!isManifestEntryKind(props.kind)) {
       throw new ManifestDomainError('files[].kind tidak dikenal (database|asset|log)')
     }
-    return new ManifestEntry(props)
+    // Revisi PO (immutability): simpan COPY objek props — mutasi objek milik
+    // caller setelah konstruksi tidak boleh mengubah state internal.
+    return new ManifestEntry({ ...props })
   }
 
   get path(): string {
