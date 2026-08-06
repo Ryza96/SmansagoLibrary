@@ -6,6 +6,8 @@ import { createContainer } from './bootstrap'
 import { registerAllHandlers } from '../ipc/index'
 import { bootstrapDataInfrastructure } from './infrastructure/bootstrap'
 import { databaseReconciliationService } from '../../src/main/services/database-reconciliation.service'
+import { resolveLiveDatabaseFile } from '../../src/main/infrastructure/database-path'
+import { connectPrisma, disconnectPrisma } from '../../src/main/repositories/base/prisma'
 
 dotenv.config({ path: path.resolve(__dirname, '../../.env') })
 dotenv.config()
@@ -47,7 +49,20 @@ app.whenReady().then(async () => {
   await initDatabase()
   await databaseReconciliationService.run()
 
-  const container = createContainer(infra.paths)
+  const container = createContainer(infra.paths, {
+    liveDatabaseFile: resolveLiveDatabaseFile(
+      process.env.DATABASE_URL ?? '',
+      path.join(app.getAppPath(), 'prisma')
+    ),
+    disconnectLiveClients: async () => {
+      await disconnectPrisma().catch(() => undefined)
+      await closeDatabase().catch(() => undefined)
+    },
+    reconnectLiveClients: async () => {
+      await connectPrisma()
+      await initDatabase()
+    },
+  })
   registerAllHandlers(container, () => mainWindow)
 
   await container.settingService.get()

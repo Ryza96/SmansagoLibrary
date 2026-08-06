@@ -53,13 +53,34 @@ import { DashboardRepository } from '../../src/main/repositories/dashboard.repos
 import { ReportService } from '../../src/main/services/report.service'
 import { ReportRepository } from '../../src/main/repositories/report.repository'
 import { AppPaths } from '../../src/main/infrastructure/paths'
-import { ProviderRegistry } from '../../src/main/domain/provider/provider-registry'
+import { ProviderRegistry, RestoreHandlerRegistry } from '../../src/main/domain/provider/provider-registry'
 import { DatabaseProvider } from '../../src/main/infrastructure/providers/database.provider'
 import { SchemaVersionReader } from '../../src/main/infrastructure/backup/schema-version.reader'
 import { ManifestBuilder } from '../../src/main/infrastructure/backup/manifest-builder'
 import { BackupPackager } from '../../src/main/infrastructure/backup/packager'
 import { BackupVerifier } from '../../src/main/infrastructure/backup/verifier'
 import { BackupService } from '../../src/main/infrastructure/backup/backup.service'
+import { DatabaseRestoreHandler } from '../../src/main/infrastructure/restore/database-restore.handler'
+import { RestoreService, createRestoreDirs } from '../../src/main/infrastructure/restore/restore.service'
+import { resolveLiveDatabaseFile } from '../../src/main/infrastructure/database-path'
+import { connectPrisma, disconnectPrisma } from '../../src/main/repositories/base/prisma'
+import { initDatabase, closeDatabase } from './database'
+
+export interface RestoreWiring {
+  liveDatabaseFile: string
+  disconnectLiveClients: () => Promise<void>
+  reconnectLiveClients: () => Promise<void>
+}
+
+const defaultDisconnectLiveClients = async (): Promise<void> => {
+  await disconnectPrisma().catch(() => undefined)
+  await closeDatabase().catch(() => undefined)
+}
+
+const defaultReconnectLiveClients = async (): Promise<void> => {
+  await connectPrisma()
+  await initDatabase()
+}
 
 export interface Container {
   bookService: BookService
@@ -91,11 +112,14 @@ export interface Container {
   dashboardService: DashboardService
   reportService: ReportService
   providerRegistry: ProviderRegistry
+  restoreHandlerRegistry: RestoreHandlerRegistry
   databaseProvider: DatabaseProvider
   backupService: BackupService
+  databaseRestoreHandler: DatabaseRestoreHandler
+  restoreService: RestoreService
 }
 
-export function createContainer(paths: AppPaths): Container {
+export function createContainer(paths: AppPaths, restoreWiring?: RestoreWiring): Container {
   const bookRepository = new BookRepository()
   const bookService = new BookService(bookRepository)
   const authorService = new AuthorService(new AuthorRepository(), bookRepository)
@@ -164,6 +188,7 @@ export function createContainer(paths: AppPaths): Container {
   const databaseProvider = new DatabaseProvider({ stagingDir: paths.tempDir })
   const providerRegistry = new ProviderRegistry()
   providerRegistry.register(databaseProvider)
+  const restoreHandlerRegistry = new RestoreHandlerRegistry()
 
   const backupService = new BackupService({
     providerRegistry,
@@ -173,6 +198,28 @@ export function createContainer(paths: AppPaths): Container {
     verifier: new BackupVerifier({ tempDir: paths.tempDir }),
     paths,
     providerStagingDirs: new Map([[databaseProvider.id.fullName, paths.tempDir]]),
+  })
+
+  const restoreDirs = createRestoreDirs(paths.tempDir)
+  const liveDatabaseFile =
+    restoreWiring?.liveDatabaseFile ?? resolveLiveDatabaseFile(process.env.DATABASE_URL ?? '', paths.root)
+  const databaseRestoreHandler = new DatabaseRestoreHandler({
+    liveDatabaseFile,
+    extractDir: restoreDirs.extractDir,
+    stagingDir: restoreDirs.stagingDir,
+    archiveDir: restoreDirs.archiveDir,
+    snapshotDir: restoreDirs.snapshotDir,
+    disconnectLiveClients: restoreWiring?.disconnectLiveClients ?? defaultDisconnectLiveClients,
+    reconnectLiveClients: restoreWiring?.reconnectLiveClients ?? defaultReconnectLiveClients,
+  })
+  restoreHandlerRegistry.register(databaseRestoreHandler)
+
+  const restoreService = new RestoreService({
+    verifier: new BackupVerifier({ tempDir: paths.tempDir }),
+    schemaVersionReader: new SchemaVersionReader(),
+    handlerRegistry: restoreHandlerRegistry,
+    paths,
+    liveDatabaseFile,
   })
 
   return {
@@ -205,7 +252,10 @@ export function createContainer(paths: AppPaths): Container {
     dashboardService,
     reportService,
     providerRegistry,
+    restoreHandlerRegistry,
     databaseProvider,
-    backupService
+    backupService,
+    databaseRestoreHandler,
+    restoreService
   }
 }
