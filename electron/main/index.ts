@@ -47,7 +47,7 @@ app.whenReady().then(async () => {
   await initDatabase()
   await databaseReconciliationService.run()
 
-  const container = createContainer()
+  const container = createContainer(infra.paths)
   registerAllHandlers(container, () => mainWindow)
 
   await container.settingService.get()

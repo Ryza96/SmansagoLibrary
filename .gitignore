@@ -30,7 +30,10 @@ npm-debug.log*
 .env.*.local
 
 # Operational backup (berisi data personal — jangan di-commit)
-backup/
+# NOTE: pola di-anchor ke root (`/backup/`) agar hanya folder backup operasional
+#       di root yang di-ignore; folder source `src/main/domain/backup` &
+#       `src/main/infrastructure/backup` TETAP ter-track (WO-4).
+/backup/
 
 # TypeScript
 *.tsbuildinfo

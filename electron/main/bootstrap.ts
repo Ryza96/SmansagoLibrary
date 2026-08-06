@@ -52,6 +52,14 @@ import { DashboardService } from '../../src/main/services/dashboard.service'
 import { DashboardRepository } from '../../src/main/repositories/dashboard.repository'
 import { ReportService } from '../../src/main/services/report.service'
 import { ReportRepository } from '../../src/main/repositories/report.repository'
+import { AppPaths } from '../../src/main/infrastructure/paths'
+import { ProviderRegistry } from '../../src/main/domain/provider/provider-registry'
+import { DatabaseProvider } from '../../src/main/infrastructure/providers/database.provider'
+import { SchemaVersionReader } from '../../src/main/infrastructure/backup/schema-version.reader'
+import { ManifestBuilder } from '../../src/main/infrastructure/backup/manifest-builder'
+import { BackupPackager } from '../../src/main/infrastructure/backup/packager'
+import { BackupVerifier } from '../../src/main/infrastructure/backup/verifier'
+import { BackupService } from '../../src/main/infrastructure/backup/backup.service'
 
 export interface Container {
   bookService: BookService
@@ -82,9 +90,12 @@ export interface Container {
   bookImportService: BookImportService
   dashboardService: DashboardService
   reportService: ReportService
+  providerRegistry: ProviderRegistry
+  databaseProvider: DatabaseProvider
+  backupService: BackupService
 }
 
-export function createContainer(): Container {
+export function createContainer(paths: AppPaths): Container {
   const bookRepository = new BookRepository()
   const bookService = new BookService(bookRepository)
   const authorService = new AuthorService(new AuthorRepository(), bookRepository)
@@ -150,6 +161,20 @@ export function createContainer(): Container {
   const dashboardService = new DashboardService(new DashboardRepository())
   const reportService = new ReportService(new ReportRepository())
 
+  const databaseProvider = new DatabaseProvider({ stagingDir: paths.tempDir })
+  const providerRegistry = new ProviderRegistry()
+  providerRegistry.register(databaseProvider)
+
+  const backupService = new BackupService({
+    providerRegistry,
+    schemaVersionReader: new SchemaVersionReader(),
+    manifestBuilder: new ManifestBuilder(),
+    packager: new BackupPackager(),
+    verifier: new BackupVerifier({ tempDir: paths.tempDir }),
+    paths,
+    providerStagingDirs: new Map([[databaseProvider.id.fullName, paths.tempDir]]),
+  })
+
   return {
     bookService,
     authorService,
@@ -178,6 +203,9 @@ export function createContainer(): Container {
     autoCreateService,
     bookImportService,
     dashboardService,
-    reportService
+    reportService,
+    providerRegistry,
+    databaseProvider,
+    backupService
   }
 }
