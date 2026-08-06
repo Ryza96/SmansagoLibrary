@@ -6,6 +6,7 @@ import { BorrowRepository } from '../../../src/main/repositories/borrow.reposito
 import { SettingService } from './setting.service'
 import { generateLabelsHtml } from '../../../src/main/services/label.service'
 import { BORROW_CARD_LAYOUT, buildBorrowCardData, generateBorrowCardHtml } from '../../../src/main/services/borrow-card.service'
+import { resolveAssetPath } from '../../../src/main/infrastructure/asset/asset-resolver'
 import type { BorrowReceiptData, ReturnReceiptData, BookLabelData } from '../../../src/shared/dto/print'
 
 // WO-2 — nama file PDF Kartu Peminjaman (FINAL PREVIEW DESIGN DECISION F5).
@@ -37,7 +38,8 @@ const IMAGE_MIME: Record<string, string> = {
 export class PrintService {
   constructor(
     private borrowRepository: BorrowRepository,
-    private settingService: SettingService
+    private settingService: SettingService,
+    private assetRoot: string = ''
   ) {}
 
   getLabelPreviewHtml(data: BookLabelData): string {
@@ -76,9 +78,18 @@ export class PrintService {
     if (!borrowing) {
       throw new AppError(404, 'Not Found', 'Data peminjaman tidak ditemukan.')
     }
-    const data = await buildBorrowCardData(borrowing, settings, {
-      readFileAsDataUri: this.readFileAsDataUri.bind(this)
-    })
+    // WO-1 (LOGO MANAGEMENT — FOUNDATION) — resolveAssetPath adalah SATU-SATUNYA
+    // pembaca logoPath (RFC §12). Relatif baru / absolut lama di-resolve ke path
+    // absolut (atau null → logo kosong → fallback monogram). buildBorrowCardData
+    // TIDAK berubah — resolver di-inject di titik readFileAsDataUri.
+    const resolvedLogoPath = resolveAssetPath(settings.logoPath, this.assetRoot)
+    const data = await buildBorrowCardData(
+      borrowing,
+      { ...settings, logoPath: resolvedLogoPath ?? '' },
+      {
+        readFileAsDataUri: this.readFileAsDataUri.bind(this)
+      }
+    )
     return generateBorrowCardHtml(data)
   }
 

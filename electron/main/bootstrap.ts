@@ -150,7 +150,7 @@ export function createContainer(paths: AppPaths, restoreWiring?: RestoreWiring):
   const settingRepository = new SettingRepository()
   const settingService = new SettingService(settingRepository)
 
-  const printService = new PrintService(borrowRepository, settingService)
+  const printService = new PrintService(borrowRepository, settingService, paths.root)
 
   const academicYearRepository = new AcademicYearRepository()
   const curriculumRepository = new CurriculumRepository()
