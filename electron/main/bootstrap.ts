@@ -63,6 +63,7 @@ import { BackupService } from '../../src/main/infrastructure/backup/backup.servi
 import { DatabaseRestoreHandler } from '../../src/main/infrastructure/restore/database-restore.handler'
 import { RestoreService, createRestoreDirs } from '../../src/main/infrastructure/restore/restore.service'
 import { resolveLiveDatabaseFile } from '../../src/main/infrastructure/database-path'
+import { BackupUIController, RestoreUIController, BackupInspector } from '../../src/main/services/backup-ui.service'
 import { connectPrisma, disconnectPrisma } from '../../src/main/repositories/base/prisma'
 import { initDatabase, closeDatabase } from './database'
 
@@ -117,6 +118,9 @@ export interface Container {
   backupService: BackupService
   databaseRestoreHandler: DatabaseRestoreHandler
   restoreService: RestoreService
+  backupUIController: BackupUIController
+  restoreUIController: RestoreUIController
+  backupInspector: BackupInspector
 }
 
 export function createContainer(paths: AppPaths, restoreWiring?: RestoreWiring): Container {
@@ -222,6 +226,13 @@ export function createContainer(paths: AppPaths, restoreWiring?: RestoreWiring):
     liveDatabaseFile,
   })
 
+  const backupUIController = new BackupUIController({ backupService, paths })
+  const restoreUIController = new RestoreUIController({ restoreService })
+  const backupInspector = new BackupInspector({
+    verifier: new BackupVerifier({ tempDir: paths.tempDir }),
+    tempDir: paths.tempDir,
+  })
+
   return {
     bookService,
     authorService,
@@ -256,6 +267,9 @@ export function createContainer(paths: AppPaths, restoreWiring?: RestoreWiring):
     databaseProvider,
     backupService,
     databaseRestoreHandler,
-    restoreService
+    restoreService,
+    backupUIController,
+    restoreUIController,
+    backupInspector
   }
 }

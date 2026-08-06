@@ -41,6 +41,8 @@ import ClassFormPage from '../pages/master/ClassFormPage'
 import PromotionHistoryPage from '../pages/promotion/PromotionHistoryPage'
 import PromotionRunDetailPage from '../pages/promotion/PromotionRunDetailPage'
 import PromotionPage from '../pages/promotion/PromotionPage'
+import BackupPage from '../pages/backup/BackupPage'
+import RestorePage from '../pages/restore/RestorePage'
 
 export const router = createHashRouter([
   {
@@ -88,6 +90,8 @@ export const router = createHashRouter([
       { path: 'reports/overdues', element: <OverdueReportPage /> },
       { path: 'reports/members', element: <MemberReportPage /> },
       { path: 'reports/collections', element: <CollectionReportPage /> },
+      { path: 'backup', element: <BackupPage /> },
+      { path: 'restore', element: <RestorePage /> },
       { path: 'settings', element: <SettingsPage /> },
       { path: 'master/authors', element: <AuthorListPage /> },
       { path: 'master/authors/new', element: <AuthorFormPage /> },

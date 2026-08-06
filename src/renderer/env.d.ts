@@ -239,6 +239,18 @@ interface ElectronAPI {
     members: (filter: import('../../src/shared/dto/report').MemberReportFilter) => Promise<import('../../src/shared/dto/report').MemberReportDTO>,
     collections: (filter: import('../../src/shared/dto/report').CollectionReportFilter) => Promise<import('../../src/shared/dto/report').CollectionReportDTO>,
   }
+  backupUI: {
+    getTargetInfo: () => Promise<import('../../src/shared/dto/backup-ui').BackupTargetInfo>,
+    openFolder: () => Promise<import('../../src/shared/dto/backup-ui').OpenFolderResult>,
+    run: () => Promise<import('../../src/shared/dto/backup-ui').BackupUISummary>,
+    onProgress: (callback: (event: import('../../src/shared/dto/backup-ui').BackupUIProgressEvent) => void) => () => void,
+  }
+  restoreUI: {
+    pickBackup: () => Promise<import('../../src/shared/dto/backup-ui').PickBackupResult>,
+    inspect: (filePath: string) => Promise<import('../../src/shared/dto/backup-ui').BackupFileInfo>,
+    run: (filePath: string) => Promise<import('../../src/shared/dto/backup-ui').RestoreUIResult>,
+    onProgress: (callback: (event: import('../../src/shared/dto/backup-ui').RestoreUIProgressEvent) => void) => () => void,
+  }
   settings: {
     get: () => Promise<{
       id: string

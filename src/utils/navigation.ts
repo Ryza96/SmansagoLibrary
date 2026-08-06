@@ -48,6 +48,8 @@ export const ROUTES = {
   PROMOTIONS: '/promotions',
   PROMOTION_RUN: '/promotions/run',
   PROMOTION_DETAIL: '/promotions/:id',
+  BACKUP: '/backup',
+  RESTORE: '/restore',
 } as const
 
 export function bookDetailPath(id: string) {

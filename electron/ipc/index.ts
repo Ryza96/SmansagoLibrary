@@ -26,6 +26,7 @@ import type { MatchingEngineService } from '../../src/services/MatchingEngineSer
 import type { BookImportService } from '../../src/main/services/book-import.service'
 import type { DashboardService } from '../../src/main/services/dashboard.service'
 import type { ReportService } from '../../src/main/services/report.service'
+import type { BackupUIController, RestoreUIController, BackupInspector } from '../../src/main/services/backup-ui.service'
 import { registerAppHandlers } from './app.ipc'
 import { registerBookImportHandlers } from './book-import.ipc'
 import { registerBookHandlers } from './book.ipc'
@@ -46,6 +47,7 @@ import { registerAssetEventHandlers } from './asset-event.ipc'
 import { registerSettingHandlers } from './setting.ipc'
 import { registerDashboardHandlers } from './dashboard.ipc'
 import { registerReportHandlers } from './report.ipc'
+import { registerBackupUIHandlers } from './backup-ui.ipc'
 
 export function registerAllHandlers(
   services: {
@@ -76,6 +78,9 @@ export function registerAllHandlers(
     bookImportService: BookImportService
     dashboardService: DashboardService
     reportService: ReportService
+    backupUIController: BackupUIController
+    restoreUIController: RestoreUIController
+    backupInspector: BackupInspector
   },
   mainWindow: () => BrowserWindow | null
 ): void {
@@ -103,4 +108,9 @@ export function registerAllHandlers(
   registerSettingHandlers(services.settingService)
   registerDashboardHandlers(services.dashboardService)
   registerReportHandlers(services.reportService)
+  registerBackupUIHandlers({
+    backupUIController: services.backupUIController,
+    restoreUIController: services.restoreUIController,
+    backupInspector: services.backupInspector,
+  })
 }
