@@ -1162,3 +1162,24 @@ pm run build PASS (main 1,819.55 kB ï¿½ preload 9.02 kB ï¿½ renderer 1,044
 - **Bukti scope negatif:** smoke memanggil `printBookLabels` setelah `printBorrowCard` dan assert opsi label TIDAK memuat `pageSize` — membuktikan helper netral & perubahan terbatas kartu.
 - **Keterbatasan perangkat:** `pageSize` menyetel ukuran job print; hasil fisik bergantung driver/printer mendukung custom paper 110×60mm (printer label/kartu). Ini keterbatasan hardware, terdokumentasi investigasi.
 - Smoke compile: `npx tsc --module node16 --moduleResolution node16 ... electron\main\services\print.service.ts` → outDir in-repo (`<wo>_smoke/out/`, gitignored) → `electron main.cjs <outDir> <pdfPath>`; NODE_PATH tidak dibaca Electron.
+
+---
+
+## WO-1 (Production Data Infrastructure): Path Helper + userData + Directory Manager + Folder Bootstrap (COMPLETE - READY review PO)
+
+### Ringkasan
+- Source of Truth: `ADR_001_DATA_PROTECTION_FINAL_DECISIONS.md` (FINAL APPROVED) + `RFC_001_DATA_PROTECTION_ARCHITECTURE.md` (APPROVED). Keputusan PO: fondasi lokasi data production saja — **BUKAN** Manifest/Provider/Backup Engine/Restore Engine/UI.
+- **File baru (3 source + 1 smoke):** `src/main/infrastructure/paths.ts` (Path Helper PURE tanpa Electron — `createAppPaths(root)` resolve absolut 11 subfolder + `databaseFile=<database>/aplibrary.db` + `appDirectoryList` 12 entri, persis ADR-001 §3.1; `DATABASE_FILENAME='aplibrary.db'` konstanta), `src/main/infrastructure/directory-manager.ts` (`DirectoryManager.ensureAll(dirs)` idempoten via `fs.access`+`fs.mkdir recursive` → `{ dirs, newlyCreated, alreadyExisted }`), `electron/main/infrastructure/bootstrap.ts` (Folder Bootstrap: root = `process.env.APPLIBRARY_USER_DATA` ?? `app.getPath('userData')` → `createAppPaths` → `ensureAll(appDirectoryList)` → `{ root, paths, newlyCreated, alreadyExisted }`), `wo1_data_infra_smoke/smoke.ts` (**69/69 PASS**).
+- **Dimodifikasi (1):** `electron/main/index.ts` — `app.whenReady()` memanggil `bootstrapDataInfrastructure()` SEBELUM `initDatabase()` (ADR-001 §9 langkah 2: direktori wajib ada sebelum koneksi DB), dua `console.log('[DataInfra] …')`.
+- **Arsitektur:** Pure vs Electron dipisah — `src/main/infrastructure/` murni (headless-testable), hanya `bootstrap.ts` di `electron/main/infrastructure/` yang mengimpor `app`; env override `APPLIBRARY_USER_DATA` hanya untuk pengujian (RFC-001 §2.2), produksi default `userData`.
+- **TIDAK diubah:** schema/migration/DB dev (`prisma migrate diff` = "This is an empty migration."), `DATABASE_URL`, PrismaClient dual, container/IPC/preload/renderer/UI. **Relokasi DB (`prisma/aplibrary.db` → `userData/database/`) + `DATABASE_URL` runtime + journal WAL = keputusan teknis tersisa (ADR-001 §8.2 Q2–Q5), WO terpisah — BUKAN bagian WO-1.**
+- **Validation PASS:** (1) `npm run lint`; (2) `npm run build` (main **1,885.95 kB** +2.49 · preload **9.95 kB identik** · renderer **1,147.66 kB identik**); (3) smoke `wo1_data_infra_smoke` **69/69 PASS** (path layout §3.1 eksak, anti-nesting backup-diluar-database, `appDirectoryList` 12 unik, fresh root 12 dibuat/0 existing, idempoten run-2 0/12, deteksi folder manual, struktur tingkat-1 `[assets,backup,database,logs,settings,temp]` + `assets/member-photos|school-logo|templates`, helper murni tidak menulis); (4) `prisma migrate diff` = empty; (5) grep bundle main `bootstrapDataInfrastructure`/`APPLIBRARY_USER_DATA`/`"aplibrary.db"`/`[DataInfra]` = ter-render.
+- **Laporan:** `WORK_ORDER_1_PRODUCTION_DATA_INFRASTRUCTURE.md`. Status: **DONE - READY review PO** (tidak membuka WO berikutnya).
+
+### Pelajaran (retain)
+- **Pure vs Electron dipisah di modul infra** — Path Helper + Directory Manager di `src/main/infrastructure/` (tanpa `app`) bisa di-smoke headless; hanya `bootstrap.ts` di `electron/main/infrastructure/` mengimpor Electron. Konsisten pola `print.service`(electron) → `borrow-card.service`(src/main).
+- **Import kedalaman Electron-wiring wajib cek:** `electron/main/infrastructure/bootstrap.ts` mengimpor `src/main/...` dengan `../../../src/main/...` (dari `electron/main/infrastructure/` naik 3 level), bukan `../../` — TS2307 muncul saat import salah kedalaman.
+- **`fs.mkdir({recursive:true})` ikut membuat root** — smoke assertion `alreadyExisted` harus tahu bahwa pre-creating `root` atau `logs` mengubah pembagian created/existing; jangan asumsikan hanya subfolder yang terdeteksi.
+- **`databaseFile` adalah file, bukan folder** — jangan masukkan ke `appDirectoryList` (12 entri folder: root + 11); assertion cek keanggotaan list harus mengecualikannya.
+- **WO-1 TIDAK memindahkan DB** — DB tetap `prisma/aplibrary.db`; `userData/database/aplibrary.db` baru siap (struktur dibuat) tapi belum dipakai sampai keputusan §8.2 Q2–Q5.
+- Smoke compile: `npx tsc --module commonjs --moduleResolution node ... wo1_data_infra_smoke/smoke.ts` → `node <out>\wo1_data_infra_smoke\smoke.js` (tanpa DB/Electron; cleanup `os.tmpdir()/wo1-data-infra-<ts>`).

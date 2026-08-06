@@ -4,6 +4,7 @@ import dotenv from 'dotenv'
 import { initDatabase, closeDatabase } from './database'
 import { createContainer } from './bootstrap'
 import { registerAllHandlers } from '../ipc/index'
+import { bootstrapDataInfrastructure } from './infrastructure/bootstrap'
 import { databaseReconciliationService } from '../../src/main/services/database-reconciliation.service'
 
 dotenv.config({ path: path.resolve(__dirname, '../../.env') })
@@ -38,6 +39,10 @@ function createWindow(): void {
 }
 
 app.whenReady().then(async () => {
+  const infra = await bootstrapDataInfrastructure()
+  console.log(`[DataInfra] Production data root: ${infra.root}`)
+  console.log(`[DataInfra] Directories ensured: ${infra.newlyCreated.length} created, ${infra.alreadyExisted.length} existed`)
+
   await initDatabase()
   await databaseReconciliationService.run()
 
