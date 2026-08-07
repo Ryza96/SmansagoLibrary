@@ -1,6 +1,6 @@
 import { AdminRepository } from '../repositories/admin.repository'
 import { PasswordHasher } from './password-hasher'
-import { SessionManager } from './session-manager'
+import { SessionManager, type Session } from './session-manager'
 import { validatePassword } from './password-policy'
 import type {
   AuthOkDTO,
@@ -23,14 +23,29 @@ export class AuthService {
 
   // RFC §4.1 auth:status — needsSetup = tabel Admin kosong; authenticated =
   // session aktif; username dari session (tampilan, bukan kredensial).
+  // AUTH-7: session dipulihkan dari DB saat proses baru (restart) via load().
   async status(): Promise<AuthStatusDTO> {
     const count = await this.adminRepository.count()
-    const session = this.sessionManager.get()
+    const session = await this.ensureLoadedSession()
     return {
       needsSetup: count === 0,
       authenticated: session !== null,
       username: session?.username
     }
+  }
+
+  // Session aktif = mirror in-memory, atau dipulihkan dari DB (AUTH-7). TTL absolute
+  // ditegakkan di sini: session yang melewati expiresAt selama proses hidup ditutup.
+  private async ensureLoadedSession(): Promise<Session | null> {
+    const current = this.sessionManager.get()
+    if (current) {
+      if (current.expiresAt.getTime() <= Date.now()) {
+        await this.sessionManager.close()
+        return null
+      }
+      return current
+    }
+    return this.sessionManager.load()
   }
 
   // RFC §7 Initial Setup (K5) — hanya sekali, saat count() === 0.
@@ -50,7 +65,7 @@ export class AuthService {
       passwordHash,
       passwordChangedAt: new Date()
     })
-    this.sessionManager.open(admin)
+    await this.sessionManager.open(admin)
     await this.adminRepository.updateLastLogin(admin.id)
     return { authenticated: true, username: admin.username }
   }
@@ -66,24 +81,25 @@ export class AuthService {
       throw new AppError(401, 'Unauthorized', 'Username atau password salah')
     }
     // Login sukses saat session ada → replace session lama (RFC §3.1).
-    this.sessionManager.open(admin)
+    await this.sessionManager.open(admin)
     await this.adminRepository.updateLastLogin(admin.id)
     return { authenticated: true, username: admin.username }
   }
 
   // RFC §9 Logout — idempoten; tanpa session tetap { ok: true } (RFC §9).
   async logout(): Promise<AuthOkDTO> {
-    this.sessionManager.close()
+    await this.sessionManager.close()
     return { ok: true }
   }
 
-  // RFC §10 Change Password — guard session aktif; session TETAP aktif.
+  // RFC §10 Change Password — guard session aktif; session TETAP aktif (AUTH-6).
+  // AUTH-7: session dipulihkan dari DB bila proses baru (restart) sebelum status() dipanggil.
   async changePassword(input: ChangePasswordDTO): Promise<AuthOkDTO> {
-    const current = this.sessionManager.currentAdmin()
-    if (!current) {
+    const session = await this.ensureLoadedSession()
+    if (!session) {
       throw new AppError(401, 'Unauthorized', 'Sesi tidak aktif')
     }
-    const admin = await this.adminRepository.findById(current.adminId)
+    const admin = await this.adminRepository.findById(session.adminId)
     if (!admin) {
       throw new AppError(401, 'Unauthorized', 'Sesi tidak aktif')
     }

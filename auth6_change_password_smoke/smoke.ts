@@ -11,6 +11,7 @@ import * as path from 'path'
 import { validateChangePasswordForm } from '../src/auth/change-password-validation'
 import { AuthService } from '../src/main/services/auth.service'
 import { AdminRepository } from '../src/main/repositories/admin.repository'
+import { AdminSessionRepository } from '../src/main/repositories/admin-session.repository'
 import { PasswordHasher } from '../src/main/services/password-hasher'
 import { SessionManager } from '../src/main/services/session-manager'
 import { getPrisma } from '../src/main/repositories/base/prisma'
@@ -89,7 +90,7 @@ async function main(): Promise<void> {
   const prisma = getPrisma()
   const repo = new AdminRepository()
   const hasher = new PasswordHasher()
-  const sm = new SessionManager()
+  const sm = new SessionManager(new AdminSessionRepository())
   const service = new AuthService(repo, hasher, sm)
 
   const st0 = await service.status()
@@ -98,7 +99,7 @@ async function main(): Promise<void> {
   await service.setup({ username: 'Kepala Perpus', password: 'Password@123' })
   expectEqual('setup berhasil -> session aktif', sm.isAuthenticated(), true)
 
-  service.logout()
+  await service.logout()
   expectEqual('logout dulu -> session tidak aktif', sm.isAuthenticated(), false)
   await expectRejected(
     'changePassword tanpa session ditolak',
@@ -131,7 +132,7 @@ async function main(): Promise<void> {
   expectEqual('session tetap aktif setelah ganti', sm.isAuthenticated(), true)
   expectEqual('status masih authenticated', (await service.status()).authenticated, true)
 
-  service.logout()
+  await service.logout()
   await expectRejected(
     'login dengan password lama gagal',
     () => service.login({ username: 'Kepala Perpus', password: 'Password@123' }),

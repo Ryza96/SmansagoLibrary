@@ -304,7 +304,27 @@ model Admin {
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
+  adminSessions AdminSession[]
+
   @@index([username])
+}
+
+// Auth context — session admin yang di-persist (RFC_AUTH_SESSION_PERSISTENCE.md, AUTH-7).
+// Opsi A: tabel SQLite agar session bertahan setelah restart aplikasi (TTL 24 jam absolute).
+// - Single admin → maksimal satu baris valid per admin (open() mengganti row lama).
+// - sessionId = token opaque 32-byte base64url, TIDAK pernah keluar dari Main (hanya
+//   disimpan di DB; renderer hanya menerima boolean dari auth:status).
+// - logout menghapus baris; row yang expire di-prune (deleteExpired) saat login.
+model AdminSession {
+  id        String   @id @default(uuid())
+  sessionId String   @unique
+  adminId   String
+  admin     Admin    @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+
+  @@index([adminId])
+  @@index([expiresAt])
 }
 
 // Infrastructure — Inventory Number Allocator

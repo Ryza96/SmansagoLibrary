@@ -1,6 +1,7 @@
 import { createRequire } from 'node:module'
 import { AuthService } from '../src/main/services/auth.service'
 import { AdminRepository } from '../src/main/repositories/admin.repository'
+import { AdminSessionRepository } from '../src/main/repositories/admin-session.repository'
 import { PasswordHasher } from '../src/main/services/password-hasher'
 import { SessionManager } from '../src/main/services/session-manager'
 import { getPrisma } from '../src/main/repositories/base/prisma'
@@ -78,7 +79,7 @@ async function main(): Promise<void> {
 
   const prisma = getPrisma()
 
-  const service = new AuthService(new AdminRepository(), new PasswordHasher(), new SessionManager())
+  const service = new AuthService(new AdminRepository(), new PasswordHasher(), new SessionManager(new AdminSessionRepository()))
 
   console.log('--- STEP 1: kontrak channel (RFC §4.1) ---')
   const { registerAuthHandlers } = req('../electron/ipc/auth.ipc') as {

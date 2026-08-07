@@ -66,6 +66,7 @@ import { resolveLiveDatabaseFile } from '../../src/main/infrastructure/database-
 import { BackupUIController, RestoreUIController, BackupInspector } from '../../src/main/services/backup-ui.service'
 import { AuthService } from '../../src/main/services/auth.service'
 import { AdminRepository } from '../../src/main/repositories/admin.repository'
+import { AdminSessionRepository } from '../../src/main/repositories/admin-session.repository'
 import { PasswordHasher } from '../../src/main/services/password-hasher'
 import { SessionManager } from '../../src/main/services/session-manager'
 import { connectPrisma, disconnectPrisma } from '../../src/main/repositories/base/prisma'
@@ -238,7 +239,7 @@ export function createContainer(paths: AppPaths, restoreWiring?: RestoreWiring):
     tempDir: paths.tempDir,
   })
 
-  const authService = new AuthService(new AdminRepository(), new PasswordHasher(), new SessionManager())
+  const authService = new AuthService(new AdminRepository(), new PasswordHasher(), new SessionManager(new AdminSessionRepository()))
 
   return {
     bookService,

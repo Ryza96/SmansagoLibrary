@@ -1,5 +1,6 @@
 import { AuthService } from '../src/main/services/auth.service'
 import { AdminRepository } from '../src/main/repositories/admin.repository'
+import { AdminSessionRepository } from '../src/main/repositories/admin-session.repository'
 import { PasswordHasher, parseArgon2Phc } from '../src/main/services/password-hasher'
 import { SessionManager } from '../src/main/services/session-manager'
 import { validatePassword, isValidPassword } from '../src/main/services/password-policy'
@@ -68,17 +69,18 @@ async function main(): Promise<void> {
   check('dua hash password sama tetap verify', await hasher.verify(hash2, 's3cureP@ss'), '')
   check('parseArgon2Phc format rusak -> null', parseArgon2Phc('bukan-hash') === null, '')
 
-  console.log('--- STEP 3: SessionManager (in-memory) ---')
-  const sm = new SessionManager()
+  console.log('--- STEP 3: SessionManager (in-memory, persist=false) ---')
+  const sm = new SessionManager(new AdminSessionRepository())
   expectEqual('awal belum autentikasi', sm.isAuthenticated(), false)
   expectEqual('currentAdmin awal null', sm.currentAdmin(), null)
-  const s1 = sm.open({ id: 'a1', username: 'Admin' })
+  // persist=false: admin id 'a1' belum ada di DB (uji murni in-memory, tanpa FK).
+  const s1 = await sm.open({ id: 'a1', username: 'Admin' }, false)
   check('session id terisi', s1.sessionId !== '', '')
   expectEqual('currentAdmin', sm.currentAdmin()?.username, 'Admin')
   expectEqual('isAuthenticated setelah open', sm.isAuthenticated(), true)
-  const s2 = sm.open({ id: 'a1', username: 'Admin' })
+  const s2 = await sm.open({ id: 'a1', username: 'Admin' }, false)
   check('open kedua replace session lama', s2.sessionId !== s1.sessionId, '')
-  sm.close()
+  await sm.close()
   expectEqual('close -> false', sm.isAuthenticated(), false)
   expectEqual('close -> currentAdmin null', sm.currentAdmin(), null)
 
@@ -106,7 +108,7 @@ async function main(): Promise<void> {
   )
 
   console.log('--- STEP 5: AuthService — login ---')
-  service.logout()
+  await service.logout()
   expectEqual('logout dulu -> false', sm.isAuthenticated(), false)
   await expectRejected(
     'login password salah (pesan seragam)',
@@ -124,7 +126,7 @@ async function main(): Promise<void> {
   expectEqual('status authenticated true', (await service.status()).authenticated, true)
 
   console.log('--- STEP 6: AuthService — changePassword ---')
-  service.logout()
+  await service.logout()
   await expectRejected(
     'changePassword tanpa session ditolak',
     () => service.changePassword({ currentPassword: 'Password@123', newPassword: 'Password@456' }),
@@ -144,7 +146,7 @@ async function main(): Promise<void> {
   const ch = await service.changePassword({ currentPassword: 'Password@123', newPassword: 'Password@456' })
   expectEqual('changePassword sukses -> ok true', ch.ok, true)
   expectEqual('session tetap aktif setelah changePassword', sm.isAuthenticated(), true)
-  service.logout()
+  await service.logout()
   await expectRejected(
     'login password lama ditolak setelah ganti',
     () => service.login({ username: 'Kepala Perpus', password: 'Password@123' }),
