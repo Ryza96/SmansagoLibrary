@@ -31,3 +31,13 @@ export interface AuthResultDTO {
 export interface AuthOkDTO {
   ok: true
 }
+
+// Kontrak error AUTH untuk renderer (AUTH-5 revisi 1): renderer TIDAK boleh
+// bergantung pada `instanceof Error` — cukup membaca `message` (dan `code`
+// bila tersedia) dari nilai reject apa pun. Nilai reject dijamin berbentuk
+// objek ber-shape ini (Electron menyampaikan Error dengan .message; .code
+// opsional bila main process menyediakannya).
+export interface AuthErrorDTO {
+  message: string
+  code?: string
+}
