@@ -1,5 +1,8 @@
 import { createHashRouter, Navigate, Outlet } from 'react-router-dom'
 import { MEMBER_TYPES } from '../shared/config/member-type'
+import AuthGate from '../auth/AuthGate'
+import SetupPage from '../pages/auth/SetupPage'
+import LoginPage from '../pages/auth/LoginPage'
 import AppLayout from '../components/layout/AppLayout'
 import { BookImportProvider } from '../contexts/BookImportContext'
 import DashboardPage from '../pages/DashboardPage'
@@ -46,9 +49,14 @@ import RestorePage from '../pages/restore/RestorePage'
 
 export const router = createHashRouter([
   {
-    path: '/',
-    element: <AppLayout />,
+    element: <AuthGate />,
     children: [
+      { path: '/setup', element: <SetupPage /> },
+      { path: '/login', element: <LoginPage /> },
+      {
+        path: '/',
+        element: <AppLayout />,
+        children: [
       { index: true, element: <Navigate to="/dashboard" replace /> },
       { path: 'dashboard', element: <DashboardPage /> },
       { path: 'books', element: <BooksPage /> },
@@ -111,6 +119,8 @@ export const router = createHashRouter([
       { path: 'master/classes', element: <ClassListPage /> },
       { path: 'master/classes/new', element: <ClassFormPage /> },
       { path: 'master/classes/:id/edit', element: <ClassFormPage /> }
+        ]
+      }
     ]
   }
 ])
