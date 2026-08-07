@@ -22,6 +22,7 @@ import type { PromotionExecuteService } from '../../src/main/services/promotion-
 import type { InventoryService } from '../main/services/inventory.service'
 import type { AssetEventService } from '../main/services/asset-event.service'
 import type { SettingService } from '../main/services/setting.service'
+import type { ResetDatabaseService } from '../../src/main/services/reset-database.service'
 import type { MatchingEngineService } from '../../src/services/MatchingEngineService'
 import type { BookImportService } from '../../src/main/services/book-import.service'
 import type { DashboardService } from '../../src/main/services/dashboard.service'
@@ -76,6 +77,7 @@ export function registerAllHandlers(
     inventoryService: InventoryService
     assetEventService: AssetEventService
     settingService: SettingService
+    resetDatabaseService: ResetDatabaseService
     matchingEngine: MatchingEngineService
     bookImportService: BookImportService
     dashboardService: DashboardService
@@ -108,7 +110,7 @@ export function registerAllHandlers(
   })
   registerInventoryHandlers(services.inventoryService)
   registerAssetEventHandlers(services.assetEventService)
-  registerSettingHandlers(services.settingService)
+  registerSettingHandlers(services.settingService, services.resetDatabaseService)
   registerDashboardHandlers(services.dashboardService)
   registerReportHandlers(services.reportService)
   registerBackupUIHandlers({

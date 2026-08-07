@@ -1326,3 +1326,23 @@ pm run build PASS (main 1,819.55 kB ï¿½ preload 9.02 kB ï¿½ renderer 1,044
 - **Sharp wajib di-`external` electron.vite + asarUnpack** (`node_modules/@img/**` + `node_modules/sharp/**`) — binary native sharp tidak bisa di-bundle; tanpa unpack → crash saat save logo di app packaged.
 - **Resize hanya downscale** — gambar ≤512×512 dikembalikan byte asli (tanpa reproses) agar kualitas & ukuran tidak berubah; upscale dilarang. Format output: input PNG→PNG, selainnya→WEBP.
 - **Split commit campuran**: 5 file (`setting.ipc.ts`, `setting.preload.ts`, `env.d.ts`, `SettingsPage.tsx`, `bootstrap.ts`) berisi kode LOGO + SETTINGS-DBRESET-1 yang berjalin — commit LOGO memakai versi LOGO-only (split baris-level), versi penuh dipulihkan ke working tree untuk WO SETTINGS berikutnya.
+
+
+## SETTINGS DATABASE RESET (COMPLETE - READY review PO)
+
+### Ringkasan
+- **Fitur:** tombol "Reset Sekarang" di halaman Pengaturan — hapus seluruh data transaksional & master, PERTAHANKAN data konfigurasi. TANPA migration/schema (reset murni data via Prisma `deleteMany`).
+- **Keputusan PO (dikonfirmasi):** (1) protected set = AcademicYear, Curriculum, Class, Setting, Admin, AdminSession; (2) `InventorySequence` baris `prefix=INV` dipertahankan (PK tidak bentrok) tapi `lastNumber` di-nol-kan; baris prefix lain dihapus; (3) SATU `$transaction` all-or-nothing (rollback penuh bila gagal); (4) single PrismaClient (`getPrisma()` stack baru); (5) legacy file (borrowing/borrowing-item/return) di-deleteMany no-op — TIDAK dihapus file (scope terpisah).
+- **File baru (2):** `src/main/services/reset-database.service.ts` (`ResetDatabaseService` — `runTransaction(getPrisma(),...)` + `performResetTx(tx)` delete order deterministik child→parent: borrowDetail→borrow→borrowItem→borrowing→return→assetEvent→promotionRunItem→promotionRun→memberEnrollment→member→bookCopy→book→author→publisher→category → baca count protected set → reset InventorySequence), `settings_db_reset_smoke/smoke.ts` (**58/58 PASS**).
+- **Dimodifikasi (7):** `electron/ipc/setting.ipc.ts` (+`settings:resetDatabase`), `electron/ipc/index.ts` (+`resetDatabaseService` di signature + pass-through), `electron/main/bootstrap.ts` (Container +`resetDatabaseService`), `electron/preload/setting.preload.ts` (+`settings.resetDatabase()`), `src/renderer/env.d.ts`, `src/pages/SettingsPage.tsx` (blok "Bahaya" + tombol; confirm danger NS-1 + toast sukses/error; TANPA alert/confirm browser), `src/utils/labels.ts` (blok `SETTINGS.DANGER*`).
+- **TIDAK diubah:** schema, migration (diff = empty), Repository, Borrow/Return/Report/Dashboard, engine Backup/Restore.
+- **Validation PASS:** lint; build (main 2,018.69 kB · preload 11.27 kB · renderer 1,188.19 kB); smoke **58/58** (seed 12 tabel + InventorySequence.lastNumber=42, reset→0 + protected tetap + prefix INV dipertahankan + lastNumber 0, idempotent, rollback all-or-nothing via override performResetTx throw); regression it1_borrow_return **34/34** fresh DB; `prisma migrate diff` empty; grep bundle `settings:resetDatabase` main 1/preload 1 + renderer `Reset Sekarang`.
+- **Laporan:** `WORK_ORDER_SETTINGS_DB_RESET_IMPLEMENTATION.md`, `SETTINGS_DB_RESET_FINAL_REVIEW.md`, `SETTINGS_DB_RESET_RELEASE.md`. Status: **DONE - READY review PO** (tidak lanjut WO berikutnya).
+
+### Pelajaran (retain)
+- **Delete order top-down wajib urut FK RESTRICT** — child dihapus sebelum parent; urutan deterministik dijadikan kontrak smoke (setiap tabel diverifikasi count = 0). Prisma `deleteMany` TIDAK mengikuti order relasi otomatis.
+- **`InventorySequence` bukan tabel konfigurasi murni** — baris pertama (INV) adalah state urutan: reset HARUS mempertahankan baris (PK) + nol-kan `lastNumber`, bukan `delete` semua, agar `INV-000001` baru tidak bentrok dengan PK lama.
+- **protected set dibaca count-nya di dalam transaksi** lalu dipetakan `Record<string, number>` — smoke membandingkan count SEBELUM reset dengan SESUDAH (bukti "dipertahankan", bukan hanya "tidak ada di list delete").
+- **`performResetTx` diekspos sebagai method instance** agar smoke bisa meng-override (stub throw) untuk membuktikan rollback — pola injeksi kegagalan P-2.
+- **Handler IPC setting di-signature ulang** — `setting.ipc.ts` kini menerima objek `{ settingService, resetDatabaseService }`; `bootstrap.ts` Container perlu field service (bukan hanya setting-only) saat handler memanggil service non-Setting.
+- Smoke compile & run mengikuti pola it1 (commonjs+node, tanpa bwip-js), fresh DB temp per suite + `migrate deploy` workdir `prisma/` (6 migration kini: baseline + WO13 + R1 + F2a + auth1 + auth7) + `NODE_PATH`.

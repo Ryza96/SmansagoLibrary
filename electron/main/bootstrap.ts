@@ -28,6 +28,7 @@ import { InventoryService } from './services/inventory.service'
 import { AssetEventService } from './services/asset-event.service'
 import { SettingService } from './services/setting.service'
 import { SettingRepository } from './repositories/setting.repository'
+import { ResetDatabaseService } from '../../src/main/services/reset-database.service'
 import { AcademicYearService } from '../../src/main/services/academic-year.service'
 import { AcademicYearRepository } from '../../src/main/repositories/academic-year.repository'
 import { CurriculumService } from '../../src/main/services/curriculum.service'
@@ -112,6 +113,7 @@ export interface Container {
   inventoryService: InventoryService
   assetEventService: AssetEventService
   settingService: SettingService
+  resetDatabaseService: ResetDatabaseService
   matchingEngine: MatchingEngineService
   autoCreateService: AutoCreateService
   bookImportService: BookImportService
@@ -155,6 +157,8 @@ export function createContainer(paths: AppPaths, restoreWiring?: RestoreWiring):
 
   const settingRepository = new SettingRepository()
   const settingService = new SettingService(settingRepository, paths.assetSchoolLogoDir)
+
+  const resetDatabaseService = new ResetDatabaseService()
 
   const printService = new PrintService(borrowRepository, settingService, paths.root)
 
@@ -265,6 +269,7 @@ export function createContainer(paths: AppPaths, restoreWiring?: RestoreWiring):
     inventoryService,
     assetEventService,
     settingService,
+    resetDatabaseService,
     matchingEngine,
     autoCreateService,
     bookImportService,

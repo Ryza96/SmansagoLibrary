@@ -45,7 +45,7 @@ const TABS: { key: TabKey; label: string; icon: LucideIcon }[] = [
 ]
 
 export default function SettingsPage() {
-  const { notify } = useNotification()
+  const { notify, confirm } = useNotification()
   const navigate = useNavigate()
   const [form, setForm] = useState<IdentityForm | null>(null)
   const [loading, setLoading] = useState(true)
@@ -56,6 +56,7 @@ export default function SettingsPage() {
   const [backupDir, setBackupDir] = useState<string | null>(null)
   const [logoPreview, setLogoPreview] = useState<LogoPreview | null>(null)
   const [logoPicking, setLogoPicking] = useState(false)
+  const [resetting, setResetting] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -125,6 +126,26 @@ export default function SettingsPage() {
 
   function handleComingSoon() {
     notify.info(LABELS.SETTINGS.COMING_SOON_HINT)
+  }
+
+  async function handleResetDatabase() {
+    const confirmed = await confirm({
+      title: LABELS.SETTINGS.RESET_CONFIRM_TITLE,
+      message: LABELS.SETTINGS.RESET_CONFIRM_MESSAGE,
+      confirmLabel: LABELS.SETTINGS.RESET_CONFIRM_OK,
+      cancelLabel: LABELS.SETTINGS.RESET_CONFIRM_CANCEL,
+      danger: true,
+    })
+    if (!confirmed) return
+    setResetting(true)
+    try {
+      await api.settings.resetDatabase()
+      notify.success(LABELS.SETTINGS.RESET_SUCCESS)
+    } catch (err: unknown) {
+      notify.error(err instanceof Error && err.message !== '' ? err.message : LABELS.SETTINGS.RESET_ERROR)
+    } finally {
+      setResetting(false)
+    }
   }
 
   async function handlePickLogo() {
@@ -311,9 +332,9 @@ export default function SettingsPage() {
             icon={RotateCcw}
             title={LABELS.SETTINGS.DATA_RESET}
             desc={LABELS.SETTINGS.DATA_RESET_DESC}
-            actionLabel={LABELS.SETTINGS.DATA_RESET}
-            badge={LABELS.SETTINGS.COMING_SOON}
-            onAction={handleComingSoon}
+            actionLabel={resetting ? LABELS.SETTINGS.RESET_RUNNING : LABELS.SETTINGS.DATA_RESET}
+            loading={resetting}
+            onAction={handleResetDatabase}
           />
         </div>
       </Card>
@@ -408,6 +429,7 @@ function ActionCard({
   actionLabel,
   onAction,
   badge,
+  loading,
 }: {
   icon: LucideIcon
   title: string
@@ -415,6 +437,7 @@ function ActionCard({
   actionLabel: string
   onAction: () => void
   badge?: string
+  loading?: boolean
 }) {
   return (
     <div className="flex flex-col rounded-xl border border-slate-200 bg-slate-50/60 p-5">
@@ -430,8 +453,10 @@ function ActionCard({
       <p className="mt-1 text-xs text-slate-500 leading-relaxed flex-1">{desc}</p>
       <button
         onClick={onAction}
-        className="mt-4 w-full py-2 rounded-lg border border-slate-300 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 hover:border-slate-400 transition-colors"
+        disabled={loading}
+        className="mt-4 w-full py-2 rounded-lg border border-slate-300 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 hover:border-slate-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
       >
+        {loading ? <Loader2 size={14} className="inline-block animate-spin mr-1.5 -mt-0.5" /> : null}
         {actionLabel}
       </button>
     </div>
