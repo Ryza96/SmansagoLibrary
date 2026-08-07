@@ -4,6 +4,8 @@ import { BorrowRepository } from '../src/main/repositories/borrow.repository'
 import { SettingService } from '../electron/main/services/setting.service'
 import { SettingRepository } from '../electron/main/repositories/setting.repository'
 import { PrintService, buildBorrowCardPdfFilename } from '../electron/main/services/print.service'
+import os from 'os'
+import path from 'path'
 
 let pass = 0
 let fail = 0
@@ -36,7 +38,7 @@ async function main(): Promise<void> {
   const prisma = getPrisma()
   await initDatabase()
 
-  const printService = new PrintService(new BorrowRepository(), new SettingService(new SettingRepository()))
+  const printService = new PrintService(new BorrowRepository(), new SettingService(new SettingRepository(), path.join(os.tmpdir(), 'wo2-preview-logo')))
 
   console.log('--- STEP 1: seed fresh DB ---')
   const m = await prisma.member.create({

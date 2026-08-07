@@ -8,7 +8,7 @@ export default defineConfig({
       outDir: 'out/main',
       rollupOptions: {
         input: resolve(__dirname, 'electron/main/index.ts'),
-        external: ['@prisma/client', '@node-rs/argon2']
+        external: ['@prisma/client', 'sharp', '@node-rs/argon2']
       }
     }
   },

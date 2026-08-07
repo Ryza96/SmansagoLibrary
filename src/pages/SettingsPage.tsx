@@ -28,6 +28,12 @@ interface IdentityForm {
   librarianName: string
 }
 
+interface LogoPreview {
+  filePath: string
+  sizeBytes: number
+  previewUri: string
+}
+
 const api = window.electronAPI
 
 const TABS: { key: TabKey; label: string; icon: LucideIcon }[] = [
@@ -48,6 +54,8 @@ export default function SettingsPage() {
   const [tab, setTab] = useState<TabKey>('identity')
   const [appInfo, setAppInfo] = useState<{ version: string; name: string } | null>(null)
   const [backupDir, setBackupDir] = useState<string | null>(null)
+  const [logoPreview, setLogoPreview] = useState<LogoPreview | null>(null)
+  const [logoPicking, setLogoPicking] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -96,12 +104,17 @@ export default function SettingsPage() {
     setSaving(true)
     setError(null)
     try {
-      const result = await api.settings.update(form as unknown as Record<string, unknown>)
+      const payload: Record<string, unknown> = { ...form }
+      if (logoPreview?.filePath) {
+        payload.logoUpload = logoPreview.filePath
+      }
+      const result = await api.settings.update(payload)
       setForm({
         libraryName: result.libraryName,
         schoolName: result.schoolName,
         librarianName: result.librarianName,
       })
+      setLogoPreview(null)
       notify.success(LABELS.SETTINGS.SAVED)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : LABELS.SETTINGS.VALIDATION_LOADING)
@@ -112,6 +125,24 @@ export default function SettingsPage() {
 
   function handleComingSoon() {
     notify.info(LABELS.SETTINGS.COMING_SOON_HINT)
+  }
+
+  async function handlePickLogo() {
+    setLogoPicking(true)
+    try {
+      const result = await api.settings.pickLogo()
+      if (!result.canceled) {
+        setLogoPreview({
+          filePath: result.filePath,
+          sizeBytes: result.sizeBytes,
+          previewUri: result.previewUri,
+        })
+      }
+    } catch (err: unknown) {
+      notify.error(err instanceof Error ? err.message : LABELS.SETTINGS.VALIDATION_LOADING)
+    } finally {
+      setLogoPicking(false)
+    }
   }
 
   if (loading) {
@@ -190,15 +221,48 @@ export default function SettingsPage() {
           </Field>
           <div className="sm:col-span-2">
             <Field label={LABELS.SETTINGS.FIELD_LOGO}>
-              <button
-                type="button"
-                onClick={handleComingSoon}
-                className="w-full flex items-center justify-center gap-2 border-2 border-dashed border-slate-300 rounded-xl px-4 py-5 bg-slate-50 hover:bg-slate-100 hover:border-slate-400 transition-colors"
-              >
-                <ImagePlus size={22} className="text-slate-400" />
-                <span className="text-sm font-semibold text-slate-600">{LABELS.SETTINGS.LOGO_PICK}</span>
-                <span className="text-xs text-slate-400">· {LABELS.SETTINGS.LOGO_COMING_SOON}</span>
-              </button>
+              <div className="flex items-center gap-4">
+                <div className="w-24 h-24 shrink-0 rounded-xl border border-slate-200 bg-slate-50 flex items-center justify-center overflow-hidden">
+                  {logoPreview ? (
+                    <img
+                      src={logoPreview.previewUri}
+                      alt={LABELS.SETTINGS.FIELD_LOGO}
+                      className="w-full h-full object-contain"
+                    />
+                  ) : (
+                    <div className="flex items-center justify-center px-2">
+                      <ImagePlus size={22} className="text-slate-300" />
+                    </div>
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  {logoPreview && (
+                    <>
+                      <p className="text-sm font-semibold text-slate-700 truncate">
+                        {logoPreview.filePath.split(/[/\\]+/).filter(Boolean).pop() || logoPreview.filePath}
+                      </p>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        {logoPreview.sizeBytes < 1024
+                          ? `${Math.round(logoPreview.sizeBytes)} B`
+                          : `${(Math.round((logoPreview.sizeBytes / 1024) * 10) / 10).toFixed(1)} KB`}
+                      </p>
+                    </>
+                  )}
+                  <button
+                    type="button"
+                    onClick={handlePickLogo}
+                    disabled={logoPicking}
+                    className="mt-2 inline-flex items-center gap-2 border border-slate-300 rounded-lg px-4 py-2 bg-white hover:bg-slate-50 hover:border-slate-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {logoPicking ? (
+                      <Loader2 size={16} className="animate-spin" />
+                    ) : (
+                      <ImagePlus size={16} className="text-slate-500" />
+                    )}
+                    <span className="text-sm font-semibold text-slate-700">{LABELS.SETTINGS.LOGO_PICK}</span>
+                  </button>
+                </div>
+              </div>
             </Field>
           </div>
           <Field label={LABELS.SETTINGS.FIELD_LIBRARIAN_NAME}>

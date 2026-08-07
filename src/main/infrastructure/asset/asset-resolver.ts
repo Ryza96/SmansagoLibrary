@@ -57,13 +57,15 @@ export function resolveAssetPath(
 
 // RFC §4 rule 2 — hapus seluruh `school-logo.<ext>` di dalam `dir`
 // (guard resolveWithin; hanya file, folder bernama school-logo.* dilewati).
-// Mengembalikan jumlah file yang dihapus. Dipanggil saveLogo/clearLogo
-// (WO berikutnya — util ini belum ter-wire di alur mana pun).
-export async function cleanupLegacyLogos(dir: string): Promise<number> {
+// `keepName` opsional: nama file yang TIDAK dihapus (dipakai saveLogo —
+// REVISION 1: setelah DB commit, hapus semua logo legacy KECUALI target baru).
+// Mengembalikan jumlah file yang dihapus.
+export async function cleanupLegacyLogos(dir: string, keepName?: string): Promise<number> {
   const entries = await readdir(dir)
   let removed = 0
   for (const name of entries) {
     if (!name.startsWith(`${LOGO_BASENAME}.`)) continue
+    if (keepName && name === keepName) continue
     const target = resolveWithin(dir, name)
     const stat = await lstat(target)
     if (!stat.isFile()) continue

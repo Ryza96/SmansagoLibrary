@@ -12,6 +12,8 @@ import { SettingRepository } from '../electron/main/repositories/setting.reposit
 import { getPrisma } from '../src/main/repositories/base/prisma'
 import { initDatabase } from '../electron/main/database'
 import { generateQrCodeSvg } from '../src/main/services/barcode.service'
+import os from 'os'
+import path from 'path'
 
 let pass = 0
 let fail = 0
@@ -53,7 +55,7 @@ async function main(): Promise<void> {
     new BookCopyRepository(),
     enrollmentService
   )
-  const printService = new PrintService(new BorrowRepository(), new SettingService(new SettingRepository()))
+  const printService = new PrintService(new BorrowRepository(), new SettingService(new SettingRepository(), path.join(os.tmpdir(), 'uat-logo')))
 
   console.log('--- STEP 1: seed (settings + member + buku) ---')
   await prisma.setting.create({

@@ -311,6 +311,7 @@ interface ElectronAPI {
       createdAt: string
       updatedAt: string
     }>
+    pickLogo: () => Promise<import('../../src/shared/dto/logo').PickLogoResult>
   }
   platform: string
 }

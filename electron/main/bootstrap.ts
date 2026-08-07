@@ -154,7 +154,7 @@ export function createContainer(paths: AppPaths, restoreWiring?: RestoreWiring):
   const assetEventService = new AssetEventService(assetEventRepository)
 
   const settingRepository = new SettingRepository()
-  const settingService = new SettingService(settingRepository)
+  const settingService = new SettingService(settingRepository, paths.assetSchoolLogoDir)
 
   const printService = new PrintService(borrowRepository, settingService, paths.root)
 

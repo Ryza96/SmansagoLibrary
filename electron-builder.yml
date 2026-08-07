@@ -39,3 +39,5 @@ nsis:
 asarUnpack:
   - "**/*.node"
   - "node_modules/.prisma/client/**"
+  - "node_modules/@img/**"
+  - "node_modules/sharp/**"
