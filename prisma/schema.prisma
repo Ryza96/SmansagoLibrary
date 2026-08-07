@@ -291,6 +291,22 @@ model BorrowDetail {
   @@index([bookCopyId])
 }
 
+// Auth context — identitas admin tunggal (RFC_AUTH_ARCHITECTURE.md §2).
+// Invariant "satu admin" dijaga di Service layer (SQLite tanpa partial unique index).
+// username: disimpan sesuai input pengguna — hanya trim(), kapitalisasi dipertahankan
+// (REV-1); login case-insensitive via lookup Service (findByUsernameCaseInsensitive).
+model Admin {
+  id                String    @id @default(uuid())
+  username          String    @unique
+  passwordHash      String
+  passwordChangedAt DateTime?
+  lastLoginAt       DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([username])
+}
+
 // Infrastructure — Inventory Number Allocator
 // BUKAN domain model. Infrastructure component untuk mengalokasikan nomor inventaris.
 model InventorySequence {

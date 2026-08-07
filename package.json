@@ -20,6 +20,7 @@
     "package:win": "electron-vite build && electron-builder --win --config electron-builder.yml"
   },
   "dependencies": {
+    "@node-rs/argon2": "^2.0.2",
     "@prisma/client": "^5.22.0",
     "adm-zip": "^0.6.0",
     "bwip-js": "^4.11.2",
