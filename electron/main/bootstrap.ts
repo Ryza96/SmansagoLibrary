@@ -64,6 +64,10 @@ import { DatabaseRestoreHandler } from '../../src/main/infrastructure/restore/da
 import { RestoreService, createRestoreDirs } from '../../src/main/infrastructure/restore/restore.service'
 import { resolveLiveDatabaseFile } from '../../src/main/infrastructure/database-path'
 import { BackupUIController, RestoreUIController, BackupInspector } from '../../src/main/services/backup-ui.service'
+import { AuthService } from '../../src/main/services/auth.service'
+import { AdminRepository } from '../../src/main/repositories/admin.repository'
+import { PasswordHasher } from '../../src/main/services/password-hasher'
+import { SessionManager } from '../../src/main/services/session-manager'
 import { connectPrisma, disconnectPrisma } from '../../src/main/repositories/base/prisma'
 import { initDatabase, closeDatabase } from './database'
 
@@ -121,6 +125,7 @@ export interface Container {
   backupUIController: BackupUIController
   restoreUIController: RestoreUIController
   backupInspector: BackupInspector
+  authService: AuthService
 }
 
 export function createContainer(paths: AppPaths, restoreWiring?: RestoreWiring): Container {
@@ -233,6 +238,8 @@ export function createContainer(paths: AppPaths, restoreWiring?: RestoreWiring):
     tempDir: paths.tempDir,
   })
 
+  const authService = new AuthService(new AdminRepository(), new PasswordHasher(), new SessionManager())
+
   return {
     bookService,
     authorService,
@@ -270,6 +277,7 @@ export function createContainer(paths: AppPaths, restoreWiring?: RestoreWiring):
     restoreService,
     backupUIController,
     restoreUIController,
-    backupInspector
+    backupInspector,
+    authService
   }
 }

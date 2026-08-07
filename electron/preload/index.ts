@@ -20,6 +20,7 @@ import { bookImportAPI } from './book-import.preload'
 import { dashboardAPI } from './dashboard.preload'
 import { reportAPI } from './report.preload'
 import { backupUIAPI } from './backup-ui.preload'
+import { authAPI } from './auth.preload'
 
 const electronAPI = {
   ...appAPI,
@@ -42,7 +43,8 @@ const electronAPI = {
   ...bookImportAPI,
   ...dashboardAPI,
   ...reportAPI,
-  ...backupUIAPI
+  ...backupUIAPI,
+  ...authAPI
 }
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI)

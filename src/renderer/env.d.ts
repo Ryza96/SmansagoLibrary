@@ -21,6 +21,13 @@ interface ElectronAPI {
   dashboard: {
     overview: () => Promise<import('../../src/shared/dto/dashboard').DashboardOverviewDTO>
   }
+  auth: {
+    status: () => Promise<import('../../src/shared/dto/auth').AuthStatusDTO>,
+    setup: (input: import('../../src/shared/dto/auth').SetupAdminDTO) => Promise<import('../../src/shared/dto/auth').AuthResultDTO>,
+    login: (input: import('../../src/shared/dto/auth').LoginAdminDTO) => Promise<import('../../src/shared/dto/auth').AuthResultDTO>,
+    logout: () => Promise<import('../../src/shared/dto/auth').AuthOkDTO>,
+    changePassword: (input: import('../../src/shared/dto/auth').ChangePasswordDTO) => Promise<import('../../src/shared/dto/auth').AuthOkDTO>,
+  }
   books: {
     findMany: () => Promise<import('../types/dtos/book').BookListItemDTO[]>
     findById: (id: string) => Promise<import('../types/dtos/book').BookDetailDTO | null>
