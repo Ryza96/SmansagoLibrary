@@ -273,8 +273,7 @@ export default function SettingsPage() {
             title={LABELS.SETTINGS.SECURITY_PASSWORD}
             desc={LABELS.SETTINGS.SECURITY_PASSWORD_DESC}
             actionLabel={LABELS.SETTINGS.SECURITY_PASSWORD}
-            badge={LABELS.SETTINGS.COMING_SOON}
-            onAction={handleComingSoon}
+            onAction={() => navigate(ROUTES.CHANGE_PASSWORD)}
           />
         </div>
       </Card>

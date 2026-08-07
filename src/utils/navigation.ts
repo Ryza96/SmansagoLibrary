@@ -27,6 +27,7 @@ export const ROUTES = {
   REPORT_MEMBERS: '/reports/members',
   REPORT_COLLECTIONS: '/reports/collections',
   SETTINGS: '/settings',
+  CHANGE_PASSWORD: '/settings/change-password',
   MASTER_AUTHORS: '/master/authors',
   MASTER_AUTHOR_NEW: '/master/authors/new',
   MASTER_AUTHOR_EDIT: '/master/authors/:id/edit',

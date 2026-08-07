@@ -3,6 +3,7 @@ import { MEMBER_TYPES } from '../shared/config/member-type'
 import AuthGate from '../auth/AuthGate'
 import SetupPage from '../pages/auth/SetupPage'
 import LoginPage from '../pages/auth/LoginPage'
+import ChangePasswordPage from '../pages/auth/ChangePasswordPage'
 import AppLayout from '../components/layout/AppLayout'
 import { BookImportProvider } from '../contexts/BookImportContext'
 import DashboardPage from '../pages/DashboardPage'
@@ -101,6 +102,7 @@ export const router = createHashRouter([
       { path: 'backup', element: <BackupPage /> },
       { path: 'restore', element: <RestorePage /> },
       { path: 'settings', element: <SettingsPage /> },
+      { path: 'settings/change-password', element: <ChangePasswordPage /> },
       { path: 'master/authors', element: <AuthorListPage /> },
       { path: 'master/authors/new', element: <AuthorFormPage /> },
       { path: 'master/authors/:id/edit', element: <AuthorFormPage /> },
