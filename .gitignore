@@ -40,3 +40,8 @@ npm-debug.log*
 
 # Electron Builder
 electron-builder-cache/
+
+# Eksperimen/debugging print A6 (WO Cetak Kartu Peminjaman) — bukan bagian aplikasi,
+# referensi desain & harness test manual, sengaja tidak di-commit.
+design-reference/
+print_engine_experiment_phase3/
