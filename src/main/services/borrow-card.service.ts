@@ -1,10 +1,10 @@
 import type { BorrowCardData, BorrowCardBookData } from '../../shared/dto/borrow-card'
-import { borrowStatusConfig, deriveBorrowStatus } from '../../shared/config/borrow-status'
+import { deriveBorrowStatus } from '../../shared/config/borrow-status'
 import { memberTypeLabel } from '../../shared/config/member-type'
 import { generateQrCodeSvg } from './barcode.service'
 
-// WO-1 — Borrow Card Engine (Single Source of Truth untuk Preview / Print / PDF).
-// Source of truth desain: BORROW_RECEIPT_DESIGN_AMENDMENT.md (FINAL DESIGN DECISION).
+// WO-A6 — Borrow Card Engine (Single Source of Truth untuk Preview / Print / PDF).
+// Source of truth desain: design-reference/kartu-a6-preview.html (A6 Portrait 105×148mm).
 //
 // Dua bagian wajib terpisah:
 //   (a) DATA ASSEMBLER  buildBorrowCardData(...) → BorrowCardData (murni, tanpa Electron API).
@@ -12,34 +12,21 @@ import { generateQrCodeSvg } from './barcode.service'
 // Template hanya menerima BorrowCardData; semua string sudah diformat, SVG sudah di-generate.
 
 // ---------------------------------------------------------------------------
-// Layout — kartu 110mm × 60mm landscape (D4). Ukuran fixed per halaman.
-// Kapasitas baris buku dihitung dari mm yang SAMA dengan yang dipakai CSS,
-// sehingga pagination deterministik dan tidak ada overflow (D10).
+// Layout — kartu A6 Portrait 105mm × 148mm (menggantikan 110×60 landscape).
+// TANPA pagination (keputusan PO): SATU kartu = SATU halaman, SEMUA baris buku
+// dirender apa pun jumlahnya. Aturan operasional maksimal 5 buku per transaksi;
+// bila suatu saat >5 baris, kartu boleh tampil padat — TODO: evaluasi ulang
+// layout bila aturan berubah, jangan memecah ke beberapa halaman.
+// Struktur kartu:
+//   header 20mm (logo-icon + brand + blok navy "KARTU PEMINJAMAN") + strip 1mm
+//   body   = QR 26mm + info peminjaman (tgl/jatuh tempo/petugas) + box DATA ANGGOTA
+//   books  = label "DAFTAR BUKU" + tabel 4 kolom (No. / Judul Buku / Kode Inv. / Jml)
+//   footer 10mm (strip navy bermotto)
 // ---------------------------------------------------------------------------
-// WO-1 BORROW CARD LAYOUT v1.1 — optimasi kapasitas daftar buku.
-//  - Jumlah + Status (AKTIF) pindah ke pojok kanan ATAS (header-info).
-//  - Footer kiri bawah dikosongkan → zona daftar buku bertambah.
-//  - Body dikurangi 20→18mm & footer 10→9mm untuk memberi ruang list.
-//  - Baris buku dirapatkan 3.4→2.8mm; judul diperkecil ke 8pt (dominant di list).
-//  Kapasitas: halaman 1 = 5 buku (sebelumnya 3), lanjutan = 13 (sebelumnya 10).
-// WO-1 BORROW CARD LAYOUT REFINEMENT v1.2 — penyempurnaan visual (tanpa mengubah
-// ukuran kartu / PDF / print pipeline / QR / header / logo / identitas anggota).
-//  - Judul buku diperkecil 8→7.5pt (tetap > teks identitas 6.5pt, tetap terbaca).
-//  - Inventory number mengikuti judul dengan jarak proporsional (flex gap 3mm +
-//    margin-left 5mm ≈ 8mm total — bukan rata ke tepi kanan) — judul pendek →
-//    inv dekat (satu grup informasi); judul panjang → judul ter-ellipsis, inv
-//    tetap mengikuti judul, area kanan lega untuk QR & tanda tangan.
-//  - Garis pemisah tipis abu terang antara data anggota & daftar buku
-//    (border-bottom .body + margin-bottom 1mm) — jarak nyaman di atas & bawah.
-//  Kapasitas dipertahankan 5+13: body 18→17mm & baris 2.8→2.7mm memberi ruang
-//  pemisah tanpa mengurangi jumlah baris (pagination deterministik, D10).
 export const BORROW_CARD_LAYOUT = {
-  pageWidthMm: 110,
-  pageHeightMm: 60,
-  paddingMm: 3,
-  bookRowHeightMm: 2.7,
-  pageOne: { headerMm: 12, bodyMm: 17, footerMm: 9 },
-  continuation: { headerMm: 8, footerMm: 9 }
+  pageWidthMm: 105,
+  pageHeightMm: 148,
+  paddingMm: 3
 } as const
 
 function escapeHtml(value: string): string {
@@ -90,153 +77,100 @@ function formatCardDate(date: Date): string {
 }
 
 // ---------------------------------------------------------------------------
-// Pagination (D10 / R4) — auto pagination, seluruh buku tampil, tanpa "+N lainnya".
-// ---------------------------------------------------------------------------
-export interface BorrowCardPage {
-  isFirst: boolean
-  startIndex: number
-  endIndex: number
-}
-
-function booksZoneCapacity(isFirst: boolean): number {
-  const { pageHeightMm, paddingMm, bookRowHeightMm, pageOne, continuation } = BORROW_CARD_LAYOUT
-  const contentHeightMm = pageHeightMm - paddingMm * 2
-  const fixedMm = isFirst
-    ? pageOne.headerMm + pageOne.bodyMm + pageOne.footerMm
-    : continuation.headerMm + continuation.footerMm
-  return Math.max(1, Math.floor((contentHeightMm - fixedMm) / bookRowHeightMm))
-}
-
-export function paginateBorrowCard(booksCount: number): BorrowCardPage[] {
-  if (booksCount <= 0) {
-    return [{ isFirst: true, startIndex: 0, endIndex: 0 }]
-  }
-  const firstCapacity = booksZoneCapacity(true)
-  const continuationCapacity = booksZoneCapacity(false)
-  const pages: BorrowCardPage[] = []
-  let cursor = 0
-  const firstCount = Math.min(booksCount, firstCapacity)
-  pages.push({ isFirst: true, startIndex: 0, endIndex: firstCount })
-  cursor = firstCount
-  while (cursor < booksCount) {
-    const end = Math.min(cursor + continuationCapacity, booksCount)
-    pages.push({ isFirst: false, startIndex: cursor, endIndex: end })
-    cursor = end
-  }
-  return pages
-}
-
-// ---------------------------------------------------------------------------
 // Template TUNGGAL — pure function, tanpa Electron API / DB.
 // ---------------------------------------------------------------------------
-function bookRowHtml(book: BorrowCardBookData, index: number): string {
-  return `<div class="book-row"><span class="num">${index + 1}.</span><span class="title">${escapeHtml(book.title)}</span><span class="inv">${escapeHtml(book.inventoryNumber)}</span></div>`
-}
-
 function logoElementHtml(data: BorrowCardData): string {
   if (data.header.logo) {
     return `<img class="logo-img" src="${escapeHtml(data.header.logo)}" alt="Logo Perpustakaan">`
   }
-  return generateLogoMonogramSvg(data.header.schoolName, data.header.libraryName)
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="#12235a" stroke-width="1.6"><path d="M2 6c3-1.5 6-1.5 9 0v13c-3-1.5-6-1.5-9 0V6z"/><path d="M22 6c-3-1.5-6-1.5-9 0v13c3-1.5 6-1.5 9 0V6z"/></svg>`
 }
 
-function headerInfoHtml(data: BorrowCardData): string {
-  const status = borrowStatusConfig(data.footer.borrowStatus)
-  return `<div class="header-info"><span class="qty">Jumlah: ${data.footer.totalBooks}</span><span class="badge ${status.className}">${escapeHtml(status.label)}</span></div>`
+function headerHtml(data: BorrowCardData): string {
+  return `<div class="header">
+  <div class="header-left">
+    <div class="logo-icon">${logoElementHtml(data)}</div>
+    <div>
+      <div class="brand-name">${escapeHtml(data.header.libraryName)}</div>
+      ${data.header.schoolName ? `<div class="brand-sub">${escapeHtml(data.header.schoolName)}</div>` : ''}
+    </div>
+  </div>
+  <div class="header-right"><span>KARTU<br>PEMINJAMAN</span></div>
+</div>
+<div class="header-strip"></div>`
 }
 
-function headerHtml(data: BorrowCardData, isFirst: boolean): string {
-  const headerClass = isFirst ? 'header' : 'header continue'
-  const logoClass = isFirst ? 'logo' : 'logo continue'
-  const logoHtml = `<div class="${logoClass}">${logoElementHtml(data)}</div>`
-
-  if (isFirst) {
-    return `<div class="${headerClass}">
-  ${logoHtml}
-  <div class="header-text">
-    <div class="lib-name">${escapeHtml(data.header.libraryName)}</div>
-    <div class="school-name">${escapeHtml(data.header.schoolName)}</div>
-  </div>
-  ${headerInfoHtml(data)}
-</div>`
-  }
-  return `<div class="${headerClass}">
-  ${logoHtml}
-  <div class="header-text">
-    <div class="lib-name">${escapeHtml(data.header.libraryName)}</div>
-    <div class="school-name"><span class="continue-label">LANJUTAN</span> &middot; ${escapeHtml(data.borrow.borrowNumber)}</div>
-  </div>
-  ${headerInfoHtml(data)}
+function borrowInfoHtml(data: BorrowCardData): string {
+  return `<div class="peminjaman-info">
+  <div class="pj-label">No. Peminjaman</div>
+  <div class="pj-value">${escapeHtml(data.borrow.borrowNumber)}</div>
+  <div class="pj-divider"></div>
+  <div class="kv-row"><span class="k">Tgl Pinjam</span><span class="v">${escapeHtml(data.borrow.borrowDate)}</span></div>
+  <div class="kv-row"><span class="k">Jatuh Tempo</span><span class="v">${escapeHtml(data.borrow.dueDate)}</span></div>
+  <div class="kv-row"><span class="k">Petugas</span><span class="v">${escapeHtml(data.footer.officerName)}</span></div>
 </div>`
 }
 
-function memberRowHtml(label: string, value: string): string {
-  return `<div class="row"><b>${escapeHtml(label)}</b><span>${escapeHtml(value)}</span></div>`
+function iconRowHtml(label: string, value: string): string {
+  return `<div class="icon-row"><div class="icon-circle"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg></div><div class="label-col">${escapeHtml(label)}</div><div class="val-col">${escapeHtml(value)}</div></div>`
+}
+
+function memberSectionHtml(data: BorrowCardData): string {
+  const m = data.member
+  const kelas = m.className ? iconRowHtml('Kelas', m.className) : ''
+  return `<div class="member-section">
+  <span class="sec-label">DATA ANGGOTA</span>
+  <div class="box-outline">
+    ${iconRowHtml('Nama', m.fullName)}
+    ${iconRowHtml('ID Anggota', m.memberNumber)}
+    ${kelas}
+  </div>
+</div>`
 }
 
 function bodyHtml(data: BorrowCardData): string {
-  const m = data.member
-  const className = m.className ? memberRowHtml('Kelas', m.className) : ''
-  const memberType = m.memberType ? memberRowHtml('Jenis', m.memberType) : ''
   return `<div class="body">
-  <div class="avatar">${m.avatarPlaceholder || generateAvatarPlaceholderSvg(m.fullName)}</div>
-  <div class="col">
-    ${memberRowHtml('Nama', m.fullName)}
-    ${memberRowHtml('No. Anggota', m.memberNumber)}
-    ${memberType}
-    ${className}
+  <div class="top-row">
+    <div class="qr-box">${data.footer.qrSvg}</div>
+    ${borrowInfoHtml(data)}
   </div>
-  <div class="col">
-    ${memberRowHtml('No. Pinjam', data.borrow.borrowNumber)}
-    ${memberRowHtml('Tgl Pinjam', data.borrow.borrowDate)}
-    ${memberRowHtml('Jatuh Tempo', data.borrow.dueDate)}
-    ${memberRowHtml('Petugas', data.footer.officerName)}
-  </div>
+  ${memberSectionHtml(data)}
 </div>`
 }
 
-function booksZoneHtml(data: BorrowCardData, page: BorrowCardPage): string {
-  const rows = data.books
-    .slice(page.startIndex, page.endIndex)
-    .map((book, i) => bookRowHtml(book, page.startIndex + i))
-    .join('')
-  return `<div class="books">${rows}</div>`
+function bookRowHtml(book: BorrowCardBookData, index: number): string {
+  // Jml = 1 per baris (satu baris = satu eksemplar buku dipinjam).
+  return `<tr><td>${index + 1}</td><td class="title">${escapeHtml(book.title)}</td><td class="inv">${escapeHtml(book.inventoryNumber)}</td><td>1</td></tr>`
 }
 
-function footerHtml(data: BorrowCardData): string {
+function booksZoneHtml(data: BorrowCardData): string {
+  const rows = data.books.map((book, i) => bookRowHtml(book, i)).join('')
+  return `<div class="books">
+  <span class="sec-label">DAFTAR BUKU</span>
+  <table class="buku">
+    <thead><tr><th>No.</th><th>Judul Buku</th><th>Kode Inv.</th><th>Jml</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table>
+</div>`
+}
+
+function footerHtml(): string {
   return `<div class="footer">
-  <div class="qr">${data.footer.qrSvg}</div>
-  <div class="sign"><div class="line"></div><div class="officer">(${escapeHtml(data.footer.officerName)})</div></div>
+  <svg viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="1.6"><path d="M2 6c3-1.5 6-1.5 9 0v13c-3-1.5-6-1.5-9 0V6z"/><path d="M22 6c-3-1.5-6-1.5-9 0v13c3-1.5 6-1.5 9 0V6z"/></svg>
+  <span>&ldquo;Buku adalah jendela ilmu, baca hari ini, cerdas esok hari.&rdquo;</span>
 </div>`
-}
-
-// Satu kartu (satu halaman 110×60mm). Halaman 2+ = kartu lanjutan (R4).
-export function generateBorrowCardPageHtml(data: BorrowCardData, page: BorrowCardPage): string {
-  if (page.isFirst) {
-    return `<div class="borrow-card">
-${headerHtml(data, true)}
-${bodyHtml(data)}
-${booksZoneHtml(data, page)}
-${footerHtml(data)}
-</div>`
-  }
-  return `<div class="borrow-card">
-${headerHtml(data, false)}
-${booksZoneHtml(data, page)}
-${footerHtml(data)}
-</div>`
-}
-
-// Auto pagination — hasilkan ARRAY halaman kartu (D10 / scope WO-1 item 5).
-export function generateBorrowCardPages(data: BorrowCardData): string[] {
-  return paginateBorrowCard(data.books.length).map((page) => generateBorrowCardPageHtml(data, page))
 }
 
 // Dokumen HTML lengkap — SATU-SATUNYA template untuk Preview / Print / PDF.
+// SATU kartu = SATU halaman A6 105×148mm (tanpa pagination / tanpa lanjutan).
 export function generateBorrowCardHtml(data: BorrowCardData): string {
-  const pages = generateBorrowCardPages(data)
-    .map((page) => `<div class="sheet">${page}</div>`)
-    .join('\n')
+  const page = `<div class="borrow-card">
+${headerHtml(data)}
+${bodyHtml(data)}
+${booksZoneHtml(data)}
+${footerHtml()}
+</div>`
+  const sheets = `<div class="sheet">${page}</div>`
 
   return `<!DOCTYPE html>
 <html lang="id">
@@ -244,54 +178,69 @@ export function generateBorrowCardHtml(data: BorrowCardData): string {
 <meta charset="utf-8">
 <title>Kartu Peminjaman</title>
 <style>
-  @page { size: 110mm 60mm; margin: 0; }
+  @page { size: 105mm 148mm; margin: 0; }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; }
   body { background: #eef2f7; font-family: Arial, 'Segoe UI', sans-serif; color: #1f2937; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .sheet { margin: 8px auto; box-shadow: 0 4px 24px rgba(15, 23, 42, 0.14); page-break-after: always; break-after: page; }
   .sheet:last-of-type { page-break-after: auto; break-after: auto; }
+
   .borrow-card {
-    width: 110mm; height: 60mm; padding: 3mm;
+    width: 105mm; height: 148mm;
     display: flex; flex-direction: column;
-    border: 1px solid #cbd5e1; border-radius: 2mm; background: #ffffff;
-    overflow: hidden;
+    background: #ffffff; overflow: hidden;
   }
-  .header { display: flex; align-items: center; gap: 3mm; height: 12mm; border-bottom: 1px solid #e2e8f0; }
-  .header.continue { height: 8mm; }
-  .logo { width: 10mm; height: 10mm; flex: 0 0 10mm; display: flex; align-items: center; justify-content: center; border: 1px solid #cbd5e1; border-radius: 2mm; padding: 0.5mm; background: #ffffff; }
-  .logo.continue { width: 7mm; height: 7mm; flex-basis: 7mm; }
-  .logo svg, .logo-img { width: 100%; height: 100%; }
-  .logo-img { object-fit: contain; }
-  .header-text { line-height: 1.15; min-width: 0; flex: 1; overflow: hidden; }
-  .lib-name { font-size: 9pt; font-weight: 700; color: #1d4ed8; text-transform: uppercase; }
-  .school-name { font-size: 7pt; color: #475569; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .continue-label { font-size: 6pt; font-weight: 600; color: #64748b; }
-  .header-info { flex: 0 0 auto; display: flex; flex-direction: column; align-items: flex-end; gap: 0.6mm; margin-left: 2mm; }
-  .header-info .qty { font-size: 6.5pt; font-weight: 600; color: #1f2937; white-space: nowrap; }
-  .header-info .badge { margin-top: 0; }
-  .body { display: flex; gap: 3mm; height: 17mm; margin-top: 0; margin-bottom: 1mm; align-items: stretch; border-bottom: 1px solid #e2e8f0; }
-  .avatar { width: 17mm; height: 17mm; flex: 0 0 17mm; display: flex; align-items: center; justify-content: center; }
-  .avatar svg { width: 100%; height: 100%; }
-  .col { flex: 1; min-width: 0; font-size: 6.5pt; display: flex; flex-direction: column; justify-content: center; gap: 1mm; }
-  .row { display: flex; }
-  .row b { flex: 0 0 21mm; font-weight: 600; color: #475569; }
-  .row span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .books { flex: 1; min-height: 0; overflow: hidden; margin-top: 0; }
-  .book-row { display: flex; gap: 3mm; font-size: 7.5pt; line-height: 2.7mm; margin-bottom: 0; }
-  .book-row .num { flex: 0 0 5mm; font-size: 6.5pt; color: #64748b; }
-  .book-row .title { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .book-row .inv { flex: 0 0 auto; margin-left: 5mm; font-family: Consolas, 'Courier New', monospace; font-size: 6.5pt; }
-  .footer { display: flex; align-items: flex-end; gap: 4mm; height: 9mm; margin-top: 0.5mm; }
-  .badge { display: inline-block; padding: 0.5mm 2mm; border-radius: 1mm; font-size: 6pt; font-weight: 700; letter-spacing: 0.3px; margin-top: 1mm; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  .badge-active   { background: #dcfce7; color: #166534; }
-  .badge-returned { background: #e2e8f0; color: #334155; }
-  .badge-overdue  { background: #fee2e2; color: #991b1b; }
-  .badge-neutral  { background: #e2e8f0; color: #334155; }
-  .qr { width: 9mm; height: 9mm; flex: 0 0 9mm; margin-left: auto; }
-  .qr svg { width: 100%; height: 100%; }
-  .sign { font-size: 6pt; text-align: center; }
-  .sign .line { border-top: 1px solid #1f2937; width: 18mm; }
-  .sign .officer { margin-top: 0.6mm; }
+
+  /* HEADER */
+  .header { flex: 0 0 20mm; display: flex; }
+  .header-left { flex: 1.15; display: flex; align-items: center; gap: 2.2mm; padding: 0 3mm; min-width: 0; }
+  .logo-icon { width: 8mm; height: 8mm; flex: 0 0 8mm; border: 0.5mm solid #12235a; border-radius: 1.3mm; display: flex; align-items: center; justify-content: center; background: #ffffff; overflow: hidden; }
+  .logo-icon svg { width: 5.2mm; height: 5.2mm; }
+  .logo-icon .logo-img { width: 100%; height: 100%; object-fit: contain; }
+  .brand-name { font-size: 10pt; font-weight: 800; color: #12235a; letter-spacing: -0.02em; line-height: 1.05; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .brand-sub { font-size: 6pt; color: #475569; margin-top: 0.4mm; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .header-right { flex: 1; background: #12235a; clip-path: polygon(10mm 0, 100% 0, 100% 100%, 0 100%); display: flex; align-items: center; justify-content: center; padding-left: 3mm; }
+  .header-right span { color: #ffffff; font-size: 9.5pt; font-weight: 800; text-align: center; line-height: 1.15; }
+  .header-strip { flex: 0 0 1mm; background: #12235a; }
+
+  /* BODY */
+  .body { flex: 0 0 auto; padding: 3mm 3.2mm 0; display: flex; flex-direction: column; gap: 2.6mm; }
+  .top-row { display: flex; gap: 2.8mm; }
+  .qr-box { width: 26mm; height: 26mm; flex: 0 0 26mm; border: 0.35mm solid #93a3c7; border-radius: 1.5mm; display: flex; align-items: center; justify-content: center; padding: 1.5mm; }
+  .qr-box svg { width: 100%; height: 100%; }
+  .peminjaman-info { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: flex-start; }
+  .pj-label { font-size: 7pt; font-weight: 700; color: #12235a; }
+  .pj-value { font-size: 10pt; font-weight: 800; color: #12235a; margin-top: 0.3mm; margin-bottom: 1.6mm; }
+  .pj-divider { border-bottom: 0.25mm solid #cbd5e1; margin-bottom: 1.4mm; }
+  .kv-row { display: flex; justify-content: space-between; font-size: 7pt; margin-bottom: 1mm; }
+  .kv-row .k { font-weight: 700; color: #1e293b; }
+  .kv-row .v { color: #334155; text-align: right; }
+
+  /* SECTION LABEL + BOX ANGGOTA */
+  .sec-label { background: #12235a; color: #ffffff; font-size: 7pt; font-weight: 700; padding: 1.1mm 3mm; display: inline-block; align-self: flex-start; clip-path: polygon(0 0, 100% 0, calc(100% - 2mm) 100%, 0 100%); letter-spacing: 0.02em; }
+  .box-outline { border: 0.3mm solid #93a3c7; border-radius: 1.5mm; padding: 2mm 2.5mm; margin-top: -0.5mm; }
+  .icon-row { display: flex; align-items: center; gap: 2mm; margin-bottom: 1.4mm; }
+  .icon-row:last-child { margin-bottom: 0; }
+  .icon-circle { width: 5mm; height: 5mm; flex: 0 0 5mm; border-radius: 50%; background: #12235a; display: flex; align-items: center; justify-content: center; }
+  .icon-circle svg { width: 2.8mm; height: 2.8mm; fill: #ffffff; }
+  .icon-row .label-col { width: 15mm; flex: 0 0 15mm; font-size: 7pt; font-weight: 700; }
+  .icon-row .val-col { font-size: 7pt; color: #334155; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* DAFTAR BUKU */
+  .books { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 1.2mm; padding: 2.6mm 3.2mm 3mm; }
+  table.buku { width: 100%; border-collapse: collapse; font-size: 6pt; }
+  table.buku th { background: #12235a; color: #ffffff; font-weight: 700; padding: 1.1mm 1mm; text-align: left; }
+  table.buku th:first-child, table.buku td:first-child { text-align: center; width: 5mm; }
+  table.buku th:nth-child(3), table.buku td:nth-child(3) { text-align: center; width: 14mm; }
+  table.buku th:last-child, table.buku td:last-child { text-align: center; width: 7mm; }
+  table.buku td { padding: 1mm 1mm; border-bottom: 0.2mm solid #e2e8f0; color: #334155; }
+  table.buku td.title { overflow: hidden; text-overflow: ellipsis; }
+  table.buku td.inv { font-family: Consolas, 'Courier New', monospace; }
+
+  /* FOOTER */
+  .footer { flex: 0 0 10mm; background: #12235a; color: #ffffff; display: flex; align-items: center; justify-content: center; gap: 2mm; padding: 0 4mm; font-size: 6.5pt; text-align: center; line-height: 1.4; }
+  .footer svg { width: 4mm; height: 4mm; flex: 0 0 4mm; }
+
   @media print {
     body { background: #ffffff; }
     .sheet { margin: 0; box-shadow: none; }
@@ -299,7 +248,7 @@ export function generateBorrowCardHtml(data: BorrowCardData): string {
 </style>
 </head>
 <body>
-${pages}
+${sheets}
 </body>
 </html>`
 }

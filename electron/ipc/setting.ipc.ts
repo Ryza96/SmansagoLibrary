@@ -2,10 +2,12 @@ import { BrowserWindow, dialog, ipcMain, type IpcMainInvokeEvent } from 'electro
 import type { SettingService } from '../main/services/setting.service'
 import type { ResetDatabaseService } from '../../src/main/services/reset-database.service'
 import type { PickLogoResult } from '../../src/shared/dto/logo'
+import type { PrinterInfoDTO } from '../../src/shared/dto/print'
 
 export function registerSettingHandlers(
   settingService: SettingService,
-  resetDatabaseService: ResetDatabaseService
+  resetDatabaseService: ResetDatabaseService,
+  listPrinters: () => Promise<PrinterInfoDTO[]>
 ): void {
   ipcMain.handle('settings:get', async () =>
     settingService.get()
@@ -13,6 +15,12 @@ export function registerSettingHandlers(
 
   ipcMain.handle('settings:update', async (_event, data: Record<string, unknown>) =>
     settingService.update(data)
+  )
+
+  // Daftar printer sistem untuk pemilih printer kartu peminjaman di UI Settings.
+  // Implementasi di PrintService.listPrinters() (getPrintersAsync via hidden window).
+  ipcMain.handle('settings:listPrinters', async () =>
+    listPrinters()
   )
 
   // Reset Database — seluruh guard & eksekusi di ResetDatabaseService

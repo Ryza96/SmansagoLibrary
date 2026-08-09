@@ -8,7 +8,8 @@ export const printAPI = {
     returnReceipt: (borrowingId: string) => ipcRenderer.invoke('printing:returnReceipt', borrowingId),
     bookLabels: (data: BookLabelData) => ipcRenderer.invoke('printing:bookLabels', data),
     borrowCardPreview: (borrowingId: string) => ipcRenderer.invoke('printing:borrowCardPreview', borrowingId),
-    borrowCard: (borrowingId: string) => ipcRenderer.invoke('printing:borrowCard', borrowingId),
+    borrowCard: (borrowingId: string, options?: { silent?: boolean }) =>
+      ipcRenderer.invoke('printing:borrowCard', borrowingId, options),
     borrowCardPdf: (borrowingId: string) =>
       ipcRenderer.invoke('printing:borrowCardPdf', borrowingId) as Promise<{ saved: boolean; filePath?: string }>
   }

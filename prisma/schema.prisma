@@ -366,6 +366,8 @@ model Setting {
   reportPaperSize      String   @default("A4")
   reportDateFormat     String   @default("DD/MM/YYYY")
   reportSigner         String   @default("")
+  // Print
+  borrowCardPrinter    String   @default("")
   // System
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt

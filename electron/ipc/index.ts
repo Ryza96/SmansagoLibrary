@@ -110,7 +110,11 @@ export function registerAllHandlers(
   })
   registerInventoryHandlers(services.inventoryService)
   registerAssetEventHandlers(services.assetEventService)
-  registerSettingHandlers(services.settingService, services.resetDatabaseService)
+  registerSettingHandlers(
+    services.settingService,
+    services.resetDatabaseService,
+    () => services.printService.listPrinters()
+  )
   registerDashboardHandlers(services.dashboardService)
   registerReportHandlers(services.reportService)
   registerBackupUIHandlers({

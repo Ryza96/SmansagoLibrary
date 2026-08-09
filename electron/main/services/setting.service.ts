@@ -141,7 +141,8 @@ export class SettingService {
       'principalName', 'principalNip', 'librarianName', 'librarianNip',
       'defaultBorrowDays', 'maxBorrowBooks', 'lateFee', 'allowRenewal',
       'inventoryPrefix', 'defaultShelfLocation', 'barcodeFormat',
-      'reportPaperSize', 'reportDateFormat', 'reportSigner'
+      'reportPaperSize', 'reportDateFormat', 'reportSigner',
+      'borrowCardPrinter'
     ]
 
     const filtered: Record<string, unknown> = {}

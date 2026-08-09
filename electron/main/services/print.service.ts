@@ -7,7 +7,7 @@ import { SettingService } from './setting.service'
 import { generateLabelsHtml } from '../../../src/main/services/label.service'
 import { BORROW_CARD_LAYOUT, buildBorrowCardData, generateBorrowCardHtml } from '../../../src/main/services/borrow-card.service'
 import { resolveAssetPath } from '../../../src/main/infrastructure/asset/asset-resolver'
-import type { BorrowReceiptData, ReturnReceiptData, BookLabelData } from '../../../src/shared/dto/print'
+import type { BorrowReceiptData, ReturnReceiptData, BookLabelData, PrinterInfoDTO } from '../../../src/shared/dto/print'
 
 // WO-2 — nama file PDF Kartu Peminjaman (FINAL PREVIEW DESIGN DECISION F5).
 // Format: "Kartu Peminjaman - <borrowNumber> - <Nama Anggota>.pdf".
@@ -33,6 +33,31 @@ const IMAGE_MIME: Record<string, string> = {
   '.webp': 'image/webp',
   '.bmp': 'image/bmp',
   '.ico': 'image/x-icon'
+}
+
+// A6 fisik = 105×148 mm; nilai SSOT dimensi kartu = BORROW_CARD_LAYOUT (105×148mm).
+// Petunjuk nama untuk mendeteksi printer kartu/A6. Electron 33 tidak mengekspos
+// PrinterInfo.pageSizes / supportsCustomPageSizes (keduanya baru ada di Electron
+// ≥34), jadi deteksi ini bersifat heuristic berbasis nama (lihat resolveA6Printer).
+const A6_PRINTER_NAME_HINTS: ReadonlyArray<string> = [
+  'a6',
+  'kartu',
+  'card',
+  'label',
+  'ql-',
+  'ql ',
+  '105x148',
+  '105×148'
+]
+
+// Opsi internal printHtml — perluasan dari WebContentsPrintOptions. `silent` dan
+// field lain sudah ada di tipe bawaan Electron; `resolveA6DeviceName` meminta
+// printHtml memilih printer A6 secara eksplisit via getPrintersAsync();
+// `preferredDeviceName` (dari Settings → borrowCardPrinter) DIUTAMAKAN daripada
+// heuristik nama.
+type PrintHtmlOptions = Electron.WebContentsPrintOptions & {
+  resolveA6DeviceName?: boolean
+  preferredDeviceName?: string
 }
 
 export class PrintService {
@@ -97,18 +122,62 @@ export class PrintService {
     return this.buildBorrowCardHtml(borrowingId)
   }
 
-  async printBorrowCard(borrowingId: string): Promise<void> {
-    const html = await this.buildBorrowCardHtml(borrowingId)
+  async printBorrowCard(borrowingId: string, options?: { silent?: boolean }): Promise<void> {
+    const [html, settings] = await Promise.all([
+      this.buildBorrowCardHtml(borrowingId),
+      this.settingService.get()
+    ])
+
+    // Printer pilihan user (Settings → borrowCardPrinter) lebih diutamakan
+    // daripada heuristik nama A6 — pemilik printer kartu tahu printer mana yang
+    // benar; heuristik hanya jadi fallback bila nilai belum diisi ('').
+    const preferredDeviceName = settings.borrowCardPrinter?.trim() || undefined
+
     await this.printHtml(html, {
       margins: { marginType: 'none' },
-      // WO BORROW CARD PRINT PIPELINE FIX — default paper size cetak 110×60mm
-      // (bukan A4/default). Satuan Size = mikron (110mm=110000, 60mm=60000).
-      // Nilai diambil dari BORROW_CARD_LAYOUT agar SSOT dimensi kartu tetap 1 tempat.
+      // Kartu cetak A6 105×148mm (bukan lagi 110×60mm). Satuan Size = mikron
+      // (105mm=105000, 148mm=148000). Nilai diambil dari BORROW_CARD_LAYOUT agar
+      // SSOT dimensi kartu tetap 1 tempat.
       pageSize: {
         width: BORROW_CARD_LAYOUT.pageWidthMm * 1000,
         height: BORROW_CARD_LAYOUT.pageHeightMm * 1000
+      },
+      // silent:true → cetak langsung tanpa dialog OS, pakai deviceName + pageSize
+      // yang sudah dipastikan A6 (tanpa risiko user/driver mengganti ukuran kertas).
+      // silent:false (default) → dialog cetak OS tetap muncul; hasil bergantung
+      // pilihan kertas di dialog tersebut.
+      silent: options?.silent === true,
+      // Minta printHtml memilih printer A6 secara eksplisit via getPrintersAsync()
+      // bila user belum memilih printer tetap (preferredDeviceName kosong).
+      resolveA6DeviceName: true,
+      preferredDeviceName
+    })
+  }
+
+  // Daftar printer sistem untuk UI Settings (pemilih printer kartu peminjaman).
+  // getPrintersAsync hanya tersedia via webContents → butuh BrowserWindow tersembunyi.
+  async listPrinters(): Promise<PrinterInfoDTO[]> {
+    const window = new BrowserWindow({
+      width: 800,
+      height: 600,
+      show: false,
+      webPreferences: {
+        contextIsolation: true,
+        nodeIntegration: false
       }
     })
+    try {
+      const printers = await window.webContents.getPrintersAsync()
+      return printers.map((p) => ({
+        name: p.name,
+        displayName: p.displayName,
+        description: p.description,
+        isDefault: p.isDefault,
+        status: p.status
+      }))
+    } finally {
+      if (!window.isDestroyed()) window.close()
+    }
   }
 
   async saveBorrowCardPdf(borrowingId: string): Promise<{ saved: boolean; filePath?: string }> {
@@ -281,7 +350,7 @@ export class PrintService {
 </body></html>`
   }
 
-  private printHtml(html: string, printOptions?: Electron.WebContentsPrintOptions): Promise<void> {
+  private printHtml(html: string, printOptions?: PrintHtmlOptions): Promise<void> {
     return new Promise((resolve, reject) => {
       const printWindow = new BrowserWindow({
         width: 800,
@@ -295,18 +364,21 @@ export class PrintService {
 
       printWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`)
 
-      printWindow.webContents.on('did-finish-load', () => {
-        printWindow.webContents.print(
-          { margins: { marginType: 'default' }, printBackground: true, ...printOptions },
-          (success, failureReason) => {
+      printWindow.webContents.on('did-finish-load', async () => {
+        try {
+          const options = await this.resolvePrintOptions(printWindow, printOptions)
+          printWindow.webContents.print(options, (success, failureReason) => {
             if (!printWindow.isDestroyed()) printWindow.close()
             if (success) {
               resolve()
             } else {
               reject(new Error(failureReason ?? 'Gagal mencetak'))
             }
-          }
-        )
+          })
+        } catch (error) {
+          if (!printWindow.isDestroyed()) printWindow.close()
+          reject(error instanceof Error ? error : new Error(String(error)))
+        }
       })
 
       printWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription) => {
@@ -314,5 +386,87 @@ export class PrintService {
         reject(new Error(`Gagal memuat halaman cetak: ${errorDescription}`))
       })
     })
+  }
+
+  private async resolvePrintOptions(
+    printWindow: BrowserWindow,
+    printOptions?: PrintHtmlOptions
+  ): Promise<Electron.WebContentsPrintOptions> {
+    const { resolveA6DeviceName, preferredDeviceName, ...rest } = printOptions ?? {}
+
+    // Base opsi DIEKSPLISITKAN (tidak mengandalkan default Chromium) agar driver
+    // tidak menerapkan orientasi/scaling sendiri:
+    //  - landscape: false → portrait eksplisit (cegah sisa setting kartu 110×60 lama)
+    //  - scaleFactor: 1   → skala 100% eksplisit. CATATAN: scaleFactor adalah
+    //    FAKTOR (1 = 100%), BUKAN persen — nilai 100 justru = 100× zoom.
+    //  - silent: false    → dialog cetak OS muncul (perilaku lama)
+    const options: Electron.WebContentsPrintOptions = {
+      margins: { marginType: 'default' },
+      printBackground: true,
+      landscape: false,
+      scaleFactor: 1,
+      silent: false,
+      ...rest
+    }
+
+    // Prioritas deviceName: (1) deviceName eksplisit, (2) preferredDeviceName dari
+    // Settings (borrowCardPrinter), (3) heuristik nama A6. deviceName eksplisit
+    // (dikirim pemanggil) tetap menang; heuristik hanya bila keduanya kosong.
+    if (!options.deviceName && preferredDeviceName) {
+      options.deviceName = preferredDeviceName
+      console.log(`[Print] deviceName dipakai dari Settings: "${preferredDeviceName}"`)
+    }
+
+    if (resolveA6DeviceName && !options.deviceName) {
+      const target = await this.resolveA6Printer(printWindow)
+      if (target) {
+        options.deviceName = target.name
+        console.log(`[Print] deviceName dipaksa ke printer A6: "${target.displayName ?? target.name}"`)
+      }
+    }
+
+    return options
+  }
+
+  private async resolveA6Printer(printWindow: BrowserWindow): Promise<Electron.PrinterInfo | null> {
+    let printers: Electron.PrinterInfo[]
+    try {
+      printers = await printWindow.webContents.getPrintersAsync()
+    } catch (error) {
+      console.warn('[Print] getPrintersAsync() gagal — fallback ke printer default sistem:', error)
+      return null
+    }
+
+    if (!printers.length) {
+      console.warn('[Print] Tidak ada printer terdeteksi — fallback ke printer default sistem.')
+      return null
+    }
+
+    const defaultPrinter = printers.find((p) => p.isDefault) ?? printers[0]
+    console.log(`[Print] Printer default: "${defaultPrinter.displayName ?? defaultPrinter.name}" (status: ${defaultPrinter.status})`)
+    console.log(
+      '[Print] Daftar printer: ' +
+        printers.map((p) => `"${p.displayName ?? p.name}"${p.isDefault ? ' [default]' : ''}`).join(', ')
+    )
+
+    const matchesHint = (p: Electron.PrinterInfo): boolean =>
+      A6_PRINTER_NAME_HINTS.some((hint) =>
+        `${p.name} ${p.displayName} ${p.description}`.toLowerCase().includes(hint)
+      )
+
+    const candidates = printers.filter(matchesHint)
+    if (!candidates.length) {
+      console.warn(
+        '[Print] Tidak ada printer A6/kartu terdeteksi dari nama printer — deviceName dibiarkan ' +
+          'default sistem; pastikan kertas A6 (105×148mm) dipilih di dialog cetak OS.'
+      )
+      return null
+    }
+
+    const target = candidates.find((p) => p.isDefault) ?? candidates[0]
+    console.log(
+      `[Print] Printer A6/kartu terdeteksi: "${target.displayName ?? target.name}"${target.isDefault ? ' (default)' : ''}`
+    )
+    return target
   }
 }

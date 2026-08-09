@@ -19,6 +19,7 @@ import {
 import { LABELS } from '../utils/labels'
 import { ROUTES } from '../utils/navigation'
 import { useNotification } from '../notification/NotificationContext'
+import type { PrinterInfoDTO } from '../shared/dto/print'
 
 type TabKey = 'identity' | 'data' | 'security' | 'appInfo' | 'about'
 
@@ -26,6 +27,7 @@ interface IdentityForm {
   libraryName: string
   schoolName: string
   librarianName: string
+  borrowCardPrinter: string
 }
 
 interface LogoPreview {
@@ -57,6 +59,15 @@ export default function SettingsPage() {
   const [logoPreview, setLogoPreview] = useState<LogoPreview | null>(null)
   const [logoPicking, setLogoPicking] = useState(false)
   const [resetting, setResetting] = useState(false)
+  const [printers, setPrinters] = useState<PrinterInfoDTO[]>([])
+  const [printersLoading, setPrintersLoading] = useState(true)
+
+  function loadPrinters() {
+    api.settings.listPrinters()
+      .then((list) => setPrinters(list))
+      .catch(() => setPrinters([]))
+      .finally(() => setPrintersLoading(false))
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -67,6 +78,7 @@ export default function SettingsPage() {
           libraryName: data.libraryName,
           schoolName: data.schoolName,
           librarianName: data.librarianName,
+          borrowCardPrinter: data.borrowCardPrinter ?? '',
         })
       })
       .catch((err: unknown) => {
@@ -85,6 +97,7 @@ export default function SettingsPage() {
         if (!cancelled) setBackupDir(info.backupDir)
       })
       .catch(() => {})
+    loadPrinters()
     return () => {
       cancelled = true
     }
@@ -114,6 +127,7 @@ export default function SettingsPage() {
         libraryName: result.libraryName,
         schoolName: result.schoolName,
         librarianName: result.librarianName,
+        borrowCardPrinter: result.borrowCardPrinter ?? '',
       })
       setLogoPreview(null)
       notify.success(LABELS.SETTINGS.SAVED)
@@ -294,6 +308,40 @@ export default function SettingsPage() {
               className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </Field>
+          <div className="sm:col-span-2">
+            <Field label={LABELS.SETTINGS.FIELD_PRINTER}>
+              <p className="text-xs text-slate-400 mb-1">{LABELS.SETTINGS.PRINTER_SUBTITLE}</p>
+              <div className="flex items-center gap-2">
+                <select
+                  value={f.borrowCardPrinter}
+                  onChange={(e) => set('borrowCardPrinter', e.target.value)}
+                  disabled={printersLoading}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                >
+                  <option value="">{LABELS.SETTINGS.PRINTER_AUTO}</option>
+                  {printersLoading ? (
+                    <option value="" disabled>{LABELS.SETTINGS.PRINTER_LOADING}</option>
+                  ) : printers.length === 0 ? (
+                    <option value="" disabled>{LABELS.SETTINGS.PRINTER_NONE}</option>
+                  ) : (
+                    printers.map((printer) => (
+                      <option key={printer.name} value={printer.name}>
+                        {printer.displayName || printer.name}
+                        {printer.isDefault ? ' (default)' : ''}
+                      </option>
+                    ))
+                  )}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => { setPrintersLoading(true); loadPrinters() }}
+                  className="shrink-0 px-3 py-2 border border-slate-300 rounded-lg bg-white text-sm text-slate-600 hover:bg-slate-50 hover:border-slate-400 transition-colors"
+                >
+                  {LABELS.SETTINGS.PRINTER_REFRESH}
+                </button>
+              </div>
+            </Field>
+          </div>
         </div>
         <div className="flex items-center gap-3 mt-6 pt-5 border-t border-slate-100">
           <button

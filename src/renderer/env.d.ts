@@ -143,7 +143,7 @@ interface ElectronAPI {
     returnReceipt: (borrowingId: string) => Promise<void>
     bookLabels: (input: import('../../src/shared/dto/print').BookLabelData) => Promise<void>
     borrowCardPreview: (borrowingId: string) => Promise<string>
-    borrowCard: (borrowingId: string) => Promise<void>
+    borrowCard: (borrowingId: string, options?: { silent?: boolean }) => Promise<void>
     borrowCardPdf: (borrowingId: string) => Promise<{ saved: boolean; filePath?: string }>
   }
   academicYears: {
@@ -282,6 +282,7 @@ interface ElectronAPI {
       reportPaperSize: string
       reportDateFormat: string
       reportSigner: string
+      borrowCardPrinter: string
       createdAt: string
       updatedAt: string
     }>
@@ -308,11 +309,13 @@ interface ElectronAPI {
       reportPaperSize: string
       reportDateFormat: string
       reportSigner: string
+      borrowCardPrinter: string
       createdAt: string
       updatedAt: string
     }>
     pickLogo: () => Promise<import('../../src/shared/dto/logo').PickLogoResult>
     resetDatabase: () => Promise<void>
+    listPrinters: () => Promise<import('../../src/shared/dto/print').PrinterInfoDTO[]>
   }
   platform: string
 }

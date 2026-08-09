@@ -24,7 +24,8 @@ const DEFAULT_SETTINGS: SettingData = {
   barcodeFormat: 'BC-XXXXXXXXXX',
   reportPaperSize: 'A4',
   reportDateFormat: 'DD/MM/YYYY',
-  reportSigner: ''
+  reportSigner: '',
+  borrowCardPrinter: ''
 }
 
 export class SettingRepository {

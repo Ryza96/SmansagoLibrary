@@ -18,8 +18,8 @@ export function registerPrintHandlers(printService: PrintService): void {
   ipcMain.handle('printing:borrowCardPreview', async (_event, borrowingId: string) =>
     printService.getBorrowCardPreviewHtml(borrowingId)
   )
-  ipcMain.handle('printing:borrowCard', async (_event, borrowingId: string) =>
-    printService.printBorrowCard(borrowingId)
+  ipcMain.handle('printing:borrowCard', async (_event, borrowingId: string, options?: { silent?: boolean }) =>
+    printService.printBorrowCard(borrowingId, options)
   )
   ipcMain.handle('printing:borrowCardPdf', async (_event, borrowingId: string) =>
     printService.saveBorrowCardPdf(borrowingId)

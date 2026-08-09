@@ -37,3 +37,13 @@ export interface BookLabelData {
   bookTitle: string
   items: BookLabelItemData[]
 }
+
+// Daftar printer untuk UI Settings (pemilih printer kartu peminjaman).
+// Dipetakan dari Electron.PrinterInfo di PrintService.listPrinters().
+export interface PrinterInfoDTO {
+  name: string
+  displayName?: string
+  description?: string
+  isDefault: boolean
+  status: number
+}

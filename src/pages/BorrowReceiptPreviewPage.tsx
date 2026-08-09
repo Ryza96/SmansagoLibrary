@@ -37,6 +37,9 @@ export default function BorrowReceiptPreviewPage() {
   const [busyPrint, setBusyPrint] = useState(false)
   const [busyPdf, setBusyPdf] = useState(false)
   const [pdfStatus, setPdfStatus] = useState('')
+  // Default silent = true: cetak langsung tanpa dialog OS (driver/printer sudah
+  // di-set custom paper size A6). Checkbox tetap tersedia untuk menonaktifkan.
+  const [silentPrint, setSilentPrint] = useState(true)
 
   const scrollRef = useRef<HTMLDivElement>(null)
   const contentRef = useRef<HTMLDivElement>(null)
@@ -148,7 +151,7 @@ export default function BorrowReceiptPreviewPage() {
     setBusyPrint(true)
     setPdfStatus('')
     try {
-      await window.electronAPI.print.borrowCard(id)
+      await window.electronAPI.print.borrowCard(id, { silent: silentPrint })
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : LABELS.RECEIPT_PREVIEW.PRINT_ERROR
       alert(message)
@@ -234,6 +237,16 @@ export default function BorrowReceiptPreviewPage() {
         </button>
 
         <div className="w-px h-6 bg-slate-300 mx-1" />
+
+        <label className="flex items-center gap-1.5 text-sm text-slate-600 select-none cursor-pointer">
+          <input
+            type="checkbox"
+            checked={silentPrint}
+            onChange={(e) => setSilentPrint(e.target.checked)}
+            className="accent-blue-600"
+          />
+          {LABELS.RECEIPT_PREVIEW.PRINT_SILENT}
+        </label>
 
         <button
           onClick={handlePrint}

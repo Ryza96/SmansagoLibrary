@@ -3,11 +3,11 @@
 // → printHtml → webContents.print) dengan webContents.print di-intercept untuk
 // menangkap opsi cetak tanpa membuka dialog printer sistem.
 // Memverifikasi:
-//   1. Opsi cetak kartu peminjaman memuat pageSize { width: 110000, height: 60000 }
-//      (110mm × 60mm dalam mikron) — bukan A4/default.
+//   1. Opsi cetak kartu peminjaman memuat pageSize { width: 105000, height: 148000 }
+//      (A6 105mm × 148mm dalam mikron) — bukan A4/default.
 //   2. Jalur label buku (A4) TIDAK memuat pageSize → scope terbatas kartu.
-//   3. HTML yang dicetak = template asli dengan @page 110mm 60mm.
-//   4. Regression PDF: renderPdf asli tetap 110×60mm.
+//   3. HTML yang dicetak = template asli dengan @page 105mm 148mm.
+//   4. Regression PDF: renderPdf asli tetap A6 105×148mm.
 //
 // Jalankan: electron main.cjs <compiledOutDir> <outPdfPath>
 
@@ -27,8 +27,8 @@ const PDF_PATH = args[1]
 const { PrintService } = require(path.join(OUT_DIR, 'electron', 'main', 'services', 'print.service.js'))
 
 const MM_TO_PT = 72 / 25.4
-const EXPECTED_W_PT = +(110 * MM_TO_PT).toFixed(3) // 311.811
-const EXPECTED_H_PT = +(60 * MM_TO_PT).toFixed(3) // 170.079
+const EXPECTED_W_PT = +(105 * MM_TO_PT).toFixed(3) // 297.638
+const EXPECTED_H_PT = +(148 * MM_TO_PT).toFixed(3) // 419.528
 
 // ---------------------------------------------------------------------------
 // Intercept webContents.print: menangkap opsi cetak, tidak membuka dialog.
@@ -117,11 +117,11 @@ app.whenReady().then(async () => {
   const borrowPrintOpts = capturedPrints[0] ? capturedPrints[0].printOpts : null
   report('opsi cetak ada (tidak null)', !!borrowPrintOpts, JSON.stringify(borrowPrintOpts && Object.keys(borrowPrintOpts)))
 
-  // pageSize 110×60mm (mikron)
+  // pageSize A6 105×148mm (mikron)
   const ps = borrowPrintOpts && borrowPrintOpts.pageSize
   report(
-    'pageSize = 110000 x 60000 mikron',
-    !!ps && ps.width === 110000 && ps.height === 60000,
+    'pageSize = 105000 x 148000 mikron',
+    !!ps && ps.width === 105000 && ps.height === 148000,
     JSON.stringify(ps)
   )
   report(
@@ -139,28 +139,57 @@ app.whenReady().then(async () => {
     borrowPrintOpts && borrowPrintOpts.printBackground === true,
     String(borrowPrintOpts && borrowPrintOpts.printBackground)
   )
+  report(
+    'landscape eksplisit false (portrait, cegah orientasi lanskap)',
+    borrowPrintOpts && borrowPrintOpts.landscape === false,
+    String(borrowPrintOpts && borrowPrintOpts.landscape)
+  )
+  report(
+    'scaleFactor eksplisit 1 (100% — skala 100×/zoom driver tidak diterapkan)',
+    borrowPrintOpts && borrowPrintOpts.scaleFactor === 1,
+    String(borrowPrintOpts && borrowPrintOpts.scaleFactor)
+  )
+  report(
+    'silent default false (dialog cetak OS tetap muncul)',
+    borrowPrintOpts && borrowPrintOpts.silent === false,
+    String(borrowPrintOpts && borrowPrintOpts.silent)
+  )
+
+  // --- Jalur silent print: silent:true diteruskan ke opsi cetak ---
+  await service.printBorrowCard('6f0f0b5d-6b6c-4a2e-9f12-3c4d5e6f7890', { silent: true })
+  const silentPrintOpts = capturedPrints[1] ? capturedPrints[1].printOpts : null
+  report(
+    'silent:true diteruskan (cetak tanpa dialog)',
+    !!silentPrintOpts && silentPrintOpts.silent === true,
+    JSON.stringify(silentPrintOpts && silentPrintOpts.silent)
+  )
 
   // --- Jalur label buku (A4) — scope terbatas: TIDAK boleh memuat pageSize ---
   await service.printBookLabels({
     bookTitle: 'Buku Contoh',
     items: [{ barcode: 'INV-000001', inventoryNumber: 'INV-000001', shelfLocation: 'RAK 1' }]
   })
-  const labelPrintOpts = capturedPrints[1] ? capturedPrints[1].printOpts : null
-  report('jalur label buku memicu cetak', capturedPrints.length === 2, `captured=${capturedPrints.length}`)
+  const labelPrintOpts = capturedPrints[2] ? capturedPrints[2].printOpts : null
+  report('jalur label buku memicu cetak', capturedPrints.length === 3, `captured=${capturedPrints.length}`)
   report(
     'label buku TANPA pageSize (A4, scope kartu saja)',
     !!labelPrintOpts && labelPrintOpts.pageSize === undefined,
     'label print tidak boleh terpengaruh pageSize kartu'
   )
+  report(
+    'label buku TANPA resolveA6DeviceName (tidak memaksa printer A6)',
+    !!labelPrintOpts && labelPrintOpts.deviceName === undefined,
+    'hanya jalur kartu yang memilih printer A6'
+  )
 
-  // --- HTML yang dicetak = template asli @page 110mm 60mm ---
+  // --- HTML yang dicetak = template asli @page 105mm 148mm ---
   // PrintService.buildBorrowCardHtml dipanggil oleh printBorrowCard; verifikasi
   // ulang lewat jalur preview asli (getBorrowCardPreviewHtml).
   const previewHtml = await service.getBorrowCardPreviewHtml('6f0f0b5d-6b6c-4a2e-9f12-3c4d5e6f7890')
-  report('preview HTML = template asli', previewHtml.includes('@page') && previewHtml.includes('110mm') && previewHtml.includes('60mm'), `${previewHtml.length} chars`)
+  report('preview HTML = template asli', previewHtml.includes('@page') && previewHtml.includes('105mm') && previewHtml.includes('148mm'), `${previewHtml.length} chars`)
   report('preview menampilkan identitas kartu', previewHtml.includes('SMAN Contoh Negeri') && previewHtml.includes('PJ2026080001'), 'data ter-render di template')
 
-  // --- Regression PDF: renderPdf asli tetap 110×60mm ---
+  // --- Regression PDF: renderPdf asli tetap A6 105×148mm ---
   const pdf = await service.renderPdf(previewHtml)
   fs.writeFileSync(PDF_PATH, pdf)
   const boxes = extractMediaBox(pdf)
@@ -168,7 +197,7 @@ app.whenReady().then(async () => {
   const wPt = first ? first.x1 - first.x0 : NaN
   const hPt = first ? first.y1 - first.y0 : NaN
   report(
-    'Regression PDF tetap 110x60mm (MediaBox)',
+    'Regression PDF tetap A6 105x148mm (MediaBox)',
     Math.abs(wPt - EXPECTED_W_PT) < 0.5 && Math.abs(hPt - EXPECTED_H_PT) < 0.5,
     `w=${wPt.toFixed(3)}pt (${(wPt / MM_TO_PT).toFixed(3)}mm) h=${hPt.toFixed(3)}pt (${(hPt / MM_TO_PT).toFixed(3)}mm)`
   )
