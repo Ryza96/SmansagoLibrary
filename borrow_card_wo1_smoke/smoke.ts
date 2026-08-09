@@ -107,27 +107,24 @@ function main(): void {
   expectEqual('1 buku -> 1 halaman', paginateBorrowCard(1).length, 1)
   expectEqual('3 buku -> 1 halaman', paginateBorrowCard(3).length, 1)
   expectEqual('5 buku -> 1 halaman', paginateBorrowCard(5).length, 1)
-  const p6 = paginateBorrowCard(6)
-  expectEqual('6 buku -> 2 halaman', p6.length, 2)
-  expectEqual('hal1 memuat 5', p6[0].endIndex - p6[0].startIndex, 5)
-  expectEqual('hal2 memuat 1', p6[1].endIndex - p6[1].startIndex, 1)
-  const p13 = paginateBorrowCard(13)
-  expectEqual('13 buku -> 2 halaman', p13.length, 2)
-  expectEqual('hal1 memuat 5', p13[0].endIndex, 5)
-  expectEqual('hal2 memuat 8', p13[1].endIndex - p13[1].startIndex, 8)
-  const p18 = paginateBorrowCard(18)
-  expectEqual('18 buku -> 2 halaman', p18.length, 2)
-  expectEqual('hal2 memuat 13', p18[1].endIndex - p18[1].startIndex, 13)
-  const p20 = paginateBorrowCard(20)
-  expectEqual('20 buku -> 3 halaman (5+13+2)', p20.length, 3)
-  expectEqual('hal3 memuat 2', p20[2].endIndex - p20[2].startIndex, 2)
-  expectEqual('tidak ada celah index', p20[2].endIndex, 20)
+  const p21 = paginateBorrowCard(21)
+  expectEqual('21 buku -> 2 halaman', p21.length, 2)
+  expectEqual('hal1 memuat 20', p21[0].endIndex - p21[0].startIndex, 20)
+  expectEqual('hal2 memuat 1', p21[1].endIndex - p21[1].startIndex, 1)
+  const p47 = paginateBorrowCard(47)
+  expectEqual('47 buku -> 2 halaman', p47.length, 2)
+  expectEqual('hal1 memuat 20', p47[0].endIndex - p47[0].startIndex, 20)
+  expectEqual('hal2 memuat 27', p47[1].endIndex - p47[1].startIndex, 27)
+  const p48 = paginateBorrowCard(48)
+  expectEqual('48 buku -> 3 halaman (20+27+1)', p48.length, 3)
+  expectEqual('hal3 memuat 1', p48[2].endIndex - p48[2].startIndex, 1)
+  expectEqual('tidak ada celah index', p48[2].endIndex, 48)
 
   console.log('--- STEP 5: generateBorrowCardHtml — 1 buku ---')
   const html1 = generateBorrowCardHtml(baseData())
   check('html terbentuk', html1.startsWith('<!DOCTYPE html>'))
   check('memuat title Kartu Peminjaman', html1.includes('Kartu Peminjaman'))
-  check('@page 110mm 60mm', html1.includes('size: 110mm 60mm'))
+  check('@page 105mm 148mm', html1.includes('size: 105mm 148mm'))
   expectEqual('jumlah kartu = 1', countOccurrences(html1, 'class="borrow-card"'), 1)
   check('memuat judul buku', html1.includes('Buku Ke-1'))
   check('memuat inventoryNumber', html1.includes('INV-000001'))
@@ -144,19 +141,19 @@ function main(): void {
   check('tidak memuat "+N lainnya"', !html1.includes('lainnya'))
 
   console.log('--- STEP 6: banyak buku — semua tampil, tanpa "+N lainnya" ---')
-  const many = baseData({ books: books(20), footer: { ...baseData().footer, totalBooks: 20 } as BorrowCardFooterData })
+  const many = baseData({ books: books(48), footer: { ...baseData().footer, totalBooks: 48 } as BorrowCardFooterData })
   const htmlMany = generateBorrowCardHtml(many)
   expectEqual('jumlah kartu = 3', countOccurrences(htmlMany, 'class="borrow-card"'), 3)
-  check('memuat Jumlah: 20', htmlMany.includes('Jumlah: 20'))
+  check('memuat Jumlah: 48', htmlMany.includes('Jumlah: 48'))
   check(
-    'semua 20 inventoryNumber tampil',
-    [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20].every((n) =>
+    'semua 48 inventoryNumber tampil',
+    Array.from({ length: 48 }, (_, i) => i + 1).every((n) =>
       htmlMany.includes(`INV-${String(n).padStart(6, '0')}`)
     )
   )
   check(
-    'semua 20 judul tampil',
-    [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20].every((n) =>
+    'semua 48 judul tampil',
+    Array.from({ length: 48 }, (_, i) => i + 1).every((n) =>
       htmlMany.includes(`Buku Ke-${n}`)
     )
   )
@@ -165,7 +162,7 @@ function main(): void {
   expectEqual('array halaman = 3', pagesMany.length, 3)
   check('halaman lanjutan memuat label LANJUTAN', htmlMany.includes('LANJUTAN'))
   check('no pinjam tampil di >= 3 tempat', countOccurrences(htmlMany, BORROW_NUMBER) >= 3)
-  check('Jumlah: 20 di pojok kanan atas tiap kartu', countOccurrences(htmlMany, 'Jumlah: 20') === 3)
+  check('Jumlah: 48 di pojok kanan atas tiap kartu', countOccurrences(htmlMany, 'Jumlah: 48') === 3)
   check('badge AKTIF di header-info tiap kartu', countOccurrences(htmlMany, 'class="badge badge-active"') === 3)
   check('tidak ada footer-left', !htmlMany.includes('footer-left'))
 
@@ -217,6 +214,8 @@ function main(): void {
 }
 
 async function assemblerSection(): Promise<void> {
+  const due = new Date(Date.now() + 30 * 86400000)
+  const dueStr = `${String(due.getDate()).padStart(2, '0')}-${String(due.getMonth() + 1).padStart(2, '0')}-${due.getFullYear()}`
   const sourceSettings = {
     libraryName: 'Perpustakaan SMP Negeri 1 Tunas Bangsa',
     schoolName: 'SMP Negeri 1 Tunas Bangsa',
@@ -228,7 +227,7 @@ async function assemblerSection(): Promise<void> {
     id: BORROW_ID,
     borrowNumber: BORROW_NUMBER,
     borrowDate: new Date('2026-08-01T00:00:00'),
-    dueDate: new Date('2026-08-08T00:00:00'),
+    dueDate: due,
     returnDate: null,
     memberName: 'Budi Santoso',
     memberNumber: 'S-000123',
@@ -254,7 +253,7 @@ async function assemblerSection(): Promise<void> {
   expectEqual('assembler className', withLogo.member.className, 'X Merdeka 1')
   expectEqual('assembler borrowId', withLogo.borrow.borrowId, BORROW_ID)
   expectEqual('assembler borrowDate format', withLogo.borrow.borrowDate, '01-08-2026')
-  expectEqual('assembler dueDate format', withLogo.borrow.dueDate, '08-08-2026')
+  expectEqual('assembler dueDate format', withLogo.borrow.dueDate, dueStr)
   expectEqual('assembler totalBooks', withLogo.footer.totalBooks, 2)
   expectEqual('assembler borrowStatus ACTIVE', withLogo.footer.borrowStatus, 'ACTIVE')
   expectEqual('assembler officerName', withLogo.footer.officerName, 'Siti Aminah')

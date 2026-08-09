@@ -3,9 +3,11 @@ import { useNavigate } from 'react-router-dom'
 import { X, BookmarkCheck } from 'lucide-react'
 import SearchableSelect from '../components/ui/SearchableSelect'
 import { useNotification } from '../notification/NotificationContext'
+import { getMemberType } from '../shared/config/member-type'
 import type { CreateBorrowingInput } from '../types/dtos/borrowing'
 import type { MemberDTO } from '../types/dtos/member'
 import { receiptPreviewPath } from '../utils/navigation'
+import { LABELS } from '../utils/labels'
 
 interface BookEntry {
   bookCopyId: string
@@ -33,6 +35,7 @@ export default function BorrowingPage() {
   const [books, setBooks] = useState<BookEntry[]>([])
   const [memberOptions, setMemberOptions] = useState<{ id: string; name: string }[]>([])
   const [selectedMember, setSelectedMember] = useState<MemberDTO | null>(null)
+  const [memberEligibility, setMemberEligibility] = useState<boolean | null>(null)
   const [memberStats, setMemberStats] = useState<{ activeBookCount: number; nearestDueDate: string | null } | null>(null)
   const [dueDate, setDueDate] = useState('')
   const [saving, setSaving] = useState(false)
@@ -46,6 +49,22 @@ export default function BorrowingPage() {
   useEffect(() => {
     if (!selectedMember) return
     window.electronAPI.borrowings.getMemberBorrowingStats(selectedMember.id).then(setMemberStats)
+  }, [selectedMember])
+
+  useEffect(() => {
+    if (!selectedMember) {
+      setMemberEligibility(null)
+      return
+    }
+    const memberType = getMemberType(selectedMember.memberType)
+    const hasAcademicRecord = memberType?.hasAcademicRecord === true
+    if (!hasAcademicRecord) {
+      setMemberEligibility(selectedMember.status === 'ACTIVE')
+      return
+    }
+    window.electronAPI.enrollments
+      .findActiveByMember(selectedMember.id)
+      .then((enrollment) => setMemberEligibility(enrollment !== null))
   }, [selectedMember])
 
   const fetchMembers = useDebounce(async (query: string) => {
@@ -242,9 +261,19 @@ export default function BorrowingPage() {
                   <span className="text-slate-800">{selectedMember.memberNumber}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-500">Status</span>
-                  <span className={`font-medium ${selectedMember.status === 'ACTIVE' ? 'text-green-600' : 'text-slate-400'}`}>
-                    {selectedMember.status === 'ACTIVE' ? 'Aktif' : 'Nonaktif'}
+                  <span className="text-slate-500">
+                    {getMemberType(selectedMember.memberType)?.hasAcademicRecord
+                      ? LABELS.FIELD.BORROW_ELIGIBILITY
+                      : LABELS.FIELD.MEMBERSHIP_STATUS}
+                  </span>
+                  <span className={`font-medium ${memberEligibility ? 'text-green-600' : 'text-slate-400'}`}>
+                    {getMemberType(selectedMember.memberType)?.hasAcademicRecord
+                      ? memberEligibility
+                        ? LABELS.MEMBER.ELIGIBLE
+                        : LABELS.MEMBER.NOT_ELIGIBLE
+                      : memberEligibility
+                        ? LABELS.FIELD.ACTIVE
+                        : LABELS.FIELD.INACTIVE}
                   </span>
                 </div>
                 <div className="flex justify-between">

@@ -35,7 +35,7 @@ export default function SummarySidebar({
           value={LABELS.MEMBER_TYPES.find((t) => t.value === memberType)?.label || '-'}
         />
         <SummaryRow
-          label={LABELS.FIELD.STATUS}
+          label={LABELS.FIELD.MEMBERSHIP_STATUS}
           value={LABELS.MEMBER_STATUSES.find((s) => s.value === status)?.label || '-'}
         />
         <SummaryRow label={LABELS.FIELD.JOIN_DATE} value={joinDate} />

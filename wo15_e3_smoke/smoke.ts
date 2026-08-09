@@ -5,7 +5,7 @@ import { ClassRepository } from '../src/main/repositories/class.repository'
 import { NumberGeneratorService } from '../src/main/services/number-generator.service'
 import { MemberService } from '../src/main/services/member.service'
 import { getPrisma } from '../src/main/repositories/base/prisma'
-import { ACADEMIC_STATUS, memberStatusForTerminalAcademic } from '../src/shared/config/academic-status'
+import { ACADEMIC_STATUS } from '../src/shared/config/academic-status'
 
 let pass = 0
 let fail = 0
@@ -66,16 +66,7 @@ async function main(): Promise<void> {
   const student1 = await seedStudent('S-000001', 'Siswa Satu')
   check('seed: 2 tahun, 3 kelas, guru, siswa', curriculum.id !== '' && student1.id !== '')
 
-  console.log('--- STEP 1: matriks sinkronisasi §4.3 (config unit) ---')
-  expectEqual('GRADUATED → INACTIVE', memberStatusForTerminalAcademic('GRADUATED'), 'INACTIVE')
-  expectEqual('TRANSFERRED → INACTIVE', memberStatusForTerminalAcademic('TRANSFERRED'), 'INACTIVE')
-  expectEqual('DROPPED → INACTIVE', memberStatusForTerminalAcademic('DROPPED'), 'INACTIVE')
-  expectEqual('PROMOTED → ACTIVE', memberStatusForTerminalAcademic('PROMOTED'), 'ACTIVE')
-  expectEqual('REPEATED → ACTIVE', memberStatusForTerminalAcademic('REPEATED'), 'ACTIVE')
-  expectEqual('REDISTRIBUTED → ACTIVE', memberStatusForTerminalAcademic('REDISTRIBUTED'), 'ACTIVE')
-  expectEqual('ACTIVE → null (tanpa sinkronisasi)', memberStatusForTerminalAcademic('ACTIVE'), null)
-
-  console.log('--- STEP 2: enroll → ACTIVE; member.status tidak berubah ---')
+  console.log('--- STEP 1: enroll → ACTIVE; member.status tidak berubah ---')
   const en1 = await enrollActive(student1.id, classA.id, yearA.id)
   expectEqual('enroll status ACTIVE', en1.status, ACADEMIC_STATUS.active)
   expectEqual('enroll leftAt null', en1.leftAt, null)
@@ -90,23 +81,18 @@ async function main(): Promise<void> {
   await expectRejected('enroll kelas tahun lain ditolak', () => enrollActive(student1.id, classOtherYear.id, yearA.id), 'bukan milik tahun ajaran')
 
   console.log('--- STEP 4: close lifecycle — seluruh status terminal (matriks §4.1) ---')
-  const terminalCases: Array<[string, string, string]> = [
-    ['PROMOTED', 'S-000100', 'ACTIVE'],
-    ['REPEATED', 'S-000101', 'ACTIVE'],
-    ['REDISTRIBUTED', 'S-000102', 'ACTIVE'],
-    ['TRANSFERRED', 'S-000103', 'INACTIVE'],
-    ['DROPPED', 'S-000104', 'INACTIVE'],
-    ['GRADUATED', 'S-000105', 'INACTIVE']
-  ]
-  for (const [status, number, expectedMemberStatus] of terminalCases) {
-    const s = await seedStudent(number, `Siswa ${status}`)
+  // MEMBER_STATUS_ALIGNMENT (Fase 1): close() TIDAK lagi menyinkronkan Member.status —
+  // status keanggotaan dan status akademik adalah dua domain terpisah.
+  const terminalStatuses = ['PROMOTED', 'REPEATED', 'REDISTRIBUTED', 'TRANSFERRED', 'DROPPED', 'GRADUATED']
+  for (const status of terminalStatuses) {
+    const s = await seedStudent(`S-0002${terminalStatuses.indexOf(status)}0`, `Siswa ${status}`)
     const en = await enrollActive(s.id, classA.id, yearA.id)
     const closed = await enrollmentService.close(en.id, { status, note: `close-${status}` })
     expectEqual(`close(${status}) status tersimpan`, closed.status, status)
     expectEqual(`close(${status}) leftAt set`, closed.leftAt !== null, true)
     expectEqual(`close(${status}) note tersimpan`, closed.note, `close-${status}`)
     const memberAfter = await memberRepo.findById(s.id)
-    expectEqual(`close(${status}) → member.status ${expectedMemberStatus}`, memberAfter?.status, expectedMemberStatus)
+    expectEqual(`close(${status}) → member.status TIDAK berubah (tetap ACTIVE)`, memberAfter?.status, 'ACTIVE')
     expectEqual(`close(${status}) findActiveByMember null`, await enrollmentService.findActiveByMember(s.id), null)
     const row = await prisma.memberEnrollment.findUnique({ where: { id: en.id } })
     expectEqual(`close(${status}) row tidak dihapus (histori utuh)`, row !== null, true)
@@ -114,7 +100,7 @@ async function main(): Promise<void> {
 
   console.log('--- STEP 5: invalid transition — close ---')
   const closedGrad = await prisma.memberEnrollment.findFirst({
-    where: { member: { memberNumber: 'S-000105' } }
+    where: { member: { memberNumber: 'S-000250' } }
   })
   await expectRejected('close enrollment sudah ditutup ditolak', () => enrollmentService.close(closedGrad!.id, { status: ACADEMIC_STATUS.dropped }), 'tidak aktif')
   const sCloseBad = await seedStudent('S-000110', 'Siswa Close Invalid')
@@ -169,7 +155,9 @@ async function main(): Promise<void> {
   await enrollmentService.close(enReg.id, { status: ACADEMIC_STATUS.graduated, note: 'tamat' })
   const dto2 = await memberService.findById(sReg.id)
   expectEqual('classInfo null setelah close', dto2.classInfo, null)
-  expectEqual('member.status INACTIVE setelah GRADUATED', dto2.status, 'INACTIVE')
+  // MEMBER_STATUS_ALIGNMENT (Fase 1): close() TIDAK menyinkronkan Member.status —
+  // status keanggotaan tetap ACTIVE (dipicu by-borrow, bukan akademik).
+  expectEqual('member.status TIDAK berubah setelah GRADUATED', dto2.status, 'ACTIVE')
 
   await prisma.$disconnect()
   console.log(`\n${pass} passed, ${fail} failed`)

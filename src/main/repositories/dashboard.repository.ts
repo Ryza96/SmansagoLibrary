@@ -37,7 +37,7 @@ export class DashboardRepository extends BaseRepository {
   }
 
   async countBookCopies(): Promise<number> {
-    return this.prisma.bookCopy.count()
+    return this.prisma.bookCopy.count({ where: { status: { not: BOOK_COPY_STATUS.REMOVED } } })
   }
 
   async countMembers(): Promise<number> {

@@ -67,7 +67,7 @@ export default function MembershipSection({
           {errors.memberType && <p className="text-red-500 text-xs mt-1">{errors.memberType}</p>}
         </div>
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">{LABELS.FIELD.STATUS}</label>
+          <label className="block text-sm font-medium text-slate-700 mb-1">{LABELS.FIELD.MEMBERSHIP_STATUS}</label>
           <select
             value={status}
             onChange={(e) => setStatus(e.target.value)}

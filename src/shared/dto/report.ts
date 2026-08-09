@@ -163,9 +163,9 @@ export interface MemberReportFilter {
   classId?: string
   // Pencarian server-side (R-2, aditif non-breaking): cocok di nomor anggota & nama.
   search?: string
-  // Status Keanggotaan (R-5, aditif non-breaking). Aturan PO: AKTIF = pernah
-  // memiliki MemberEnrollment (status apa pun); NONAKTIF = tidak pernah memiliki
-  // MemberEnrollment. BUKAN berdasarkan Member.status maupun pinjaman aktif.
+  // Status Keanggotaan (R-5, MEMBER_STATUS_ALIGNMENT). Source of Truth = kolom
+  // Member.status: AKTIF = 'ACTIVE', NONAKTIF = selain 'ACTIVE'. MemberEnrollment
+  // BUKAN sumber status ini — hanya untuk informasi Kelas.
   status?: 'ACTIVE' | 'INACTIVE'
   page?: number
   limit?: number
@@ -180,10 +180,10 @@ export interface MemberReportRowDTO {
   email: string | null
   // Kelas saat ini (SSOT MemberEnrollment ACTIVE) atau null.
   className: string | null
-  // Kolom Member.status (keanggotaan sistem). TIDAK sama dengan membershipStatus.
+  // Kolom Member.status (keanggotaan sistem). Source of Truth Status Keanggotaan.
   status: string
-  // Status Keanggotaan (R-5, turunan): ACTIVE = pernah memiliki MemberEnrollment
-  // (status apa pun); INACTIVE = tidak pernah memiliki. Bukan dari pinjaman aktif.
+  // Status Keanggotaan (R-5, turunan dari Member.status): ACTIVE = 'ACTIVE',
+  // INACTIVE = selain 'ACTIVE'. MemberEnrollment BUKAN sumber — hanya untuk Kelas.
   membershipStatus: 'ACTIVE' | 'INACTIVE'
   // Tanggal Bergabung (R-5). Catatan kontrak: Member.createdAt BUKAN definisi
   // bisnis "Tanggal Bergabung" — saat ini hanya dipakai sebagai FALLBACK karena
@@ -197,8 +197,8 @@ export interface MemberReportSummaryDTO {
   students: number
   teachers: number
   general: number
-  // R-5 (aditif): Aktif = pernah memiliki MemberEnrollment; Nonaktif = tidak
-  // pernah. total === active + nonActive; seluruh ringkasan mengikuti filter.
+  // R-5 (MEMBER_STATUS_ALIGNMENT): Aktif = Member.status 'ACTIVE'; Nonaktif =
+  // selain 'ACTIVE'. total === active + nonActive; seluruh ringkasan mengikuti filter.
   active: number
   nonActive: number
 }

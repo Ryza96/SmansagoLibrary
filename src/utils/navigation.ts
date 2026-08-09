@@ -17,6 +17,7 @@ export const ROUTES = {
   MEMBERS_EDIT: '/members/:id/edit',
   MEMBER_ENROLLMENT_HISTORY: '/members/:id/enrollments',
   BORROWINGS: '/borrowings',
+  BORROW_CARD_PRINT: '/borrowings/print-card',
   RETURNS: '/returns',
   INVENTORY: '/inventory',
   INVENTORY_DETAIL: '/inventory/:id',

@@ -15,7 +15,6 @@ import { PromotionPreviewService } from '../src/main/services/promotion-preview.
 import { AcademicYearRepository } from '../src/main/repositories/academic-year.repository'
 import { ClassRepository } from '../src/main/repositories/class.repository'
 import { EnrollmentRepository } from '../src/main/repositories/enrollment.repository'
-import { MemberRepository } from '../src/main/repositories/member.repository'
 import { PromotionRepository } from '../src/main/repositories/promotion.repository'
 import { getPrisma } from '../src/main/repositories/base/prisma'
 import { ACADEMIC_STATUS } from '../src/shared/config/academic-status'
@@ -47,11 +46,10 @@ async function main(): Promise<void> {
   const prisma = getPrisma()
   const enrollmentRepo = new EnrollmentRepository()
   const classRepo = new ClassRepository()
-  const memberRepo = new MemberRepository()
   const academicYearRepo = new AcademicYearRepository()
   const promotionRepo = new PromotionRepository()
   const runService = new PromotionRunService(promotionRepo)
-  const executeService = new PromotionExecuteService(academicYearRepo, classRepo, enrollmentRepo, memberRepo, promotionRepo, runService)
+  const executeService = new PromotionExecuteService(academicYearRepo, classRepo, enrollmentRepo, promotionRepo, runService)
   const previewService = new PromotionPreviewService(academicYearRepo, classRepo, enrollmentRepo)
 
   console.log('--- STEP 0: seed master data (fresh DB) ---')
@@ -146,13 +144,15 @@ async function main(): Promise<void> {
   // 6 seed (tidak dihapus — ditutup via update) + 2 ACTIVE baru (sX, sXI) = 8.
   expectEqual('total enrollment setelah run = 8', await prisma.memberEnrollment.count(), 8)
 
-  console.log('--- STEP 4: sinkronisasi Member.status (RFC §4.3) ---')
+  console.log('--- STEP 4: Member.status TIDAK disentuh execute (MEMBER_STATUS_ALIGNMENT Fase 1) ---')
+  // Eksekusi promosi kini HANYA memutasi enrollment (close + create ACTIVE);
+  // Member.status adalah domain keanggotaan terpisah — tidak pernah disinkronkan.
   expectEqual('sX status ACTIVE', (await prisma.member.findUnique({ where: { id: sX.id } }))?.status, 'ACTIVE')
   expectEqual('sXI status ACTIVE', (await prisma.member.findUnique({ where: { id: sXI.id } }))?.status, 'ACTIVE')
-  expectEqual('sXIIa status INACTIVE', (await prisma.member.findUnique({ where: { id: sXIIa.id } }))?.status, 'INACTIVE')
-  expectEqual('sXIIb status INACTIVE', (await prisma.member.findUnique({ where: { id: sXIIb.id } }))?.status, 'INACTIVE')
+  expectEqual('sXIIa status ACTIVE (GRADUATED TIDAK dinonaktifkan)', (await prisma.member.findUnique({ where: { id: sXIIa.id } }))?.status, 'ACTIVE')
+  expectEqual('sXIIb status ACTIVE (GRADUATED TIDAK dinonaktifkan)', (await prisma.member.findUnique({ where: { id: sXIIb.id } }))?.status, 'ACTIVE')
   expectEqual('sNoTarget status ACTIVE', (await prisma.member.findUnique({ where: { id: sNoTarget.id } }))?.status, 'ACTIVE')
-  expectEqual('sClosed status INACTIVE', (await prisma.member.findUnique({ where: { id: sClosed.id } }))?.status, 'INACTIVE')
+  expectEqual('sClosed status INACTIVE (nilai seed dipertahankan)', (await prisma.member.findUnique({ where: { id: sClosed.id } }))?.status, 'INACTIVE')
 
   console.log('--- STEP 5: invarian satu-ACTIVE per member ---')
   for (const [name, id] of [['sX', sX.id], ['sXI', sXI.id], ['sNoTarget', sNoTarget.id]] as const) {

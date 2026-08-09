@@ -88,7 +88,7 @@ export default function MembersPage() {
                   <tr className="border-b border-slate-200 text-left text-slate-500">
                     <th className="pb-3 font-medium">Nomor Anggota</th>
                     <th className="pb-3 font-medium">Nama</th>
-                    <th className="pb-3 font-medium">Status</th>
+                    <th className="pb-3 font-medium">{LABELS.FIELD.MEMBERSHIP_STATUS}</th>
                     <th className="pb-3 font-medium">Kelas</th>
                     <th className="pb-3 font-medium">Jenis Anggota</th>
                     <th className="pb-3 font-medium w-24">Aksi</th>

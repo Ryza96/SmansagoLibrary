@@ -230,7 +230,7 @@ function ProfileSection({ member }: { member: MemberView }) {
           <SummaryField label={LABELS.FIELD.MEMBER_NUMBER} value={member.number} />
           <SummaryField label={LABELS.FIELD.MEMBER_TYPE} value={member.memberTypeLabel} />
           <SummaryField
-            label={LABELS.FIELD.STATUS}
+            label={LABELS.FIELD.MEMBERSHIP_STATUS}
             value={<StatusBadge status={member.statusLabel} active={member.statusActive} />}
           />
           <SummaryField label={LABELS.FIELD.JOIN_DATE} value={member.joinDate} />
@@ -418,7 +418,7 @@ function StatusCard({ member }: { member: MemberView }) {
     <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-5">
       <h2 className="text-sm font-semibold text-slate-800 mb-4">{LABELS.MEMBER.STATUS_MEMBERSHIP}</h2>
       <div className="space-y-3">
-        <SidebarField label={LABELS.FIELD.STATUS} value={<StatusBadge status={member.statusLabel} active={member.statusActive} />} />
+        <SidebarField label={LABELS.FIELD.MEMBERSHIP_STATUS} value={<StatusBadge status={member.statusLabel} active={member.statusActive} />} />
         <SidebarField label={LABELS.FIELD.JOIN_DATE} value={member.joinDate} />
       </div>
     </div>

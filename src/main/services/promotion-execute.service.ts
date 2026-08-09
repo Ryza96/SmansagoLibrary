@@ -1,11 +1,10 @@
 import { AcademicYearRepository } from '../repositories/academic-year.repository'
 import { ClassRepository } from '../repositories/class.repository'
 import { EnrollmentRepository } from '../repositories/enrollment.repository'
-import { MemberRepository } from '../repositories/member.repository'
 import { PromotionRepository, type PromotionRunItemWrite } from '../repositories/promotion.repository'
 import { PromotionRunService } from './promotion-run.service'
 import { decide } from './promotion-preview.service'
-import { ACADEMIC_STATUS, memberStatusForTerminalAcademic } from '../../shared/config/academic-status'
+import { ACADEMIC_STATUS } from '../../shared/config/academic-status'
 import { getPrisma } from '../repositories/base/prisma'
 import { runTransaction } from '../repositories/base/transaction'
 import { AppError } from '../../../electron/main/errorHandler'
@@ -35,10 +34,11 @@ const OUTCOME_COUNT_KEY: Record<PromotionOutcome, keyof PromotionPreviewCounts> 
 //      enrollment ACTIVE sumber yang diproses;
 //   2) keputusan dihitung oleh decide() P-1 (SATU-SATUNYA decision engine —
 //      tidak ada logika keputusan kedua di manapun);
-//   3) tulis: tutup enrollment sumber (terminal + leftAt) → sinkron Member.status
-//      (RFC §4.3) → buka enrollment ACTIVE baru di kelas target (PROMOTED/
-//      REPEATED); tutup + INACTIVE untuk GRADUATED; NO_TARGET/ERROR tanpa mutasi
-//      (enrollment tetap ACTIVE — RFC §9 state-based eligibility);
+//   3) tulis: tutup enrollment sumber (terminal + leftAt) → buka enrollment ACTIVE
+//      baru di kelas target (PROMOTED/REPEATED); tutup saja untuk GRADUATED;
+//      NO_TARGET/ERROR tanpa mutasi (enrollment tetap ACTIVE — RFC §9 state-based
+//      eligibility). Member.status TIDAK disentuh (MEMBER_STATUS_ALIGNMENT Fase 1 —
+//      status membership terpisah dari status akademik);
 //   4) simpan PromotionRun + seluruh PromotionRunItem (audit, RFC §2.2/§9).
 // Exception apa pun di dalam transaksi = rollback penuh (tidak ada paruh tulis).
 //
@@ -50,7 +50,6 @@ export class PromotionExecuteService {
     private academicYearRepository: AcademicYearRepository,
     private classRepository: ClassRepository,
     private enrollmentRepository: EnrollmentRepository,
-    private memberRepository: MemberRepository,
     private promotionRepository: PromotionRepository,
     private runService: PromotionRunService
   ) {}
@@ -142,10 +141,6 @@ export class PromotionExecuteService {
               throw new AppError(500, 'Internal', `Keputusan ${decision.outcome} tanpa kelas target untuk member ${row.memberId}`)
             }
             await this.enrollmentRepository.closeWithTx(tx, row.id, decision.outcome, note)
-            const memberStatus = memberStatusForTerminalAcademic(decision.outcome)
-            if (memberStatus) {
-              await this.memberRepository.updateStatusWithTx(tx, row.memberId, memberStatus)
-            }
             await this.enrollmentRepository.createActiveWithTx(tx, {
               memberId: row.memberId,
               classId: decision.targetClassId,
@@ -156,7 +151,6 @@ export class PromotionExecuteService {
           }
           case 'GRADUATED': {
             await this.enrollmentRepository.closeWithTx(tx, row.id, ACADEMIC_STATUS.graduated, note)
-            await this.memberRepository.updateStatusWithTx(tx, row.memberId, 'INACTIVE')
             break
           }
           case 'REDISTRIBUTED':

@@ -1,4 +1,4 @@
-import { app, BrowserWindow } from 'electron'
+import { app, BrowserWindow, Menu } from 'electron'
 import path from 'path'
 import dotenv from 'dotenv'
 import { initDatabase, closeDatabase } from './database'
@@ -68,6 +68,8 @@ app.whenReady().then(async () => {
   await container.settingService.get()
 
   createWindow()
+
+  Menu.setApplicationMenu(null)
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {

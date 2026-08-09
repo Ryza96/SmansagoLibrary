@@ -176,7 +176,6 @@ export function createContainer(paths: AppPaths, restoreWiring?: RestoreWiring):
     academicYearRepository,
     classRepository,
     enrollmentRepository,
-    newMemberRepository,
     promotionRepository,
     promotionRunService
   )

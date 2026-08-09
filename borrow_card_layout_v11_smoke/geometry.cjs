@@ -5,6 +5,8 @@
 //   - seluruh baris buku berada di dalam kartu (tidak terpotong keluar);
 //   - QR & tanda tangan tetap di footer kanan-bawah, tidak saling tumpang tindih;
 //   - Jumlah+Status berada di pojok kanan atas (header-info), footer kiri kosong.
+// A6 CONVERSION: kartu 105×148mm, kapasitas halaman 1 = 20, lanjutan = 27;
+// 48 buku -> 3 sheet (distribusi 20+27+1).
 //
 // Jalankan: electron geometry.cjs <compiledOutDir>
 
@@ -136,10 +138,10 @@ app.whenReady().then(async () => {
   report('header-info (Jumlah+Status) di kanan atas header', c0.headerInfo !== null && c0.headerInfo.top < c0.footerTop && c0.headerInfo.left > 0, JSON.stringify(c0.headerInfo))
   report('tidak ada footer-left (area kiri bawah bebas)', !c0.hasFooterLeft, `hasFooterLeft=${c0.hasFooterLeft}`)
 
-  const many = await measure(buildCardHtml(20))
-  report('20 buku -> 3 sheet', many.sheets === 3, `sheets=${many.sheets}`)
+  const many = await measure(buildCardHtml(48))
+  report('48 buku -> 3 sheet', many.sheets === 3, `sheets=${many.sheets}`)
   const dist = many.cards.map((c) => c.rows)
-  report('distribusi baris 5+13+2', JSON.stringify(dist) === JSON.stringify([5, 13, 2]), JSON.stringify(dist))
+  report('distribusi baris 20+27+1', JSON.stringify(dist) === JSON.stringify([20, 27, 1]), JSON.stringify(dist))
   const allNoOverlap = many.cards.every((c) => !c.rowOverlap && c.insideCard && c.footerClear)
   report('tiap sheet: tanpa overlap, di dalam kartu, footer clear', allNoOverlap, JSON.stringify(many.cards.map((c) => ({ rows: c.rows, ov: c.rowOverlap, in: c.insideCard, fc: c.footerClear }))))
 

@@ -35,21 +35,3 @@ export function isTerminalAcademicStatus(value: string): value is AcademicStatus
   return TERMINAL_ACADEMIC_STATUS_SET.has(value)
 }
 
-// RFC §4.3 — sinkronisasi Member.status (sistem) dari status akademik terminal.
-// Status terminal yang berarti "keluar sistem" men-drive member menjadi INACTIVE;
-// status terminal yang berarti "tetap sekolah" mempertahankan member ACTIVE.
-// Mengembalikan null untuk status non-terminal (tidak ada sinkronisasi).
-export function memberStatusForTerminalAcademic(academicStatus: string): 'ACTIVE' | 'INACTIVE' | null {
-  switch (academicStatus) {
-    case ACADEMIC_STATUS.graduated:
-    case ACADEMIC_STATUS.transferred:
-    case ACADEMIC_STATUS.dropped:
-      return 'INACTIVE'
-    case ACADEMIC_STATUS.promoted:
-    case ACADEMIC_STATUS.repeated:
-    case ACADEMIC_STATUS.redistributed:
-      return 'ACTIVE'
-    default:
-      return null
-  }
-}

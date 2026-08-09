@@ -1,7 +1,11 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { BookOpen, PackageSearch, Users, BookMarked, Clock, AlertCircle, Activity, ArrowRightLeft, Undo2, FileSpreadsheet, BookUp, BookDown, TriangleAlert, Hourglass } from 'lucide-react'
+import { BookOpen, PackageSearch, Users, BookMarked, Clock, AlertCircle, Activity, ArrowRightLeft, Undo2, FileSpreadsheet, BookUp, BookDown, TriangleAlert, Hourglass, RefreshCw } from 'lucide-react'
 import type { DashboardOverviewDTO } from '../shared/dto/dashboard'
+import { useNotification } from '../notification/NotificationContext'
+import { LABELS } from '../utils/labels'
+import { ROUTES } from '../utils/navigation'
+import MemberImportDialog from '../components/members/MemberImportDialog'
 
 function useRealtimeClock() {
   const [clock, setClock] = useState(new Date())
@@ -92,26 +96,50 @@ function SummaryCard({ icon, label, value }: SummaryCardProps) {
 
 export default function DashboardPage() {
   const navigate = useNavigate()
+  const { notify } = useNotification()
   const clock = useRealtimeClock()
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
   const [overview, setOverview] = useState<DashboardOverviewDTO | null>(null)
+  const [importMemberOpen, setImportMemberOpen] = useState(false)
+
+  async function load() {
+    setLoading(true)
+    setError(false)
+    try {
+      const data = await window.electronAPI.dashboard.overview()
+      setOverview(data)
+    } catch (err: unknown) {
+      setError(true)
+      notify.error(err instanceof Error ? err.message : LABELS.DASHBOARD.LOAD_ERROR)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
-    async function load() {
-      try {
-        const data = await window.electronAPI.dashboard.overview()
-        setOverview(data)
-      } catch {
-        /* placeholder mode */
-      } finally {
-        setLoading(false)
-      }
-    }
     load()
   }, [])
 
   return (
     <div className="space-y-6">
+
+      {/* ── SECTION 0: ERROR STATE ── */}
+      {error && (
+        <div className="flex items-center justify-between gap-4 rounded-xl border border-rose-200 bg-rose-50 px-5 py-4">
+          <div className="flex items-center gap-3 min-w-0">
+            <AlertCircle size={20} className="text-rose-500 shrink-0" />
+            <p className="text-sm text-rose-700">{LABELS.DASHBOARD.LOAD_ERROR}</p>
+          </div>
+          <button
+            onClick={load}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-600 text-white text-xs font-medium hover:bg-rose-700 transition-colors shrink-0"
+          >
+            <RefreshCw size={14} />
+            {LABELS.DASHBOARD.RETRY}
+          </button>
+        </div>
+      )}
 
       {/* ── SECTION 1: HEADER ── */}
       <div className="bg-slate-900 rounded-xl p-6 text-white">
@@ -213,12 +241,39 @@ export default function DashboardPage() {
 
       {/* ── SECTION 5: IMPORT DATA ── */}
       <div>
-        <div className="border border-dashed border-slate-200 rounded-xl p-6 flex flex-col items-center gap-2 text-center">
-          <FileSpreadsheet size={28} className="text-slate-300" />
-          <div>
-            <p className="text-sm font-medium text-slate-400">Import Data</p>
-            <p className="text-xs text-slate-300 mt-0.5">Coming Soon</p>
-          </div>
+        <h2 className="text-sm font-semibold text-slate-700 uppercase tracking-wider mb-3">{LABELS.DASHBOARD.IMPORT_TITLE}</h2>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+          <button
+            onClick={() => navigate(ROUTES.BOOK_IMPORT)}
+            className="flex items-center gap-5 p-5 rounded-xl border border-slate-200 bg-white hover:shadow-lg hover:-translate-y-0.5 hover:border-slate-300 transition-all duration-200 text-left w-full"
+          >
+            <div className="p-3 rounded-xl shrink-0 text-blue-600 bg-blue-50">
+              <FileSpreadsheet size={24} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-slate-800">{LABELS.DASHBOARD.IMPORT_BOOKS}</p>
+              <p className="text-xs text-slate-500 mt-1">{LABELS.DASHBOARD.IMPORT_BOOKS_DESC}</p>
+            </div>
+            <span className="text-xs font-medium text-slate-400 shrink-0">
+              {LABELS.DASHBOARD.IMPORT_BOOKS_CTA} →
+            </span>
+          </button>
+
+          <button
+            onClick={() => setImportMemberOpen(true)}
+            className="flex items-center gap-5 p-5 rounded-xl border border-slate-200 bg-white hover:shadow-lg hover:-translate-y-0.5 hover:border-slate-300 transition-all duration-200 text-left w-full"
+          >
+            <div className="p-3 rounded-xl shrink-0 text-emerald-600 bg-emerald-50">
+              <Users size={24} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-slate-800">{LABELS.DASHBOARD.IMPORT_MEMBERS}</p>
+              <p className="text-xs text-slate-500 mt-1">{LABELS.DASHBOARD.IMPORT_MEMBERS_DESC}</p>
+            </div>
+            <span className="text-xs font-medium text-slate-400 shrink-0">
+              {LABELS.DASHBOARD.IMPORT_MEMBERS_CTA} →
+            </span>
+          </button>
         </div>
       </div>
 
@@ -248,7 +303,7 @@ export default function DashboardPage() {
           ) : (
             <div className="flex flex-col items-center justify-center py-10 text-slate-400">
               <Activity size={32} className="text-slate-300 mb-3" />
-              <p className="text-sm">Belum ada aktivitas hari ini.</p>
+              <p className="text-sm">{LABELS.DASHBOARD.ACTIVITY_EMPTY}</p>
               <p className="text-xs text-slate-300 mt-1">Aktivitas akan muncul setelah transaksi dilakukan.</p>
             </div>
           )}
@@ -299,6 +354,15 @@ export default function DashboardPage() {
           <SummaryCard icon={<BookMarked size={18} />} label="Sedang Dipinjam" value={loading ? '...' : overview?.summary.activeBorrowings ?? '—'} />
         </div>
       </div>
+
+      {importMemberOpen && (
+        <MemberImportDialog
+          onClose={() => {
+            setImportMemberOpen(false)
+            load()
+          }}
+        />
+      )}
 
     </div>
   )

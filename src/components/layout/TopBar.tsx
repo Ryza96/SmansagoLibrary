@@ -1,23 +1,15 @@
 import { useState } from 'react'
-import { User, Settings, LogOut, Minus, Square, X } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { User, Settings, LogOut } from 'lucide-react'
 import { LABELS } from '../../utils/labels'
+import { ROUTES } from '../../utils/navigation'
 import { useAuthGate } from '../../auth/AuthGate'
 import { useNotification } from '../../notification/NotificationContext'
 import { authErrorMessageOf } from '../../auth/auth-error'
-
-function minimize() {
-  window.electronAPI.window.minimize()
-}
-
-function maximize() {
-  window.electronAPI.window.maximize()
-}
-
-function close() {
-  window.electronAPI.window.close()
-}
+import FileMenuDropdown from './FileMenuDropdown'
 
 export default function TopBar() {
+  const navigate = useNavigate()
   const { refreshStatus } = useAuthGate()
   const { notify } = useNotification()
   const [loggingOut, setLoggingOut] = useState(false)
@@ -38,6 +30,7 @@ export default function TopBar() {
   return (
     <header className="flex items-center justify-between h-12 px-4 bg-slate-900 text-white select-none draggable">
       <div className="flex items-center gap-2">
+        <FileMenuDropdown />
         <span className="font-bold text-lg tracking-wide">APLibrary</span>
       </div>
 
@@ -47,7 +40,11 @@ export default function TopBar() {
           <span>Admin</span>
         </div>
 
-        <button className="p-1.5 rounded hover:bg-slate-700 transition-colors" title="Settings">
+        <button
+          onClick={() => navigate(ROUTES.SETTINGS)}
+          className="p-1.5 rounded hover:bg-slate-700 transition-colors"
+          title={LABELS.SETTINGS.TITLE}
+        >
           <Settings size={16} />
         </button>
 
@@ -59,30 +56,6 @@ export default function TopBar() {
         >
           <LogOut size={16} />
         </button>
-
-        <div className="flex items-center ml-2">
-          <button
-            onClick={minimize}
-            className="p-2 hover:bg-slate-700 transition-colors"
-            title="Minimize"
-          >
-            <Minus size={16} />
-          </button>
-          <button
-            onClick={maximize}
-            className="p-2 hover:bg-slate-700 transition-colors"
-            title="Maximize"
-          >
-            <Square size={14} />
-          </button>
-          <button
-            onClick={close}
-            className="p-2 hover:bg-red-600 transition-colors"
-            title="Close"
-          >
-            <X size={16} />
-          </button>
-        </div>
       </div>
     </header>
   )

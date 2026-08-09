@@ -69,6 +69,16 @@ export class EnrollmentRepository extends BaseRepository {
     })
   }
 
+  // MEMBER_STATUS_ALIGNMENT (Fase 1) — close() service kini satu tulis tunggal
+  // (tanpa sinkronisasi Member.status), sehingga cukup update tanpa transaksi.
+  async close(enrollmentId: string, status: string, note?: string | null): Promise<EnrollmentWithRelations> {
+    return this.prisma.memberEnrollment.update({
+      where: { id: enrollmentId },
+      data: { status, leftAt: new Date(), note },
+      include: enrollmentInclude
+    })
+  }
+
   async countByClass(classId: string): Promise<number> {
     return this.prisma.memberEnrollment.count({
       where: { classId, status: ACADEMIC_STATUS.active, leftAt: null }

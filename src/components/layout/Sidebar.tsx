@@ -12,7 +12,6 @@ import {
   PlayCircle,
   Settings,
   Database,
-  DatabaseBackup,
   ChevronDown,
   ChevronRight
 } from 'lucide-react'
@@ -26,8 +25,6 @@ const menuItems = [
   { to: '/promotions/run', label: 'Promosi', icon: PlayCircle },
   { to: '/promotions', label: 'Riwayat Promosi', icon: TrendingUp },
   { to: '/reports', label: 'Laporan', icon: BarChart3 },
-  { to: '/backup', label: 'Backup', icon: DatabaseBackup },
-  { to: '/restore', label: 'Restore', icon: DatabaseBackup },
   { to: '/settings', label: 'Pengaturan', icon: Settings }
 ]
 

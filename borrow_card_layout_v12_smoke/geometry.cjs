@@ -5,9 +5,10 @@
 //     + inv margin-left 5mm; bukan rata tepi kanan & bukan jarak keras 13mm);
 //   - judul PENDEK menyisakan ruang legroom di kanan baris (sign area terlihat lebih luas);
 //   - judul PANJANG ter-ellipsis namun inv tetap ~8mm setelah judul;
-//   - garis pemisah abu terang antara data anggota & daftar buku + jarak ~1mm;
+//   - garis pemisah abu terang antara data anggota & daftar buku (border-bottom
+//     body, jarak pemisah 0mm karena body margin-bottom 0 & books margin-top 0);
 //   - regresi v1.1: baris tidak overlap, di dalam kartu, footer clear, QR & ttd terpisah;
-//   - kapasitas 5+13 dipertahankan (20 buku -> 3 sheet, distribusi 5+13+2).
+//   - kapasitas A6 20+27 (48 buku -> 3 sheet, distribusi 20+27+1).
 //
 // Jalankan: electron geometry.cjs <compiledOutDir>
 
@@ -168,13 +169,13 @@ app.whenReady().then(async () => {
 
   const single = await measure(buildCardHtml(5))
   const c0 = single.cards[0]
-  report('1 kartu utk 5 buku (kapasitas hal1 = 5)', single.sheets === 1 && c0.rows === 5, `sheets=${single.sheets} rows=${c0.rows}`)
+  report('1 kartu utk 5 buku (kapasitas hal1 = 20)', single.sheets === 1 && c0.rows === 5, `sheets=${single.sheets} rows=${c0.rows}`)
   report('5 baris tidak overlap & di dalam kartu & footer clear', !c0.rowOverlap && c0.insideCard && c0.footerClear, `overlap=${c0.rowOverlap} inside=${c0.insideCard} lastBottom=${c0.lastRowBottom} footerTop=${c0.footerTop}`)
   report('gap inv->judul ~8mm (flex gap 3mm + margin-left 5mm, semua baris)', c0.gaps.every((g) => inRange(g.titleInv, 8, 2)), JSON.stringify(c0.gaps.map((g) => g.titleInv)))
   report('gap num->judul ~3mm (flex gap)', c0.gaps.every((g) => inRange(g.numTitle, 3, 2)), JSON.stringify(c0.gaps.map((g) => g.numTitle)))
   report('judul pendek menyisakan legroom kanan (inv tidak rata ke tepi)', c0.legroomMm !== null && c0.legroomMm >= 5, `legroom=${c0.legroomMm}mm cardRight=${c0.cardRight}`)
   report('separator abu terang antara body & books', c0.hasSeparator, `borderBottom=${c0.hasSeparator}`)
-  report('jarak pemisah ke daftar buku ~1mm', c0.hasBody && inRange(c0.bodyBooksGapMm, 1, 0.8), `gap=${c0.bodyBooksGapMm}mm`)
+  report('jarak pemisah ke daftar buku 0mm (body margin-bottom 0)', c0.hasBody && inRange(c0.bodyBooksGapMm, 0, 0.4), `gap=${c0.bodyBooksGapMm}mm`)
   report('QR & tanda tangan terpisah (tidak overlap)', c0.qr && !overlaps(c0.qr, c0.sign), JSON.stringify({ qr: c0.qr, sign: c0.sign }))
   report('header-info di kanan atas (ada di atas footer)', c0.headerInfo !== null && c0.headerInfo.top < c0.footerTop, JSON.stringify(c0.headerInfo))
   report('tidak ada footer-left', !c0.hasFooterLeft, `hasFooterLeft=${c0.hasFooterLeft}`)
@@ -185,10 +186,10 @@ app.whenReady().then(async () => {
   report('judul panjang: inv tetap ~8mm setelah judul', cLong.gaps.every((g) => inRange(g.titleInv, 8, 2)), JSON.stringify(cLong.gaps.map((g) => g.titleInv)))
   report('judul panjang: baris tidak overlap / di dalam kartu', !cLong.rowOverlap && cLong.insideCard && cLong.footerClear, JSON.stringify({ ov: cLong.rowOverlap, in: cLong.insideCard, fc: cLong.footerClear }))
 
-  const many = await measure(buildCardHtml(20))
-  report('20 buku -> 3 sheet', many.sheets === 3, `sheets=${many.sheets}`)
+  const many = await measure(buildCardHtml(48))
+  report('48 buku -> 3 sheet', many.sheets === 3, `sheets=${many.sheets}`)
   const dist = many.cards.map((c) => c.rows)
-  report('distribusi baris 5+13+2 (kapasitas dipertahankan)', JSON.stringify(dist) === JSON.stringify([5, 13, 2]), JSON.stringify(dist))
+  report('distribusi baris 20+27+1 (kapasitas A6)', JSON.stringify(dist) === JSON.stringify([20, 27, 1]), JSON.stringify(dist))
   const allNoOverlap = many.cards.every((c) => !c.rowOverlap && c.insideCard && c.footerClear)
   report('tiap sheet: tanpa overlap, di dalam kartu, footer clear', allNoOverlap, JSON.stringify(many.cards.map((c) => ({ rows: c.rows, ov: c.rowOverlap, in: c.insideCard, fc: c.footerClear }))))
   report('tiap sheet: gap inv->judul ~8mm', many.cards.every((c) => c.gaps.length === 0 || c.gaps.every((g) => inRange(g.titleInv, 8, 2))), JSON.stringify(many.cards.map((c) => c.gaps[0])))

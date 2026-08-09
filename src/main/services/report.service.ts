@@ -279,9 +279,10 @@ export class ReportService {
         email: m.email,
         className: enrollment ? `${enrollment.class.educationLevel} ${enrollment.class.parallel}` : null,
         status: m.status,
-        // Status Keanggotaan (R-5): ACTIVE = pernah memiliki MemberEnrollment
-        // (status apa pun — _count seluruh enrollment); bukan dari pinjaman aktif.
-        membershipStatus: m._count.memberEnrollments > 0 ? 'ACTIVE' : 'INACTIVE',
+        // Status Keanggotaan (R-5, MEMBER_STATUS_ALIGNMENT): Source of Truth = kolom
+        // Member.status — ACTIVE bila 'ACTIVE', selainnya INACTIVE. MemberEnrollment
+        // BUKAN sumber membershipStatus (hanya untuk Kelas).
+        membershipStatus: m.status === 'ACTIVE' ? 'ACTIVE' : 'INACTIVE',
         // Tanggal Bergabung = Member.createdAt. CATATAN: ini FALLBACK sementara —
         // createdAt bukan definisi bisnis "Tanggal Bergabung"; domain belum punya
         // field khusus. Ganti ke field khusus saat tersedia.

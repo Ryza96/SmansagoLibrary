@@ -18,7 +18,6 @@ import { PromotionRunService } from '../src/main/services/promotion-run.service'
 import { AcademicYearRepository } from '../src/main/repositories/academic-year.repository'
 import { ClassRepository } from '../src/main/repositories/class.repository'
 import { EnrollmentRepository } from '../src/main/repositories/enrollment.repository'
-import { MemberRepository } from '../src/main/repositories/member.repository'
 import { PromotionRepository } from '../src/main/repositories/promotion.repository'
 import { getPrisma } from '../src/main/repositories/base/prisma'
 import { ACADEMIC_STATUS } from '../src/shared/config/academic-status'
@@ -51,11 +50,10 @@ async function main(): Promise<void> {
   const prisma = getPrisma()
   const enrollmentRepo = new EnrollmentRepository()
   const classRepo = new ClassRepository()
-  const memberRepo = new MemberRepository()
   const academicYearRepo = new AcademicYearRepository()
   const promotionRepo = new PromotionRepository()
   const runService = new PromotionRunService(promotionRepo)
-  const executeService = new PromotionExecuteService(academicYearRepo, classRepo, enrollmentRepo, memberRepo, promotionRepo, runService)
+  const executeService = new PromotionExecuteService(academicYearRepo, classRepo, enrollmentRepo, promotionRepo, runService)
 
   console.log('--- STEP 0: seed master data + eksekusi 1 run (via executeService P-2) ---')
   const curriculum = await prisma.curriculum.create({ data: { name: 'MERDEKA' } })

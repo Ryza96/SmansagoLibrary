@@ -37,8 +37,9 @@ export interface MemberReportQuery {
   academicYearId?: string
   classId?: string
   search?: string
-  // R-5: Status Keanggotaan. ACTIVE = pernah memiliki MemberEnrollment;
-  // INACTIVE = tidak pernah. Bukan dari Member.status maupun pinjaman aktif.
+  // R-5: Status Keanggotaan. Source of Truth = kolom Member.status (MEMBER_STATUS
+  // ALIGNMENT): ACTIVE = status 'ACTIVE', INACTIVE = selain 'ACTIVE'. MemberEnrollment
+  // BUKAN sumber membershipStatus (hanya untuk Kelas).
   status?: 'ACTIVE' | 'INACTIVE'
   page?: number
   limit?: number
@@ -77,9 +78,10 @@ const borrowReportInclude = {
 type BorrowReportRow = Prisma.BorrowGetPayload<{ include: typeof borrowReportInclude }>
 
 // SSOT penempatan kelas = MemberEnrollment ACTIVE (pola member.repository.findMany).
-// _count.memberEnrollments = JUMLAH SELURUH enrollment (status apa pun) — independen
-// dari filter include; dipakai Laporan Anggota R-5 untuk menurunkan membershipStatus
-// ("pernah memiliki MemberEnrollment").
+// Include HANYA untuk turunan Kelas (className). Status Keanggotaan (membershipStatus)
+// TIDAK diturunkan dari sini — Source of Truth = kolom Member.status (MEMBER_STATUS
+// ALIGNMENT). Konsekuensinya: enrollment di-scan dengan filter ACTIVE, dan _count
+// enrollment tidak lagi dibutuhkan oleh Laporan Anggota R-5.
 const memberReportInclude = {
   memberEnrollments: {
     where: { status: ACADEMIC_STATUS.active, leftAt: null },
@@ -88,8 +90,7 @@ const memberReportInclude = {
       academicYear: true
     },
     orderBy: { enrolledAt: 'desc' }
-  },
-  _count: { select: { memberEnrollments: true } }
+  }
 } as const
 
 type MemberReportRow = Prisma.MemberGetPayload<{ include: typeof memberReportInclude }>
@@ -246,14 +247,13 @@ function buildMemberReportWhere(query: MemberReportQuery): Prisma.MemberWhereInp
     where.memberEnrollments = { some: enrollmentFilter }
   }
 
+  // R-5 (MEMBER_STATUS_ALIGNMENT): Filter Status Keanggotaan berdasar kolom
+  // Member.status — ACTIVE = 'ACTIVE', INACTIVE = selain 'ACTIVE'. BUKAN berdasar
+  // keberadaan MemberEnrollment (enrollment hanya dipakai filter kelas/tahun di atas).
   if (query.status === 'ACTIVE') {
-    const existing = where.memberEnrollments as Prisma.MemberEnrollmentListRelationFilter | undefined
-    // Kelas/tahun sudah membatasi via some → implies "pernah memiliki"; hindari
-    // menimpa predicate kelas.
-    where.memberEnrollments = existing?.some ? existing : { ...(existing ?? {}), some: {} }
+    where.status = 'ACTIVE'
   } else if (query.status === 'INACTIVE') {
-    const existing = (where.memberEnrollments as Prisma.MemberEnrollmentListRelationFilter | undefined) ?? {}
-    where.memberEnrollments = { ...existing, none: {} }
+    where.status = { not: 'ACTIVE' }
   }
 
   return where
@@ -493,20 +493,16 @@ export class ReportRepository extends BaseRepository {
     return grouped.map((g) => ({ memberType: g.memberType, count: g._count._all }))
   }
 
-  // Ringkasan Status Keanggotaan (R-5): ACTIVE = pernah memiliki MemberEnrollment
-  // (memberEnrollments some {}), NONAKTIF = tidak pernah (none {}). Seluruh predikat
-  // filter (search/kelas/status) tetap diberlakukan di atasnya — kombinasi some+none
-  // di-AND Prisma sehingga `active + nonActive === total` konsisten dengan pagination.
+  // Ringkasan Status Keanggotaan (R-5, MEMBER_STATUS_ALIGNMENT): ACTIVE = kolom
+  // Member.status 'ACTIVE', NONAKTIF = selain 'ACTIVE'. MemberEnrollment BUKAN sumber.
+  // `base` (buildMemberReportWhere) sudah memuat filter search/kelas/tahun/status;
+  // partisi ACTIVE/nonActive di-AND di atas base (bukan menimpa) sehingga ringkasan
+  // SELALU mengikuti filter — active + nonActive === total konsisten dengan pagination.
   async countMemberMembershipSummary(query: MemberReportQuery) {
     const base = buildMemberReportWhere(query)
-    const baseEnroll = (base.memberEnrollments as Prisma.MemberEnrollmentListRelationFilter | undefined) ?? {}
     const [active, nonActive] = await Promise.all([
-      this.prisma.member.count({
-        where: { ...base, memberEnrollments: { ...baseEnroll, some: baseEnroll.some ?? {} } }
-      }),
-      this.prisma.member.count({
-        where: { ...base, memberEnrollments: { ...baseEnroll, none: {} } }
-      })
+      this.prisma.member.count({ where: { ...base, AND: [{ status: 'ACTIVE' }] } }),
+      this.prisma.member.count({ where: { ...base, AND: [{ status: { not: 'ACTIVE' } }] } })
     ])
     return { active, nonActive }
   }
