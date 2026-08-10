@@ -37,6 +37,7 @@ export interface BookLabelData {
   libraryName?: string
   schoolName?: string
   logo?: string
+  barcodeFormat?: string
   bookTitle: string
   items: BookLabelItemData[]
 }

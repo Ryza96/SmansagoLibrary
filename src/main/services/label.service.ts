@@ -62,7 +62,7 @@ function labelHeaderHtml(data: BookLabelData): string {
 
 function labelItemHtml(item: BookLabelItemData, data: BookLabelData): string {
   const barcodeValue = item.barcode || item.inventoryNumber
-  const barcodeSvg = generateBarcodeSvg(barcodeValue)
+  const barcodeSvg = generateBarcodeSvg(barcodeValue, data.barcodeFormat)
   const authorHtml = item.author ? `<div class="label-author">${escapeHtml(item.author)}</div>` : ''
 
   return `<div class="label">

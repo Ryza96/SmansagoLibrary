@@ -80,7 +80,8 @@ export class PrintService {
       ...data,
       libraryName: data.libraryName ?? settings.libraryName,
       schoolName: settings.schoolName,
-      logo: logo ?? ''
+      logo: logo ?? '',
+      barcodeFormat: data.barcodeFormat ?? settings.barcodeFormat
     }
   }
 

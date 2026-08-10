@@ -20,6 +20,7 @@ import { LABELS } from '../utils/labels'
 import { ROUTES } from '../utils/navigation'
 import { useNotification } from '../notification/NotificationContext'
 import type { PrinterInfoDTO } from '../shared/dto/print'
+import { BARCODE_FORMATS, normalizeBarcodeFormat } from '../shared/config/barcode-format'
 
 type TabKey = 'identity' | 'data' | 'security' | 'appInfo' | 'about'
 
@@ -28,6 +29,7 @@ interface IdentityForm {
   schoolName: string
   librarianName: string
   borrowCardPrinter: string
+  barcodeFormat: string
 }
 
 interface LogoPreview {
@@ -79,6 +81,7 @@ export default function SettingsPage() {
           schoolName: data.schoolName,
           librarianName: data.librarianName,
           borrowCardPrinter: data.borrowCardPrinter ?? '',
+          barcodeFormat: normalizeBarcodeFormat(data.barcodeFormat),
         })
       })
       .catch((err: unknown) => {
@@ -128,6 +131,7 @@ export default function SettingsPage() {
         schoolName: result.schoolName,
         librarianName: result.librarianName,
         borrowCardPrinter: result.borrowCardPrinter ?? '',
+        barcodeFormat: normalizeBarcodeFormat(result.barcodeFormat),
       })
       setLogoPreview(null)
       notify.success(LABELS.SETTINGS.SAVED)
@@ -342,6 +346,22 @@ export default function SettingsPage() {
               </div>
             </Field>
           </div>
+        </div>
+        <div className="sm:col-span-2">
+          <Field label={LABELS.SETTINGS.FIELD_BARCODE_FORMAT}>
+            <p className="text-xs text-slate-400 mb-1">{LABELS.SETTINGS.BARCODE_FORMAT_SUBTITLE}</p>
+            <select
+              value={f.barcodeFormat}
+              onChange={(e) => set('barcodeFormat', e.target.value)}
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              {Object.values(BARCODE_FORMATS).map((format) => (
+                <option key={format.code} value={format.code}>
+                  {format.label}
+                </option>
+              ))}
+            </select>
+          </Field>
         </div>
         <div className="flex items-center gap-3 mt-6 pt-5 border-t border-slate-100">
           <button

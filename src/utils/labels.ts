@@ -783,6 +783,8 @@ export const LABELS = {
     FIELD_SCHOOL_NAME: 'Nama Sekolah',
     FIELD_LOGO: 'Logo Perpustakaan',
     FIELD_LIBRARIAN_NAME: 'Nama Pustakawan',
+    FIELD_BARCODE_FORMAT: 'Format Barcode',
+    BARCODE_FORMAT_SUBTITLE: 'Simbol kode batang pada label buku.',
     LOGO_PICK: 'PILIH LOGO',
     LOGO_COMING_SOON: 'Fitur akan tersedia pada tahap berikutnya.',
     SAVE: 'Simpan Perubahan',
