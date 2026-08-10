@@ -21,9 +21,13 @@ export class DatabaseReconciliationService {
     })
 
     const setting = await prisma.setting.findFirst()
-    const prefix = (setting?.inventoryPrefix?.trim().toUpperCase() || DEFAULT_PREFIX)
+    const settingPrefix = (setting?.inventoryPrefix?.trim().toUpperCase() || DEFAULT_PREFIX)
 
-    const maxInventoryNumber = this.maxInventoryNumber(copies.map((c) => c.inventoryNumber), prefix)
+    // maxInventoryNumber memakai needle TETAP 'INV-' pada kolom inventoryNumber —
+    // independen dari Setting.inventoryPrefix (inventoryNumber selalu INV-XXXXXX;
+    // hanya kolom barcode yang boleh ber-prefix khusus). Nilai prefix setting
+    // tetap ditulis ke record sequence (kosmetik/informasional).
+    const maxInventoryNumber = this.maxInventoryNumber(copies.map((c) => c.inventoryNumber), DEFAULT_PREFIX)
     const duplicateInventoryNumbers = this.findDuplicates(copies.map((c) => c.inventoryNumber))
     const duplicateBarcodes = this.findDuplicates(copies.map((c) => c.barcode))
 
@@ -40,12 +44,12 @@ export class DatabaseReconciliationService {
         where: { id: SEQUENCE_ID },
         create: {
           id: SEQUENCE_ID,
-          prefix,
+          prefix: settingPrefix,
           lastNumber: maxInventoryNumber,
         },
         update: {
           lastNumber: { set: maxInventoryNumber },
-          prefix,
+          prefix: settingPrefix,
         },
       })
       sequenceSynced = true

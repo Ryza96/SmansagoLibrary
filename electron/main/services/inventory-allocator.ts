@@ -4,15 +4,23 @@ const SEQUENCE_ID = 'default'
 const DEFAULT_PREFIX = 'INV'
 const PAD_LENGTH = 6
 
-// Alokasi nomor inventaris (INV-XXXXXX) — sisi legacy (jalur import buku).
+// Alokasi nomor inventaris + barcode — sisi legacy (jalur tambah eksemplar).
+// inventoryNumber SELALU 'INV-XXXXXX'; barcode = '<Setting.inventoryPrefix>-XXXXXX'.
+// Keduanya berbagi SATU counter (tidak di-reset saat prefix berubah).
+// Tanpa healing — urutan dari lastNumber; kolisi ditangani retry P2002 caller.
 // Prefix dibaca dari `Setting.inventoryPrefix` di dalam transaksi yang sama;
-// fallback 'INV'. Nomor urut berlanjut (tidak di-reset saat prefix berubah).
+// fallback 'INV'.
+
+export interface InventoryAllocation {
+  inventoryNumber: string
+  barcode: string
+}
 
 export class InventoryAllocator {
   async allocate(
     tx: Prisma.TransactionClient,
     count: number
-  ): Promise<string[]> {
+  ): Promise<InventoryAllocation[]> {
     const prefix = await this.readPrefix(tx)
     const record = await tx.inventorySequence.upsert({
       where: { id: SEQUENCE_ID },
@@ -31,7 +39,10 @@ export class InventoryAllocator {
 
     return Array.from({ length: count }, (_, i) => {
       const seq = startNumber + i
-      return `${prefix}-${seq.toString().padStart(PAD_LENGTH, '0')}`
+      return {
+        inventoryNumber: `${DEFAULT_PREFIX}-${seq.toString().padStart(PAD_LENGTH, '0')}`,
+        barcode: `${prefix}-${seq.toString().padStart(PAD_LENGTH, '0')}`
+      }
     })
   }
 

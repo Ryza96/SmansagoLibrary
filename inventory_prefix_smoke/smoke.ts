@@ -10,15 +10,19 @@ import { AppError } from '../electron/main/errorHandler'
 import path from 'path'
 import os from 'os'
 
-// inventory_prefix_smoke — Awalan Nomor Inventaris (Setting.inventoryPrefix)
+// inventory_prefix_smoke — Awalan Nomor Inventaris & Barcode
 //
-// Menutup fitur: prefix nomor inventaris/barcode kini konfigurable dari
-// Pengaturan (Identitas Perpustakaan). Scope:
-//   1. BOTH allocators (src/main baru + electron/main legacy) membaca prefix
-//      dari Setting.inventoryPrefix di dalam transaksi (fallback 'INV').
-//   2. Perubahan prefix TIDAK me-reset urutan — nomor berlanjut.
-//   3. Healing tetap prefix-aware (maksimum dari kode yang pakai prefix aktif).
-//   4. Reconciliation Database (startup) memakai prefix dari setting.
+// Desain baru: kolom `inventoryNumber` SELALU 'INV-XXXXXX' (identitas stabil);
+// kolom `barcode` = '<Setting.inventoryPrefix>-XXXXXX'. Kedua nilai memakai
+// SATU counter urutan yang sama. Scope:
+//   1. BOTH allocators (src/main baru + electron/main legacy) mengembalikan
+//      pasangan { inventoryNumber: 'INV-...', barcode: '<prefix>-...' }.
+//   2. Perubahan prefix TIDAK me-reset urutan — nomor berlanjut (dua kolom
+//      berbagi counter).
+//   3. Healing membaca kolom inventoryNumber dengan needle TETAP 'INV-' —
+//      nilai ber-prefix lain (mis. legacy 'BC-...') TIDAK memengaruhi urutan.
+//   4. Reconciliation Database (startup) memakai needle tetap 'INV-',
+//      independen dari Setting.inventoryPrefix.
 //   5. Reset Database mempertahankan prefix setting di InventorySequence.
 //   6. Backend SettingService.update: validasi + normalisasi (uppercase/trim).
 //
@@ -32,6 +36,21 @@ function deepEqual(a: unknown, b: unknown): boolean {
   if (a === b) return true
   if (Array.isArray(a) && Array.isArray(b)) {
     return a.length === b.length && a.every((v, i) => deepEqual(v, b[i]))
+  }
+  if (
+    typeof a === 'object' &&
+    a !== null &&
+    typeof b === 'object' &&
+    b !== null &&
+    !Array.isArray(a) &&
+    !Array.isArray(b)
+  ) {
+    const ka = Object.keys(a as Record<string, unknown>)
+    const kb = Object.keys(b as Record<string, unknown>)
+    return (
+      ka.length === kb.length &&
+      ka.every((k) => deepEqual((a as Record<string, unknown>)[k], (b as Record<string, unknown>)[k]))
+    )
   }
   return false
 }
@@ -73,6 +92,11 @@ async function expectRejected(fn: () => Promise<unknown>, messagePart: string): 
   }
 }
 
+interface AllocatedPair {
+  inventoryNumber: string
+  barcode: string
+}
+
 async function main(): Promise<void> {
   await initDatabase()
   const prisma = getPrisma()
@@ -87,11 +111,11 @@ async function main(): Promise<void> {
     await prisma.setting.update({ where: { id: (await prisma.setting.findFirstOrThrow()).id }, data: { inventoryPrefix: prefix } })
   }
 
-  async function allocateNew(count: number): Promise<string[]> {
+  async function allocateNew(count: number): Promise<AllocatedPair[]> {
     return prisma.$transaction((tx) => newAllocator.allocate(tx, count))
   }
 
-  async function allocateLegacy(count: number): Promise<string[]> {
+  async function allocateLegacy(count: number): Promise<AllocatedPair[]> {
     return prisma.$transaction((tx) => legacyAllocator.allocate(tx, count))
   }
 
@@ -105,62 +129,80 @@ async function main(): Promise<void> {
     data: { isbn: `978-${ts}`, title: `Buku Uji-${ts}`, authorId: author.id, publisherId: publisher.id, categoryId: category.id },
   })
 
-  console.log('--- STEP 2: allocator BARU membaca prefix dari setting ---')
-  expectEqual('BC allocate(2)', await allocateNew(2), ['BC-000001', 'BC-000002'])
-  expectEqual('BC allocate(1)', await allocateNew(1), ['BC-000003'])
+  console.log('--- STEP 2: allocator BARU — pasangan INV + prefix dari setting ---')
+  expectEqual(
+    'BC allocate(2)',
+    await allocateNew(2),
+    [
+      { inventoryNumber: 'INV-000001', barcode: 'BC-000001' },
+      { inventoryNumber: 'INV-000002', barcode: 'BC-000002' },
+    ]
+  )
+  expectEqual('BC allocate(1)', await allocateNew(1), [{ inventoryNumber: 'INV-000003', barcode: 'BC-000003' }])
   const seqAfterBc = await prisma.inventorySequence.findUniqueOrThrow({ where: { id: 'default' } })
   expectEqual('lastNumber', seqAfterBc.lastNumber, 3)
   expectEqual('record.prefix', seqAfterBc.prefix, 'BC')
 
   console.log('--- STEP 3: ganti prefix PSA — urutan BERLANJUT (tidak reset) ---')
   await setPrefix('PSA')
-  expectEqual('PSA allocate(1) lanjut nomor', await allocateNew(1), ['PSA-000004'])
+  expectEqual('PSA allocate(1) lanjut nomor', await allocateNew(1), [{ inventoryNumber: 'INV-000004', barcode: 'PSA-000004' }])
   const seqAfterPsa = await prisma.inventorySequence.findUniqueOrThrow({ where: { id: 'default' } })
   expectEqual('lastNumber tetap berlanjut', seqAfterPsa.lastNumber, 4)
   expectEqual('record.prefix berubah', seqAfterPsa.prefix, 'PSA')
 
-  console.log('--- STEP 4: healing prefix-aware (max kode prefix aktif) ---')
+  console.log('--- STEP 4: healing needle TETAP INV- (bukan prefix aktif) ---')
   await prisma.bookCopy.create({
-    data: { bookId: book.id, inventoryNumber: 'BC-000020', barcode: 'BC-000020', condition: 'GOOD', status: 'AVAILABLE', shelfLocation: 'R1' },
+    data: { bookId: book.id, inventoryNumber: 'INV-000020', barcode: 'INV-000020', condition: 'GOOD', status: 'AVAILABLE', shelfLocation: 'R1' },
+  })
+  await prisma.bookCopy.create({
+    data: { bookId: book.id, inventoryNumber: 'BC-000099', barcode: 'BC-000099', condition: 'GOOD', status: 'AVAILABLE', shelfLocation: 'R1' },
   })
   await setPrefix('BC')
-  expectEqual('healing ambil max BC=20', await allocateNew(1), ['BC-000021'])
+  expectEqual('healing ambil max INV=20', await allocateNew(1), [{ inventoryNumber: 'INV-000021', barcode: 'BC-000021' }])
   const seqAfterHeal = await prisma.inventorySequence.findUniqueOrThrow({ where: { id: 'default' } })
   expectEqual('lastNumber healing', seqAfterHeal.lastNumber, 21)
+  expectEqual('BC-000099 legacy diabaikan', await allocateNew(1), [{ inventoryNumber: 'INV-000022', barcode: 'BC-000022' }])
 
-  console.log('--- STEP 5: allocator LEGACY juga membaca prefix ---')
+  console.log('--- STEP 5: allocator LEGACY juga mengembalikan pasangan ---')
   await setPrefix('LGC')
-  expectEqual('legacy LGC allocate(2)', await allocateLegacy(2), ['LGC-000022', 'LGC-000023'])
-  expectEqual('legacy LGC allocate(1)', await allocateLegacy(1), ['LGC-000024'])
+  expectEqual(
+    'legacy LGC allocate(2)',
+    await allocateLegacy(2),
+    [
+      { inventoryNumber: 'INV-000023', barcode: 'LGC-000023' },
+      { inventoryNumber: 'INV-000024', barcode: 'LGC-000024' },
+    ]
+  )
+  expectEqual('legacy LGC allocate(1)', await allocateLegacy(1), [{ inventoryNumber: 'INV-000025', barcode: 'LGC-000025' }])
 
   console.log('--- STEP 6: fallback INV bila prefix kosong ---')
   await setPrefix('')
-  expectEqual('fallback INV', await allocateNew(1), ['INV-000025'])
+  expectEqual('fallback INV (inv & barcode sama)', await allocateNew(1), [{ inventoryNumber: 'INV-000026', barcode: 'INV-000026' }])
   const seqAfterInv = await prisma.inventorySequence.findUniqueOrThrow({ where: { id: 'default' } })
-  expectEqual('lastNumber fallback', seqAfterInv.lastNumber, 25)
+  expectEqual('lastNumber fallback', seqAfterInv.lastNumber, 26)
   expectEqual('record.prefix fallback', seqAfterInv.prefix, 'INV')
 
-  console.log('--- STEP 7: reconciliation prefix-aware ---')
+  console.log('--- STEP 7: reconciliation needle TETAP INV- ---')
   await setPrefix('REC')
   await prisma.bookCopy.create({
-    data: { bookId: book.id, inventoryNumber: 'REC-000099', barcode: 'REC-000099', condition: 'GOOD', status: 'AVAILABLE', shelfLocation: 'R1' },
+    data: { bookId: book.id, inventoryNumber: 'INV-000099', barcode: 'INV-000099', condition: 'GOOD', status: 'AVAILABLE', shelfLocation: 'R1' },
   })
   await prisma.bookCopy.create({
-    data: { bookId: book.id, inventoryNumber: 'INV-000999', barcode: 'INV-000999', condition: 'GOOD', status: 'AVAILABLE', shelfLocation: 'R1' },
+    data: { bookId: book.id, inventoryNumber: 'REC-000999', barcode: 'REC-000999', condition: 'GOOD', status: 'AVAILABLE', shelfLocation: 'R1' },
   })
   const rec1 = await reconciliation.run()
-  expectEqual('max REC (INV-000999 diabaikan)', rec1.maxInventoryNumber, 99)
+  expectEqual('max INV=99 (REC-000999 diabaikan)', rec1.maxInventoryNumber, 99)
   expectTrue('reconcile tersinkron', rec1.sequenceSynced)
   expectEqual('sequenceLastNumber = 99', rec1.sequenceLastNumber, 99)
   const seqAfterRec = await prisma.inventorySequence.findUniqueOrThrow({ where: { id: 'default' } })
-  expectEqual('record.prefix = REC', seqAfterRec.prefix, 'REC')
+  expectEqual('record.prefix = REC (kosmetik)', seqAfterRec.prefix, 'REC')
   const rec2 = await reconciliation.run()
   expectTrue('run ulang tanpa sync', !rec2.sequenceSynced)
   expectEqual('lastNumber stabil', rec2.sequenceLastNumber, 99)
 
   console.log('--- STEP 8: allocator menormalkan lowercase prefix ---')
   await setPrefix('lwr')
-  expectEqual('lwr -> LWR uppercase', await allocateNew(1), ['LWR-000100'])
+  expectEqual('lwr -> LWR uppercase', await allocateNew(1), [{ inventoryNumber: 'INV-000100', barcode: 'LWR-000100' }])
 
   console.log('--- STEP 9: reset database memakai prefix setting ---')
   await setPrefix('RST')

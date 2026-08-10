@@ -153,13 +153,13 @@ export class BookImportService {
           }
 
           const book = await this.bookRepository.createWithTx(tx, { ...bookData, authorId, publisherId, categoryId })
-          const inventoryNumbers = await this.inventoryAllocator.allocate(tx, copyCount)
+          const allocations = await this.inventoryAllocator.allocate(tx, copyCount)
           await this.bookCopyRepository.createManyWithTx(
             tx,
-            inventoryNumbers.map((inventoryNumber) => ({
+            allocations.map(({ inventoryNumber, barcode }) => ({
               bookId: book.id,
               inventoryNumber,
-              barcode: inventoryNumber,
+              barcode,
               shelfLocation,
               acquisitionSource,
               acquisitionDate,

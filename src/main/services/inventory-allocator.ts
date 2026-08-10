@@ -4,16 +4,26 @@ const SEQUENCE_ID = 'default'
 const DEFAULT_PREFIX = 'INV'
 const PAD_LENGTH = 6
 
-// Alokasi nomor inventaris (INV-XXXXXX). Prefix dibaca dari konfigurasi
-// `Setting.inventoryPrefix` (fallback 'INV') di dalam transaksi yang sama
-// sehingga perubahan prefix di Pengaturan langsung berlaku tanpa restart.
-// Nomor urut TIDAK di-reset saat prefix berubah — urutan berlanjut dari
-// nilai terakhir yang disimpan (mis. lastNumber 28 -> BC-000029).
+// Alokasi nomor inventaris + barcode dari SATU counter yang sama.
+//   inventoryNumber SELALU 'INV-XXXXXX' (identitas stabil lintas perubahan
+//     prefix; kolom `barcode` yang boleh memakai prefix khusus).
+//   barcode = '<Setting.inventoryPrefix>-XXXXXX' (prefix konfigurable).
+// Keduanya memakai nomor urut yang sama dalam satu transaksi sehingga tetap
+// 1:1 per eksemplar. Prefix dibaca dari `Setting.inventoryPrefix` (fallback
+// 'INV') di dalam transaksi sehingga perubahan prefix langsung berlaku tanpa
+// restart. Nomor urut TIDAK di-reset saat prefix berubah — urutan berlanjut.
+// Healing membaca kolom `inventoryNumber` dengan needle TETAP 'INV-'; nilai
+// barcode/inventoryNumber ber-prefix lain TIDAK memengaruhi urutan.
+
+export interface InventoryAllocation {
+  inventoryNumber: string
+  barcode: string
+}
 
 export class InventoryAllocator {
-  async allocate(tx: Prisma.TransactionClient, count: number): Promise<string[]> {
+  async allocate(tx: Prisma.TransactionClient, count: number): Promise<InventoryAllocation[]> {
     const prefix = await this.readPrefix(tx)
-    const maxUsedNumber = await this.findMaxUsedNumber(tx, prefix)
+    const maxUsedNumber = await this.findMaxUsedNumber(tx)
     const record = await tx.inventorySequence.findUnique({ where: { id: SEQUENCE_ID } })
 
     const needsHealing = !record || record.lastNumber < maxUsedNumber
@@ -45,7 +55,10 @@ export class InventoryAllocator {
 
     return Array.from({ length: count }, (_, i) => {
       const seq = startNumber + i
-      return `${prefix}-${seq.toString().padStart(PAD_LENGTH, '0')}`
+      return {
+        inventoryNumber: `${DEFAULT_PREFIX}-${seq.toString().padStart(PAD_LENGTH, '0')}`,
+        barcode: `${prefix}-${seq.toString().padStart(PAD_LENGTH, '0')}`,
+      }
     })
   }
 
@@ -55,9 +68,9 @@ export class InventoryAllocator {
     return prefix && prefix.length > 0 ? prefix : DEFAULT_PREFIX
   }
 
-  private async findMaxUsedNumber(tx: Prisma.TransactionClient, prefix: string): Promise<number> {
+  private async findMaxUsedNumber(tx: Prisma.TransactionClient): Promise<number> {
     const copies = await tx.bookCopy.findMany({ select: { inventoryNumber: true } })
-    const needle = `${prefix}-`
+    const needle = `${DEFAULT_PREFIX}-`
     let max = 0
     for (const copy of copies) {
       const value = copy.inventoryNumber

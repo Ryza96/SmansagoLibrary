@@ -110,13 +110,13 @@ export class BookCopyService {
     for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
       try {
         return await prisma.$transaction(async (tx) => {
-          const inventoryNumbers = await this.allocator.allocate(tx, quantity)
+          const allocations = await this.allocator.allocate(tx, quantity)
 
-          const copiesData = inventoryNumbers.map((invNum) => ({
+          const copiesData = allocations.map(({ inventoryNumber, barcode }) => ({
             id: crypto.randomUUID(),
             bookId,
-            inventoryNumber: invNum,
-            barcode: invNum,
+            inventoryNumber,
+            barcode,
             shelfLocation,
             condition,
             status: BookCopyStatus.AVAILABLE,
