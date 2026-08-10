@@ -67,12 +67,29 @@ export class PrintService {
     private assetRoot: string = ''
   ) {}
 
-  getLabelPreviewHtml(data: BookLabelData): string {
-    return generateLabelsHtml(data)
+  // WO-LABEL — isi ulang data label dari Settings (libraryName/schoolName) dan
+  // logo (data URI) persis pola buildBorrowCardHtml: resolveAssetPath adalah
+  // SATU-SATUNYA pembaca logoPath (RFC §12). Logo tidak terbaca → string kosong
+  // → template memakai fallback monogram. Renderer cukup mengirim items/author;
+  // libraryName renderer dipertahankan bila diisi, selebihnya dari Settings.
+  private async enrichLabelData(data: BookLabelData): Promise<BookLabelData> {
+    const settings = await this.settingService.get()
+    const resolvedLogoPath = resolveAssetPath(settings.logoPath, this.assetRoot)
+    const logo = resolvedLogoPath ? await this.readFileAsDataUri(resolvedLogoPath) : null
+    return {
+      ...data,
+      libraryName: data.libraryName ?? settings.libraryName,
+      schoolName: settings.schoolName,
+      logo: logo ?? ''
+    }
+  }
+
+  async getLabelPreviewHtml(data: BookLabelData): Promise<string> {
+    return generateLabelsHtml(await this.enrichLabelData(data))
   }
 
   async printBookLabels(data: BookLabelData): Promise<void> {
-    const html = generateLabelsHtml(data)
+    const html = generateLabelsHtml(await this.enrichLabelData(data))
     await this.printHtml(html, { margins: { marginType: 'none' } })
   }
 

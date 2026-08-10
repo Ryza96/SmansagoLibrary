@@ -33,13 +33,16 @@ export default function LabelPreviewPage() {
           throw new Error(LABELS.LABEL_PREVIEW.BOOK_NOT_FOUND)
         }
 
+        const author = (book.authors ?? []).map((a) => a.name).join(', ')
+
         const data: BookLabelData = {
           libraryName: settings.libraryName,
           bookTitle: book.title,
           items: copies.map((copy: BookCopyDTO) => ({
             barcode: copy.barcode ?? copy.inventoryNumber,
             inventoryNumber: copy.inventoryNumber,
-            shelfLocation: copy.shelfLocation ?? ''
+            shelfLocation: copy.shelfLocation ?? '',
+            author
           }))
         }
 

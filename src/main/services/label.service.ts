@@ -1,5 +1,6 @@
 import type { BookLabelData, BookLabelItemData } from '../../shared/dto/print'
 import { generateBarcodeSvg } from './barcode.service'
+import { generateLogoMonogramSvg } from './borrow-card.service'
 
 export const LABEL_PRINT_CONFIG = {
   pageWidthMm: 210,
@@ -34,19 +35,52 @@ function escapeHtml(value: string): string {
     .replace(/'/g, '&#39;')
 }
 
-function labelItemHtml(item: BookLabelItemData, bookTitle: string, libraryName: string): string {
+// Ikon buku kecil (navy) untuk baris judul — self-contained SVG.
+const BOOK_ICON_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="#12235a" stroke-width="1.8"><path d="M4 6c2-1 4.5-1.5 7-1.5V18c-2.5-.5-5 0-7 1V6z"/><path d="M20 6c-2-1-4.5-1.5-7-1.5V18c2.5-.5 5 0 7 1V6z"/></svg>`
+
+// Ikon pin lokasi (putih) untuk footer bar navy.
+const PIN_ICON_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 1 1 16 0z"/><circle cx="12" cy="10" r="3"/></svg>`
+
+// Logo label — gambar data URI bila tersedia, selainnya monogram (fallback wajar
+// tanpa ruang kosong: inisial schoolName/libraryName; kosong penuh → ikon buku).
+function labelLogoHtml(data: BookLabelData): string {
+  if (data.logo) {
+    return `<img class="label-logo-img" src="${escapeHtml(data.logo)}" alt="">`
+  }
+  return generateLogoMonogramSvg(data.schoolName ?? '', data.libraryName ?? '')
+}
+
+function labelHeaderHtml(data: BookLabelData): string {
+  return `<div class="label-header">
+  <div class="label-logo">${labelLogoHtml(data)}</div>
+  <div class="label-head-text">
+    <div class="label-library">${escapeHtml(data.libraryName ?? '')}</div>
+    ${data.schoolName ? `<div class="label-school">${escapeHtml(data.schoolName)}</div>` : ''}
+  </div>
+</div>`
+}
+
+function labelItemHtml(item: BookLabelItemData, data: BookLabelData): string {
   const barcodeValue = item.barcode || item.inventoryNumber
   const barcodeSvg = generateBarcodeSvg(barcodeValue)
-  const libraryHtml = libraryName
-    ? `<div class="label-library">${escapeHtml(libraryName)}</div>`
-    : ''
+  const authorHtml = item.author ? `<div class="label-author">${escapeHtml(item.author)}</div>` : ''
 
   return `<div class="label">
-    ${libraryHtml}
+    ${labelHeaderHtml(data)}
     <div class="label-barcode">${barcodeSvg}</div>
     <div class="label-inventory">${escapeHtml(item.inventoryNumber)}</div>
-    <div class="label-title">${escapeHtml(bookTitle)}</div>
-    <div class="label-shelf">${escapeHtml(item.shelfLocation || '')}</div>
+    <div class="label-book-divider"></div>
+    <div class="label-book">
+      <div class="label-book-icon">${BOOK_ICON_SVG}</div>
+      <div class="label-book-text">
+        <div class="label-title">${escapeHtml(data.bookTitle)}</div>
+        ${authorHtml}
+      </div>
+    </div>
+    <div class="label-footer">
+      ${PIN_ICON_SVG}
+      <span>${escapeHtml(item.shelfLocation || '')}</span>
+    </div>
   </div>`
 }
 
@@ -88,7 +122,7 @@ export function generateLabelsHtml(data: BookLabelData): string {
   const pagesHtml = Array.from({ length: pageCount }, (_, page) => {
     const pageItems = data.items.slice(page * LABELS_PER_PAGE, (page + 1) * LABELS_PER_PAGE)
     const labelsHtml = pageItems
-      .map((item) => labelItemHtml(item, data.bookTitle, data.libraryName ?? ''))
+      .map((item) => labelItemHtml(item, data))
       .join('')
     const cutMarksHtml = cutMarkPositions()
       .map(({ xMm, yMm, rotateDeg }) => cutMarkSvg(xMm, yMm, rotateDeg))
@@ -196,18 +230,61 @@ ${cutMarksHtml}
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: space-evenly;
+    justify-content: flex-start;
     text-align: center;
     page-break-inside: avoid;
   }
+  .label-header {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 2mm;
+    padding-bottom: 1.2mm;
+    border-bottom: 0.3mm solid #12235a;
+  }
+  .label-logo {
+    flex: 0 0 auto;
+    width: 7mm;
+    height: 7mm;
+    border-radius: 50%;
+    border: 0.4mm solid #12235a;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #ffffff;
+  }
+  .label-logo svg,
+  .label-logo img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+  .label-head-text {
+    flex: 1;
+    min-width: 0;
+    text-align: left;
+  }
   .label-library {
-    font-size: 10px;
-    font-weight: 700;
+    font-size: 12px;
+    font-weight: 800;
+    color: #12235a;
     text-transform: uppercase;
     letter-spacing: 0.5px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .label-school {
+    font-size: 7.5px;
+    color: #64748b;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-top: 0.5mm;
   }
   .label-barcode {
-    max-width: 100%;
+    width: 100%;
     height: ${LABEL_PRINT_CONFIG.barcodeHeightMm}mm;
   }
   .label-barcode svg {
@@ -216,24 +293,81 @@ ${cutMarksHtml}
   }
   .label-inventory {
     font-size: 13px;
-    font-weight: 700;
+    font-weight: 800;
+    color: #12235a;
     font-family: Consolas, 'Courier New', monospace;
     letter-spacing: 1px;
+    margin-top: 0.8mm;
+  }
+  .label-book-divider {
+    width: 100%;
+    height: 0.3mm;
+    background: #cbd5e1;
+    margin: 0.9mm 0;
+  }
+  .label-book {
+    flex: 1;
+    min-height: 0;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 1.5mm;
+  }
+  .label-book-icon {
+    flex: 0 0 auto;
+    width: 4.5mm;
+    height: 4.5mm;
+  }
+  .label-book-icon svg {
+    width: 100%;
+    height: 100%;
+  }
+  .label-book-text {
+    flex: 1;
+    min-width: 0;
+    text-align: left;
   }
   .label-title {
     font-size: 10.5px;
     line-height: 1.3;
+    font-weight: 700;
+    color: #1f2937;
     overflow: hidden;
     text-overflow: ellipsis;
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
-    padding: 0 6px;
   }
-  .label-shelf {
-    font-size: 10px;
-    font-weight: 600;
+  .label-author {
+    font-size: 8.5px;
+    font-style: italic;
     color: #475569;
+    margin-top: 0.4mm;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .label-footer {
+    width: 100%;
+    margin-top: auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1mm;
+    background: #12235a;
+    border-radius: 2mm;
+    padding: 0.8mm 1.5mm;
+    color: #ffffff;
+    font-size: 8.5px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .label-footer svg {
+    flex: 0 0 auto;
+    width: 3mm;
+    height: 3mm;
   }
 </style>
 </head>

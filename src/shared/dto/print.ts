@@ -30,10 +30,13 @@ export interface BookLabelItemData {
   barcode: string
   inventoryNumber: string
   shelfLocation: string
+  author?: string
 }
 
 export interface BookLabelData {
   libraryName?: string
+  schoolName?: string
+  logo?: string
   bookTitle: string
   items: BookLabelItemData[]
 }
