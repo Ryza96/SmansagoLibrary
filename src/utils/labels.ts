@@ -837,6 +837,7 @@ export const LABELS = {
   },
   AUTH: {
     APP_NAME: 'APLibrary',
+    APP_SUBTITLE: 'Sistem Manajemen Perpustakaan',
     SETUP_TITLE: 'Setup Awal Admin',
     SETUP_SUBTITLE:
       'Buat akun administrator untuk mengelola aplikasi. Hanya dilakukan sekali saat pertama kali aplikasi dijalankan.',
@@ -850,8 +851,10 @@ export const LABELS = {
     ERR_PASSWORD_MAX: 'Password maksimal 128 karakter.',
     ERR_PASSWORD_MISMATCH: 'Password dan konfirmasi password tidak sama.',
     LOGIN_TITLE: 'Login',
+    LOGIN_SUBTITLE: 'Masukkan kata sandi untuk melanjutkan.',
     LOGIN_BUTTON: 'Masuk',
     LOGIN_PROCESSING: 'Memverifikasi...',
+    FOOTER_AUTHORIZED: 'Akses hanya untuk pengguna berwenang.',
     ERR_PASSWORD_REQUIRED: 'Password wajib diisi.',
     CURRENT_PASSWORD: 'Password Lama',
     NEW_PASSWORD: 'Password Baru',
