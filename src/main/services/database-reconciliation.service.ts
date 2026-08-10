@@ -1,7 +1,7 @@
 import { getPrisma } from '../repositories/base/prisma'
 
 const SEQUENCE_ID = 'default'
-const PREFIX = 'INV'
+const DEFAULT_PREFIX = 'INV'
 
 export interface DatabaseReconciliationResult {
   sequenceExisted: boolean
@@ -20,7 +20,10 @@ export class DatabaseReconciliationService {
       select: { inventoryNumber: true, barcode: true },
     })
 
-    const maxInventoryNumber = this.maxInventoryNumber(copies.map((c) => c.inventoryNumber))
+    const setting = await prisma.setting.findFirst()
+    const prefix = (setting?.inventoryPrefix?.trim().toUpperCase() || DEFAULT_PREFIX)
+
+    const maxInventoryNumber = this.maxInventoryNumber(copies.map((c) => c.inventoryNumber), prefix)
     const duplicateInventoryNumbers = this.findDuplicates(copies.map((c) => c.inventoryNumber))
     const duplicateBarcodes = this.findDuplicates(copies.map((c) => c.barcode))
 
@@ -37,11 +40,12 @@ export class DatabaseReconciliationService {
         where: { id: SEQUENCE_ID },
         create: {
           id: SEQUENCE_ID,
-          prefix: PREFIX,
+          prefix,
           lastNumber: maxInventoryNumber,
         },
         update: {
           lastNumber: { set: maxInventoryNumber },
+          prefix,
         },
       })
       sequenceSynced = true
@@ -69,12 +73,12 @@ export class DatabaseReconciliationService {
     }
   }
 
-  private maxInventoryNumber(inventoryNumbers: string[]): number {
-    const prefix = `${PREFIX}-`
+  private maxInventoryNumber(inventoryNumbers: string[], prefix: string): number {
+    const needle = `${prefix}-`
     let max = 0
     for (const value of inventoryNumbers) {
-      if (!value.startsWith(prefix)) continue
-      const num = Number(value.slice(prefix.length))
+      if (!value.startsWith(needle)) continue
+      const num = Number(value.slice(needle.length))
       if (Number.isFinite(num) && num > max) max = num
     }
     return max

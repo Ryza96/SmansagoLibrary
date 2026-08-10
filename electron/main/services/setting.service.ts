@@ -152,6 +152,18 @@ export class SettingService {
       }
     }
 
+    if ('inventoryPrefix' in filtered) {
+      const raw = String(filtered.inventoryPrefix ?? '').trim().toUpperCase()
+      if (!/^[A-Z0-9]{1,10}$/.test(raw)) {
+        throw new AppError(
+          400,
+          'ValidationError',
+          'Awalan nomor inventaris hanya huruf/angka, tanpa spasi, maksimal 10 karakter.'
+        )
+      }
+      filtered.inventoryPrefix = raw
+    }
+
     await this.settingRepository.update(filtered)
     return this.get()
   }

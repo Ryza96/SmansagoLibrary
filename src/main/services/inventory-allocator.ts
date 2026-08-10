@@ -1,12 +1,19 @@
 import type { Prisma } from '@prisma/client'
 
 const SEQUENCE_ID = 'default'
-const PREFIX = 'INV'
+const DEFAULT_PREFIX = 'INV'
 const PAD_LENGTH = 6
+
+// Alokasi nomor inventaris (INV-XXXXXX). Prefix dibaca dari konfigurasi
+// `Setting.inventoryPrefix` (fallback 'INV') di dalam transaksi yang sama
+// sehingga perubahan prefix di Pengaturan langsung berlaku tanpa restart.
+// Nomor urut TIDAK di-reset saat prefix berubah — urutan berlanjut dari
+// nilai terakhir yang disimpan (mis. lastNumber 28 -> BC-000029).
 
 export class InventoryAllocator {
   async allocate(tx: Prisma.TransactionClient, count: number): Promise<string[]> {
-    const maxUsedNumber = await this.findMaxUsedNumber(tx)
+    const prefix = await this.readPrefix(tx)
+    const maxUsedNumber = await this.findMaxUsedNumber(tx, prefix)
     const record = await tx.inventorySequence.findUnique({ where: { id: SEQUENCE_ID } })
 
     const needsHealing = !record || record.lastNumber < maxUsedNumber
@@ -18,17 +25,18 @@ export class InventoryAllocator {
         where: { id: SEQUENCE_ID },
         create: {
           id: SEQUENCE_ID,
-          prefix: PREFIX,
+          prefix,
           lastNumber,
         },
         update: {
           lastNumber: { set: lastNumber },
+          prefix,
         },
       })
     } else {
       const updated = await tx.inventorySequence.update({
         where: { id: SEQUENCE_ID },
-        data: { lastNumber: { increment: count } },
+        data: { lastNumber: { increment: count }, prefix },
       })
       lastNumber = updated.lastNumber
     }
@@ -37,18 +45,24 @@ export class InventoryAllocator {
 
     return Array.from({ length: count }, (_, i) => {
       const seq = startNumber + i
-      return `${PREFIX}-${seq.toString().padStart(PAD_LENGTH, '0')}`
+      return `${prefix}-${seq.toString().padStart(PAD_LENGTH, '0')}`
     })
   }
 
-  private async findMaxUsedNumber(tx: Prisma.TransactionClient): Promise<number> {
+  private async readPrefix(tx: Prisma.TransactionClient): Promise<string> {
+    const setting = await tx.setting.findFirst()
+    const prefix = setting?.inventoryPrefix?.trim().toUpperCase()
+    return prefix && prefix.length > 0 ? prefix : DEFAULT_PREFIX
+  }
+
+  private async findMaxUsedNumber(tx: Prisma.TransactionClient, prefix: string): Promise<number> {
     const copies = await tx.bookCopy.findMany({ select: { inventoryNumber: true } })
-    const prefix = `${PREFIX}-`
+    const needle = `${prefix}-`
     let max = 0
     for (const copy of copies) {
       const value = copy.inventoryNumber
-      if (!value.startsWith(prefix)) continue
-      const num = Number(value.slice(prefix.length))
+      if (!value.startsWith(needle)) continue
+      const num = Number(value.slice(needle.length))
       if (Number.isFinite(num) && num > max) max = num
     }
     return max

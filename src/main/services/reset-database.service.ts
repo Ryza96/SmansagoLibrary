@@ -36,10 +36,13 @@ export class ResetDatabaseService {
     await tx.publisher.deleteMany()
     await tx.category.deleteMany()
 
+    const setting = await tx.setting.findFirst()
+    const prefix = (setting?.inventoryPrefix?.trim().toUpperCase() || 'INV')
+
     await tx.inventorySequence.upsert({
       where: { id: 'default' },
-      create: { id: 'default', prefix: 'INV', lastNumber: 0 },
-      update: { lastNumber: 0 },
+      create: { id: 'default', prefix, lastNumber: 0 },
+      update: { lastNumber: 0, prefix },
     })
   }
 }

@@ -30,6 +30,7 @@ interface IdentityForm {
   librarianName: string
   borrowCardPrinter: string
   barcodeFormat: string
+  inventoryPrefix: string
 }
 
 interface LogoPreview {
@@ -82,6 +83,7 @@ export default function SettingsPage() {
           librarianName: data.librarianName,
           borrowCardPrinter: data.borrowCardPrinter ?? '',
           barcodeFormat: normalizeBarcodeFormat(data.barcodeFormat),
+          inventoryPrefix: data.inventoryPrefix ?? 'INV',
         })
       })
       .catch((err: unknown) => {
@@ -117,11 +119,16 @@ export default function SettingsPage() {
       notify.error(LABELS.SETTINGS.VALIDATION_LIBRARY_NAME)
       return
     }
+    const inventoryPrefixRaw = form.inventoryPrefix.trim().toUpperCase()
+    if (!/^[A-Z0-9]{1,10}$/.test(inventoryPrefixRaw)) {
+      notify.error(LABELS.SETTINGS.VALIDATION_INVENTORY_PREFIX)
+      return
+    }
 
     setSaving(true)
     setError(null)
     try {
-      const payload: Record<string, unknown> = { ...form }
+      const payload: Record<string, unknown> = { ...form, inventoryPrefix: inventoryPrefixRaw }
       if (logoPreview?.filePath) {
         payload.logoUpload = logoPreview.filePath
       }
@@ -132,6 +139,7 @@ export default function SettingsPage() {
         librarianName: result.librarianName,
         borrowCardPrinter: result.borrowCardPrinter ?? '',
         barcodeFormat: normalizeBarcodeFormat(result.barcodeFormat),
+        inventoryPrefix: result.inventoryPrefix ?? 'INV',
       })
       setLogoPreview(null)
       notify.success(LABELS.SETTINGS.SAVED)
@@ -346,22 +354,41 @@ export default function SettingsPage() {
               </div>
             </Field>
           </div>
-        </div>
-        <div className="sm:col-span-2">
-          <Field label={LABELS.SETTINGS.FIELD_BARCODE_FORMAT}>
-            <p className="text-xs text-slate-400 mb-1">{LABELS.SETTINGS.BARCODE_FORMAT_SUBTITLE}</p>
-            <select
-              value={f.barcodeFormat}
-              onChange={(e) => set('barcodeFormat', e.target.value)}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              {Object.values(BARCODE_FORMATS).map((format) => (
-                <option key={format.code} value={format.code}>
-                  {format.label}
-                </option>
-              ))}
-            </select>
-          </Field>
+          <div className="sm:col-span-2">
+            <Field label={LABELS.SETTINGS.FIELD_BARCODE_FORMAT}>
+              <p className="text-xs text-slate-400 mb-1">{LABELS.SETTINGS.BARCODE_FORMAT_SUBTITLE}</p>
+              <select
+                value={f.barcodeFormat}
+                onChange={(e) => set('barcodeFormat', e.target.value)}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {Object.values(BARCODE_FORMATS).map((format) => (
+                  <option key={format.code} value={format.code}>
+                    {format.label}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          </div>
+          <div className="sm:col-span-2">
+            <Field label={LABELS.SETTINGS.FIELD_INVENTORY_PREFIX}>
+              <p className="text-xs text-slate-400 mb-1">{LABELS.SETTINGS.INVENTORY_PREFIX_SUBTITLE}</p>
+              <div className="flex items-center gap-3">
+                <input
+                  type="text"
+                  value={f.inventoryPrefix}
+                  onChange={(e) => set('inventoryPrefix', e.target.value)}
+                  className="w-full max-w-[220px] px-3 py-2 border border-slate-300 rounded-lg text-sm font-mono uppercase focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <span className="text-xs text-slate-500">
+                  {LABELS.SETTINGS.INVENTORY_PREFIX_PREVIEW}
+                  <span className="font-mono font-semibold text-slate-700">
+                    {(f.inventoryPrefix.trim() || 'INV').toUpperCase()}-000001
+                  </span>
+                </span>
+              </div>
+            </Field>
+          </div>
         </div>
         <div className="flex items-center gap-3 mt-6 pt-5 border-t border-slate-100">
           <button
