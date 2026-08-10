@@ -20,7 +20,9 @@ import { LABELS } from '../utils/labels'
 import { ROUTES } from '../utils/navigation'
 import { useNotification } from '../notification/NotificationContext'
 import type { PrinterInfoDTO } from '../shared/dto/print'
+import type { AppDatabaseInfoDTO } from '../shared/dto/app-info'
 import { BARCODE_FORMATS, normalizeBarcodeFormat } from '../shared/config/barcode-format'
+import { formatFileSize } from '../utils/bookImport'
 
 type TabKey = 'identity' | 'data' | 'security' | 'appInfo' | 'about'
 
@@ -58,6 +60,7 @@ export default function SettingsPage() {
   const [error, setError] = useState<string | null>(null)
   const [tab, setTab] = useState<TabKey>('identity')
   const [appInfo, setAppInfo] = useState<{ version: string; name: string } | null>(null)
+  const [dbInfo, setDbInfo] = useState<AppDatabaseInfoDTO | null>(null)
   const [backupDir, setBackupDir] = useState<string | null>(null)
   const [logoPreview, setLogoPreview] = useState<LogoPreview | null>(null)
   const [logoPicking, setLogoPicking] = useState(false)
@@ -100,6 +103,11 @@ export default function SettingsPage() {
     api.backupUI.getTargetInfo()
       .then((info) => {
         if (!cancelled) setBackupDir(info.backupDir)
+      })
+      .catch(() => {})
+    api.app.dbInfo()
+      .then((info) => {
+        if (!cancelled) setDbInfo(info)
       })
       .catch(() => {})
     loadPrinters()
@@ -464,11 +472,11 @@ export default function SettingsPage() {
     const notAvailable = LABELS.SETTINGS.NOT_AVAILABLE
     const rows = [
       { label: LABELS.SETTINGS.INFO_APP_VERSION, value: appInfo?.version ?? notAvailable, mono: false },
-      { label: LABELS.SETTINGS.INFO_DB_VERSION, value: notAvailable, mono: false },
-      { label: LABELS.SETTINGS.INFO_BACKUP_VERSION, value: notAvailable, mono: false },
-      { label: LABELS.SETTINGS.INFO_DB_LOCATION, value: notAvailable, mono: true },
+      { label: LABELS.SETTINGS.INFO_DB_VERSION, value: dbInfo?.dbVersion ?? notAvailable, mono: false },
+      { label: LABELS.SETTINGS.INFO_BACKUP_VERSION, value: dbInfo ? String(dbInfo.backupVersion) : notAvailable, mono: false },
+      { label: LABELS.SETTINGS.INFO_DB_LOCATION, value: dbInfo?.dbLocation ?? notAvailable, mono: true },
       { label: LABELS.SETTINGS.INFO_BACKUP_LOCATION, value: backupDir ?? notAvailable, mono: true },
-      { label: LABELS.SETTINGS.INFO_DB_SIZE, value: notAvailable, mono: false },
+      { label: LABELS.SETTINGS.INFO_DB_SIZE, value: dbInfo?.dbSizeBytes != null ? formatFileSize(dbInfo.dbSizeBytes) : notAvailable, mono: false },
     ]
     return (
       <Card title={LABELS.SETTINGS.TAB_APP_INFO} subtitle={LABELS.SETTINGS.APP_INFO_SUBTITLE}>

@@ -29,6 +29,7 @@ import type { DashboardService } from '../../src/main/services/dashboard.service
 import type { ReportService } from '../../src/main/services/report.service'
 import type { BackupUIController, RestoreUIController, BackupInspector } from '../../src/main/services/backup-ui.service'
 import type { AuthService } from '../../src/main/services/auth.service'
+import type { AppInfoService } from '../../src/main/services/app-info.service'
 import { registerAppHandlers } from './app.ipc'
 import { registerBookImportHandlers } from './book-import.ipc'
 import { registerBookHandlers } from './book.ipc'
@@ -86,10 +87,11 @@ export function registerAllHandlers(
     restoreUIController: RestoreUIController
     backupInspector: BackupInspector
     authService: AuthService
+    appInfoService: AppInfoService
   },
   mainWindow: () => BrowserWindow | null
 ): void {
-  registerAppHandlers(mainWindow)
+  registerAppHandlers(mainWindow, services.appInfoService)
   registerBookImportHandlers(services.matchingEngine, services.bookImportService)
   registerBookHandlers(services.bookService)
   registerBookCopyHandlers(services.bookCopyService, services.newBookCopyService)

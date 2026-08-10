@@ -5,7 +5,8 @@ export const appAPI = {
     ping: () => ipcRenderer.invoke('db:ping')
   },
   app: {
-    info: () => ipcRenderer.invoke('app:info')
+    info: () => ipcRenderer.invoke('app:info'),
+    dbInfo: () => ipcRenderer.invoke('app:dbInfo')
   },
   window: {
     minimize: () => ipcRenderer.invoke('window:minimize'),

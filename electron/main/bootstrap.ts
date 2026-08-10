@@ -65,6 +65,7 @@ import { DatabaseRestoreHandler } from '../../src/main/infrastructure/restore/da
 import { RestoreService, createRestoreDirs } from '../../src/main/infrastructure/restore/restore.service'
 import { resolveLiveDatabaseFile } from '../../src/main/infrastructure/database-path'
 import { BackupUIController, RestoreUIController, BackupInspector } from '../../src/main/services/backup-ui.service'
+import { AppInfoService } from '../../src/main/services/app-info.service'
 import { AuthService } from '../../src/main/services/auth.service'
 import { AdminRepository } from '../../src/main/repositories/admin.repository'
 import { AdminSessionRepository } from '../../src/main/repositories/admin-session.repository'
@@ -128,6 +129,7 @@ export interface Container {
   backupUIController: BackupUIController
   restoreUIController: RestoreUIController
   backupInspector: BackupInspector
+  appInfoService: AppInfoService
   authService: AuthService
 }
 
@@ -244,6 +246,11 @@ export function createContainer(paths: AppPaths, restoreWiring?: RestoreWiring):
 
   const authService = new AuthService(new AdminRepository(), new PasswordHasher(), new SessionManager(new AdminSessionRepository()))
 
+  const appInfoService = new AppInfoService({
+    schemaVersionReader: new SchemaVersionReader(),
+    liveDatabaseFile,
+  })
+
   return {
     bookService,
     authorService,
@@ -283,6 +290,7 @@ export function createContainer(paths: AppPaths, restoreWiring?: RestoreWiring):
     backupUIController,
     restoreUIController,
     backupInspector,
+    appInfoService,
     authService
   }
 }

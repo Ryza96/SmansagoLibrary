@@ -1,7 +1,11 @@
 import { ipcMain, BrowserWindow, app } from 'electron'
 import { prisma } from '../main/database'
+import type { AppInfoService } from '../../src/main/services/app-info.service'
 
-export function registerAppHandlers(mainWindow: () => BrowserWindow | null): void {
+export function registerAppHandlers(
+  mainWindow: () => BrowserWindow | null,
+  appInfoService: AppInfoService
+): void {
   ipcMain.handle('db:ping', async () => {
     try {
       await prisma.$queryRaw`SELECT 1`
@@ -29,4 +33,6 @@ export function registerAppHandlers(mainWindow: () => BrowserWindow | null): voi
     else win?.maximize()
   })
   ipcMain.handle('window:close', () => mainWindow()?.close())
+
+  ipcMain.handle('app:dbInfo', () => appInfoService.getDatabaseInfo())
 }

@@ -12,6 +12,7 @@ interface ElectronAPI {
       electronVersion: string
       nodeVersion: string
     }>
+    dbInfo: () => Promise<import('../../src/shared/dto/app-info').AppDatabaseInfoDTO>
   }
   window: {
     minimize: () => Promise<void>
