@@ -33,19 +33,13 @@ function readRel(rel: string): string {
   return fs.readFileSync(path.join(repoRoot, rel), 'utf8')
 }
 
-// STEP 1 — validasi login murni
-const e1 = validateLoginForm('', '')
-check('username & password kosong -> 2 error', !!e1.username && !!e1.password)
-const e2 = validateLoginForm('  ', 'secret')
-check('username whitespace-only -> error username', !!e2.username && !e2.password)
-const e3 = validateLoginForm('admin', '')
-check('password kosong -> error password', !e3.username && !!e3.password)
-const e4 = validateLoginForm('admin', 'secret123')
-check('input valid -> tanpa error', !e4.username && !e4.password)
-const e5 = validateLoginForm('', 'x')
-check('pesan username persis label', e5.username === 'Username wajib diisi.')
-const e6 = validateLoginForm('admin', '')
-check('pesan password persis label', e6.password === 'Password wajib diisi.')
+// STEP 1 — validasi login murni (Opsi B: password-only, tanpa username)
+const e1 = validateLoginForm('')
+check('password kosong -> error password', !!e1.password && !('username' in e1))
+const e4 = validateLoginForm('secret123')
+check('input valid -> tanpa error', !e4.password && !('username' in e4))
+const e5 = validateLoginForm('')
+check('pesan password persis label', e5.password === 'Password wajib diisi.')
 
 // STEP 1b — kontrak error DTO (REVISI 1): tanpa instanceof Error
 const errObj = { message: 'Username atau password salah.' }
@@ -76,6 +70,14 @@ check(
 // STEP 2 — LoginPage memakai kontrak auth.login & helper DTO
 const loginSrc = readRel('src/pages/auth/LoginPage.tsx')
 check('LoginPage memanggil auth.login', loginSrc.includes('window.electronAPI.auth.login('))
+check(
+  'LoginPage TIDAK memiliki field username (Opsi B password-only)',
+  !loginSrc.includes('LABELS.AUTH.USERNAME') && !loginSrc.includes('setUsername') && !loginSrc.includes('autoComplete="username"')
+)
+check(
+  'LoginPage mengirim login password-only',
+  loginSrc.includes('window.electronAPI.auth.login({ password })')
+)
 check(
   'LoginPage tidak memakai alert()',
   !loginSrc.includes('alert(') && !loginSrc.includes('confirm(')

@@ -20,6 +20,14 @@ export class AdminRepository extends BaseRepository {
     return this.prisma.admin.findUnique({ where: { id } })
   }
 
+  // Opsi B (login tanpa username): resolve single-admin. Tabel admin maksimal
+  // satu baris (invariant Service, RFC §1.2) sehingga findFirst() aman.
+  // orderBy createdAt asc → deterministik: bila melanggar invariant (2+ baris),
+  // yang dikembalikan adalah admin pertama dibuat.
+  async findSingle(): Promise<Admin | null> {
+    return this.prisma.admin.findFirst({ orderBy: { createdAt: 'asc' } })
+  }
+
   // REV-1: lookup case-insensitive. SQLite TIDAK mendukung `mode: 'insensitive'`
   // pada Prisma → normalisasi dilakukan SAAT VERIFIKASI (bukan saat persist).
   // Tabel Admin maksimal satu baris (invariant Service, RFC §1.2) sehingga

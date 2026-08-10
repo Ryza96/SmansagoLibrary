@@ -13,8 +13,11 @@ export interface SetupAdminDTO {
   password: string
 }
 
+// Opsi B (login tanpa username): field dipertahankan sebagai opsional agar
+// IPC/auth3 tetap kompatibel, namun Service MENGABAIKAN username — single-admin
+// di-resolve langsung (RFC §1.2 invariant "maksimal satu admin").
 export interface LoginAdminDTO {
-  username: string
+  username?: string
   password: string
 }
 

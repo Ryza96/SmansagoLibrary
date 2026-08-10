@@ -65,7 +65,7 @@ async function main(): Promise<void> {
   const row1 = await repo.findLatestValid()
   check('row DB ada', row1 !== null, '')
   check('token base64url 43 karakter', row1 ? /^[A-Za-z0-9_-]{43}$/.test(row1.sessionId) : false, row1?.sessionId)
-  const stLogin = JSON.stringify(await svc.login({ username: 'kepala perpus', password: 'Password@123' }))
+  const stLogin = JSON.stringify(await svc.login({ password: 'Password@123' }))
   expectEqual('DTO login TIDAK membocorkan sessionId/token', stLogin.includes('sessionId'), false)
 
   console.log('--- STEP 5: restart simulation (mirror baru + load) ---')
@@ -89,7 +89,7 @@ async function main(): Promise<void> {
 
   console.log('--- STEP 7: login replace (maksimal satu session) ---')
   const idBefore = row1?.sessionId
-  await svc2.login({ username: 'KEPALA PERPUS', password: 'Password@123' })
+  await svc2.login({ password: 'Password@123' })
   expectEqual('count tetap 1 (replace)', await repo.count(), 1)
   const row2 = await repo.findLatestValid()
   check('sessionId baru berbeda dari lama', row2 !== null && row2.sessionId !== idBefore, '')
@@ -103,10 +103,10 @@ async function main(): Promise<void> {
   check('session tetap valid setelah changePassword', loadedAfter !== null && loadedAfter.sessionId === row2?.sessionId, '')
   await expectRejected(
     'login password LAMA ditolak',
-    () => svc2.login({ username: 'kepala perpus', password: 'Password@123' }),
+    () => svc2.login({ password: 'Password@123' }),
     'Username atau password salah'
   )
-  const loginNew = await svc2.login({ username: 'kepala perpus', password: 'Password@456' })
+  const loginNew = await svc2.login({ password: 'Password@456' })
   expectEqual('login password baru sukses', loginNew.authenticated, true)
 
   console.log('--- STEP 9: logout menghapus row ---')
@@ -135,7 +135,7 @@ async function main(): Promise<void> {
     const stExp = await svc4.status()
     expectEqual('status authenticated false (row expired)', stExp.authenticated, false)
     // Login berikutnya: deleteExpired prune row basi lalu create row baru.
-    await svc4.login({ username: 'kepala perpus', password: 'Password@456' })
+    await svc4.login({ password: 'Password@456' })
     expectEqual('login prune expired + buat baru -> count 1', await repo.count(), 1)
     const row3 = await repo.findLatestValid()
     check('row baru valid (expiresAt > now)', row3 !== null && row3.expiresAt.getTime() > Date.now(), '')
@@ -171,7 +171,7 @@ async function main(): Promise<void> {
   }
 
   console.log('--- STEP 12: tutup (login ulang utk state konsisten) ---')
-  const finalLogin = await svc3.login({ username: 'kepala perpus', password: 'Password@456' })
+  const finalLogin = await svc3.login({ password: 'Password@456' })
   expectEqual('login ulang sukses', finalLogin.authenticated, true)
   expectEqual('count session 1', await repo.count(), 1)
 

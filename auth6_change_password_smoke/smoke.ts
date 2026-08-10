@@ -107,7 +107,7 @@ async function main(): Promise<void> {
     'Sesi tidak aktif'
   )
 
-  await service.login({ username: 'Kepala Perpus', password: 'Password@123' })
+  await service.login({ password: 'Password@123' })
   expectEqual('login ulang -> session aktif', sm.isAuthenticated(), true)
 
   await expectRejected(
@@ -135,10 +135,10 @@ async function main(): Promise<void> {
   await service.logout()
   await expectRejected(
     'login dengan password lama gagal',
-    () => service.login({ username: 'Kepala Perpus', password: 'Password@123' }),
+    () => service.login({ password: 'Password@123' }),
     'Username atau password salah'
   )
-  const login2 = await service.login({ username: 'Kepala Perpus', password: 'Password@456' })
+  const login2 = await service.login({ password: 'Password@456' })
   expectEqual('login dengan password baru berhasil', login2.authenticated, true)
   expectEqual('username login baru', login2.username, 'Kepala Perpus')
 
@@ -164,8 +164,8 @@ async function main(): Promise<void> {
   check('kartu Ubah Password navigasi ke CHANGE_PASSWORD', settings.includes('navigate(ROUTES.CHANGE_PASSWORD)'))
   const comingSoonCount = settings.split('badge={LABELS.SETTINGS.COMING_SOON}').length - 1
   check(
-    'kartu Ubah Password TIDAK lagi ber-badge COMING_SOON (sisa 2: Login Admin & Reset Data)',
-    comingSoonCount === 2,
+    'kartu Ubah Password TIDAK lagi ber-badge COMING_SOON (sisa 1: Login Admin)',
+    comingSoonCount === 1,
     `count=${comingSoonCount}`
   )
 

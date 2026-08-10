@@ -7,7 +7,6 @@ import { authErrorMessageOf } from '../../auth/auth-error'
 
 export default function LoginPage() {
   const { refreshStatus } = useAuthGate()
-  const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [errors, setErrors] = useState<LoginFormErrors>({})
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -17,14 +16,14 @@ export default function LoginPage() {
     e.preventDefault()
     if (submitting) return
 
-    const nextErrors = validateLoginForm(username, password)
+    const nextErrors = validateLoginForm(password)
     setErrors(nextErrors)
-    if (nextErrors.username || nextErrors.password) return
+    if (nextErrors.password) return
 
     setSubmitError(null)
     setSubmitting(true)
     try {
-      await window.electronAPI.auth.login({ username: username.trim(), password })
+      await window.electronAPI.auth.login({ password })
       await refreshStatus()
     } catch (err: unknown) {
       setSubmitError(authErrorMessageOf(err, LABELS.AUTH.SUBMIT_ERROR_DEFAULT))
@@ -46,21 +45,6 @@ export default function LoginPage() {
         <form onSubmit={handleSubmit} className="mt-6 space-y-4" noValidate>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">
-              {LABELS.AUTH.USERNAME} <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              className={inputClass(!!errors.username)}
-              autoComplete="username"
-              autoFocus
-            />
-            {errors.username && <p className="text-red-500 text-xs mt-1">{errors.username}</p>}
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
               {LABELS.AUTH.PASSWORD} <span className="text-red-500">*</span>
             </label>
             <input
@@ -69,6 +53,7 @@ export default function LoginPage() {
               onChange={(e) => setPassword(e.target.value)}
               className={inputClass(!!errors.password)}
               autoComplete="current-password"
+              autoFocus
             />
             {errors.password && <p className="text-red-500 text-xs mt-1">{errors.password}</p>}
           </div>

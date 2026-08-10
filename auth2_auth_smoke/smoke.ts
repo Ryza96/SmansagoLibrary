@@ -107,23 +107,29 @@ async function main(): Promise<void> {
     'Setup admin sudah pernah dilakukan'
   )
 
-  console.log('--- STEP 5: AuthService — login ---')
+  console.log('--- STEP 5: AuthService — login (Opsi B: password-only) ---')
   await service.logout()
   expectEqual('logout dulu -> false', sm.isAuthenticated(), false)
   await expectRejected(
     'login password salah (pesan seragam)',
-    () => service.login({ username: 'Kepala Perpus', password: 'Salah@123' }),
+    () => service.login({ password: 'Salah@123' }),
     'Username atau password salah'
   )
   await expectRejected(
-    'login username salah (pesan seragam)',
-    () => service.login({ username: 'oranglain', password: 'Password@123' }),
+    'login password salah dgn username (username diabaikan, tetap ditolak)',
+    () => service.login({ username: 'Kepala Perpus', password: 'Salah@123' }),
     'Username atau password salah'
   )
-  const login1 = await service.login({ username: 'KEPALA PERPUS', password: 'Password@123' })
-  expectEqual('login case-insensitive sukses', login1.authenticated, true)
+  const login1 = await service.login({ password: 'Password@123' })
+  expectEqual('login password-only sukses', login1.authenticated, true)
   expectEqual('login -> username asli', login1.username, 'Kepala Perpus')
   expectEqual('status authenticated true', (await service.status()).authenticated, true)
+  await service.logout()
+  // Username pada input DIIMPANGGAP (single-admin resolve) — sembarang username
+  // + password benar tetap sukses.
+  const loginIgnored = await service.login({ username: 'oranglain', password: 'Password@123' })
+  expectEqual('username diabaikan (single-admin resolve)', loginIgnored.authenticated, true)
+  expectEqual('login ignored -> username asli', loginIgnored.username, 'Kepala Perpus')
 
   console.log('--- STEP 6: AuthService — changePassword ---')
   await service.logout()
@@ -132,7 +138,7 @@ async function main(): Promise<void> {
     () => service.changePassword({ currentPassword: 'Password@123', newPassword: 'Password@456' }),
     'Sesi tidak aktif'
   )
-  await service.login({ username: 'kepala perpus', password: 'Password@123' })
+  await service.login({ password: 'Password@123' })
   await expectRejected(
     'changePassword password lama salah',
     () => service.changePassword({ currentPassword: 'Salah@123', newPassword: 'Password@456' }),
@@ -149,10 +155,10 @@ async function main(): Promise<void> {
   await service.logout()
   await expectRejected(
     'login password lama ditolak setelah ganti',
-    () => service.login({ username: 'Kepala Perpus', password: 'Password@123' }),
+    () => service.login({ password: 'Password@123' }),
     'Username atau password salah'
   )
-  const login2 = await service.login({ username: 'Kepala Perpus', password: 'Password@456' })
+  const login2 = await service.login({ password: 'Password@456' })
   expectEqual('login password baru sukses', login2.authenticated, true)
 
   console.log('--- STEP 7: AuthService — logout idempoten ---')
@@ -192,6 +198,13 @@ async function main(): Promise<void> {
   expectEqual('updatePassword: hash berubah', updatedPw.passwordHash, hash2)
   const lastLogin = await repo.updateLastLogin(created.id)
   check('updateLastLogin: lastLoginAt terisi', lastLogin.lastLoginAt !== null, '')
+  const single = await repo.findSingle()
+  check('findSingle: admin ter-resolve (findFirst)', single !== null, '')
+  expectEqual(
+    'findSingle: deterministik — admin pertama dibuat (createdAt asc)',
+    single?.username,
+    'Kepala Perpus'
+  )
 
   await prisma.$disconnect()
   console.log('')

@@ -122,26 +122,33 @@ async function main(): Promise<void> {
     400
   )
 
-  console.log('--- STEP 5: auth:login ---')
+  console.log('--- STEP 5: auth:login (Opsi B: password-only) ---')
   await invoke('auth:logout')
   await expectRejected(
     'login password salah (pesan seragam)',
+    () => invoke('auth:login', { password: 'Salah@123' }),
+    'Username atau password salah',
+    401
+  )
+  await expectRejected(
+    'login password salah dgn username (username diabaikan)',
     () => invoke('auth:login', { username: 'Kepala Perpus', password: 'Salah@123' }),
     'Username atau password salah',
     401
   )
-  await expectRejected(
-    'login username salah (pesan seragam)',
-    () => invoke('auth:login', { username: 'oranglain', password: 'Password@123' }),
-    'Username atau password salah',
-    401
-  )
-  const login = (await invoke('auth:login', {
-    username: 'KEPALA PERPUS',
+  const login = (await invoke('auth:login', { password: 'Password@123' })) as {
+    authenticated: boolean
+    username: string
+  }
+  expectEqual('login password-only sukses', login.authenticated, true)
+  expectEqual('login -> username asli', login.username, 'Kepala Perpus')
+  // Username diinput DIIMPANGGAP (single-admin resolve): sembarang username
+  // + password benar tetap sukses.
+  const loginIgnored = (await invoke('auth:login', {
+    username: 'oranglain',
     password: 'Password@123'
   })) as { authenticated: boolean; username: string }
-  expectEqual('login case-insensitive sukses', login.authenticated, true)
-  expectEqual('login -> username asli', login.username, 'Kepala Perpus')
+  expectEqual('login username diabaikan -> sukses', loginIgnored.authenticated, true)
 
   console.log('--- STEP 6: auth:changePassword ---')
   await invoke('auth:logout')
@@ -151,7 +158,7 @@ async function main(): Promise<void> {
     'Sesi tidak aktif',
     401
   )
-  await invoke('auth:login', { username: 'kepala perpus', password: 'Password@123' })
+  await invoke('auth:login', { password: 'Password@123' })
   await expectRejected(
     'changePassword password lama salah',
     () => invoke('auth:changePassword', { currentPassword: 'Salah@123', newPassword: 'Password@456' }),

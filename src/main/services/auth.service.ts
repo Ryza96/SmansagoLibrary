@@ -71,8 +71,11 @@ export class AuthService {
   }
 
   // RFC §8 Login — pesan 401 seragam (anti user-enumeration & timing, §11.2).
+  // Opsi B: login TANPA username (password-only). Single-admin di-resolve via
+  // findSingle() (RFC §1.2); field username pada input DIIMPANGGAP (dibiarkan
+  // opsional di DTO untuk kompatibilitas IPC, namun tidak dipakai).
   async login(input: LoginAdminDTO): Promise<AuthResultDTO> {
-    const admin = await this.adminRepository.findByUsernameCaseInsensitive(input.username)
+    const admin = await this.adminRepository.findSingle()
     if (!admin) {
       throw new AppError(401, 'Unauthorized', 'Username atau password salah')
     }
