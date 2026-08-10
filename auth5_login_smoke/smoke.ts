@@ -12,7 +12,8 @@ import { validateLoginForm } from '../src/auth/login-validation'
 import {
   authErrorPayload,
   authErrorMessageOf,
-  authErrorCodeOf
+  authErrorCodeOf,
+  cleanAuthErrorMessage
 } from '../src/auth/auth-error'
 
 let pass = 0
@@ -65,6 +66,45 @@ check('errorCodeOf undefined bila code bukan string', authErrorCodeOf({ message:
 check(
   'helper tidak memakai instanceof Error',
   !authErrorMessageOf.toString().includes('instanceof')
+)
+
+// STEP 1c — pesan BERSIH (fix tech debt B-7 jalur AUTH): Electron membungkus
+// error main menjadi `Error invoking remote method '<channel>': AppError: <pesan>`.
+// authErrorMessageOf harus memangkas prefix sehingga hanya pesan yang tampil ke user.
+const wrappedLogin = new Error("Error invoking remote method 'auth:login': AppError: Username atau password salah")
+check(
+  'pesan login gagal dibersihkan dari prefix Electron + AppError',
+  authErrorMessageOf(wrappedLogin, 'fallback') === 'Username atau password salah'
+)
+const wrappedStatus = new Error("Error invoking remote method 'auth:status': AppError: Sesi tidak aktif")
+check(
+  'pesan status dibersihkan untuk channel lain (auth:status)',
+  authErrorMessageOf(wrappedStatus, 'fallback') === 'Sesi tidak aktif'
+)
+const wrappedNoMarker = new Error("Error invoking remote method 'auth:logout': Gagal logout")
+check(
+  'strip prefix TANPA marker AppError tetap bersih',
+  authErrorMessageOf(wrappedNoMarker, 'fallback') === 'Gagal logout'
+)
+const cleanLogin = authErrorMessageOf(wrappedLogin, 'fallback')
+check('hasil bersih TANPA "Error invoking"', !cleanLogin.includes('Error invoking'))
+check('hasil bersih TANPA "AppError:"', !cleanLogin.includes('AppError:'))
+check('hasil bersih TANPA channel "auth:login"', !cleanLogin.includes('auth:login'))
+check(
+  'pesan tanpa prefix tetap utuh (regresi)',
+  authErrorMessageOf({ message: 'Username atau password salah' }, 'fallback') === 'Username atau password salah'
+)
+check(
+  'cleanAuthErrorMessage murni: whitespace dirapikan (trim)',
+  cleanAuthErrorMessage("   Error invoking remote method 'auth:login': AppError:   Pesan beranda   ") === 'Pesan beranda'
+)
+check(
+  'cleanAuthErrorMessage murni: pesan polos dipertahankan',
+  cleanAuthErrorMessage('Password salah.') === 'Password salah.'
+)
+check(
+  'fallback ikut dibersihkan (tanpa prefix = no-op)',
+  authErrorMessageOf(null, 'Terjadi kesalahan. Coba lagi.') === 'Terjadi kesalahan. Coba lagi.'
 )
 
 // STEP 2 — LoginPage memakai kontrak auth.login & helper DTO
