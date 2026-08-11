@@ -4,11 +4,19 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   main: {
+    resolve: {
+      alias: {
+        '@prisma/client': resolve(__dirname, 'src/generated/prisma/index.js')
+      }
+    },
     build: {
       outDir: 'out/main',
       rollupOptions: {
         input: resolve(__dirname, 'electron/main/index.ts'),
-        external: ['@prisma/client', 'sharp', '@node-rs/argon2']
+        external: ['sharp', '@node-rs/argon2']
+      },
+      commonjsOptions: {
+        include: [/node_modules/, /src\/generated\/prisma/]
       }
     }
   },

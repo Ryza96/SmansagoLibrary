@@ -12,6 +12,18 @@ import { connectPrisma, disconnectPrisma } from '../../src/main/repositories/bas
 dotenv.config({ path: path.resolve(__dirname, '../../.env') })
 dotenv.config()
 
+// Fix #1 (Installer Audit): saat packaged, arahkan Prisma engine ke salinan
+// extraResources (file nyata di disk, bukan di dalam app.asar). Dev tidak
+// terpengaruh (app.isPackaged = false) — engine dibaca dari .prisma/client.
+if (app.isPackaged && process.platform === 'win32') {
+  process.env.PRISMA_QUERY_ENGINE_LIBRARY = path.join(
+    process.resourcesPath,
+    'prisma',
+    'client',
+    'query_engine-windows.dll.node'
+  )
+}
+
 let mainWindow: BrowserWindow | null = null
 
 function createWindow(): void {

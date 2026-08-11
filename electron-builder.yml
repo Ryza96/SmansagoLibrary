@@ -7,11 +7,10 @@ directories:
 files:
   - out/**/*
   - node_modules/**/*
-  - "!node_modules/.prisma/client/*.node"
-  - "node_modules/.prisma/client/*.node"
+  - "!node_modules/.prisma/**"
 
 extraResources:
-  - from: node_modules/.prisma/client/
+  - from: src/generated/prisma/
     to: prisma/client/
     filter:
       - "*.node"
@@ -38,6 +37,5 @@ nsis:
 
 asarUnpack:
   - "**/*.node"
-  - "node_modules/.prisma/client/**"
   - "node_modules/@img/**"
   - "node_modules/sharp/**"

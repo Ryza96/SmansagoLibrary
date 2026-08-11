@@ -11,7 +11,11 @@
     "isolatedModules": true,
     "outDir": "./out",
     "declaration": true,
-    "composite": true
+    "composite": true,
+    "baseUrl": ".",
+    "paths": {
+      "@prisma/client": ["src/generated/prisma/index.d.ts"]
+    }
   },
   "include": [
     "electron/main/**/*",
