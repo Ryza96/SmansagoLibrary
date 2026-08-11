@@ -5,6 +5,7 @@ import { initDatabase, closeDatabase } from './database'
 import { createContainer } from './bootstrap'
 import { registerAllHandlers } from '../ipc/index'
 import { bootstrapDataInfrastructure } from './infrastructure/bootstrap'
+import { bootstrapMigrations } from '../../src/main/infrastructure/migrations/migration-bootstrap'
 import { databaseReconciliationService } from '../../src/main/services/database-reconciliation.service'
 import { resolveLiveDatabaseFile } from '../../src/main/infrastructure/database-path'
 import { connectPrisma, disconnectPrisma } from '../../src/main/repositories/base/prisma'
@@ -63,6 +64,16 @@ app.whenReady().then(async () => {
   // TODO(WO Logging): console.log akan diganti Logging Framework pada Work Order Logging.
   console.log(`[DataInfra] Production data root: ${infra.root}`)
   console.log(`[DataInfra] Directories ensured: ${infra.newlyCreated.length} created, ${infra.alreadyExisted.length} existed`)
+
+  // Fix #3 (Installer Audit): pada instalasi bersih, skema DB dibuat otomatis
+  // dengan menjalankan migration yang belum diterapkan (transaction-per-migration,
+  // direkam ke tabel `_prisma_migrations` ala `prisma migrate deploy`). Dev tidak
+  // terpengaruh — migration dev dikelola `prisma migrate deploy`.
+  if (app.isPackaged) {
+    const migrationsDir = path.join(process.resourcesPath, 'migrations')
+    const migrationResult = await bootstrapMigrations(migrationsDir)
+    console.log(`[Migrations] bootstrap: ${migrationResult.applied.length} applied, ${migrationResult.skipped.length} skipped`)
+  }
 
   await initDatabase()
   await databaseReconciliationService.run()
