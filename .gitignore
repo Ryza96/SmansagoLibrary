@@ -10,6 +10,12 @@ prisma/*.db-journal
 prisma/*.db-wal
 prisma/*.db-shm
 
+# Prisma generated client (dibuat ulang via `prisma generate`)
+/src/generated/
+
+# Harness smoke manual migration bootstrap — bukan bagian aplikasi
+migration_bootstrap_smoke/
+
 # IDE
 .vscode/
 .idea/
