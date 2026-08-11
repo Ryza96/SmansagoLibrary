@@ -54,6 +54,12 @@ function createWindow(): void {
 
 app.whenReady().then(async () => {
   const infra = await bootstrapDataInfrastructure()
+  // Fix #2 (Installer Audit): saat packaged, arahkan live DB ke userData
+  // (folder database/ sudah di-ensure WO-1). Dev (app.isPackaged=false) tetap
+  // memakai .env → prisma/aplibrary.db. Data dev TIDAK dihapus/dipindah paksa.
+  if (app.isPackaged) {
+    process.env.DATABASE_URL = 'file:' + infra.paths.databaseFile.replace(/\\/g, '/')
+  }
   // TODO(WO Logging): console.log akan diganti Logging Framework pada Work Order Logging.
   console.log(`[DataInfra] Production data root: ${infra.root}`)
   console.log(`[DataInfra] Directories ensured: ${infra.newlyCreated.length} created, ${infra.alreadyExisted.length} existed`)
