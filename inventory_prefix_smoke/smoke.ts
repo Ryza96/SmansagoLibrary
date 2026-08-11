@@ -10,13 +10,15 @@ import { AppError } from '../electron/main/errorHandler'
 import path from 'path'
 import os from 'os'
 
-// inventory_prefix_smoke — Awalan Nomor Inventaris & Barcode
+// inventory_prefix_smoke — Identitas Barcode & Awalan Nomor Inventaris
 //
-// Desain baru: kolom `inventoryNumber` SELALU 'INV-XXXXXX' (identitas stabil);
-// kolom `barcode` = '<Setting.inventoryPrefix>-XXXXXX'. Kedua nilai memakai
+// Konsolidasi identitas: kolom `inventoryNumber` SELALU 'INV-XXXXXX' dan
+// `barcode` = inventoryNumber (nilai identik). Setting.inventoryPrefix TIDAK
+// lagi membentuk nilai barcode; prefix tetap disimpan di record
+// InventorySequence (kosmetik, DEPRECATED untuk alokasi). Kedua kolom memakai
 // SATU counter urutan yang sama. Scope:
 //   1. BOTH allocators (src/main baru + electron/main legacy) mengembalikan
-//      pasangan { inventoryNumber: 'INV-...', barcode: '<prefix>-...' }.
+//      pasangan { inventoryNumber: 'INV-...', barcode: 'INV-...' } (identik).
 //   2. Perubahan prefix TIDAK me-reset urutan — nomor berlanjut (dua kolom
 //      berbagi counter).
 //   3. Healing membaca kolom inventoryNumber dengan needle TETAP 'INV-' —
@@ -129,26 +131,26 @@ async function main(): Promise<void> {
     data: { isbn: `978-${ts}`, title: `Buku Uji-${ts}`, authorId: author.id, publisherId: publisher.id, categoryId: category.id },
   })
 
-  console.log('--- STEP 2: allocator BARU — pasangan INV + prefix dari setting ---')
+  console.log('--- STEP 2: allocator BARU — barcode identik inventoryNumber ---')
   expectEqual(
     'BC allocate(2)',
     await allocateNew(2),
     [
-      { inventoryNumber: 'INV-000001', barcode: 'BC-000001' },
-      { inventoryNumber: 'INV-000002', barcode: 'BC-000002' },
+      { inventoryNumber: 'INV-000001', barcode: 'INV-000001' },
+      { inventoryNumber: 'INV-000002', barcode: 'INV-000002' },
     ]
   )
-  expectEqual('BC allocate(1)', await allocateNew(1), [{ inventoryNumber: 'INV-000003', barcode: 'BC-000003' }])
+  expectEqual('BC allocate(1)', await allocateNew(1), [{ inventoryNumber: 'INV-000003', barcode: 'INV-000003' }])
   const seqAfterBc = await prisma.inventorySequence.findUniqueOrThrow({ where: { id: 'default' } })
   expectEqual('lastNumber', seqAfterBc.lastNumber, 3)
-  expectEqual('record.prefix', seqAfterBc.prefix, 'BC')
+  expectEqual('record.prefix = BC (kosmetik)', seqAfterBc.prefix, 'BC')
 
   console.log('--- STEP 3: ganti prefix PSA — urutan BERLANJUT (tidak reset) ---')
   await setPrefix('PSA')
-  expectEqual('PSA allocate(1) lanjut nomor', await allocateNew(1), [{ inventoryNumber: 'INV-000004', barcode: 'PSA-000004' }])
+  expectEqual('PSA allocate(1) lanjut nomor', await allocateNew(1), [{ inventoryNumber: 'INV-000004', barcode: 'INV-000004' }])
   const seqAfterPsa = await prisma.inventorySequence.findUniqueOrThrow({ where: { id: 'default' } })
   expectEqual('lastNumber tetap berlanjut', seqAfterPsa.lastNumber, 4)
-  expectEqual('record.prefix berubah', seqAfterPsa.prefix, 'PSA')
+  expectEqual('record.prefix berubah (kosmetik)', seqAfterPsa.prefix, 'PSA')
 
   console.log('--- STEP 4: healing needle TETAP INV- (bukan prefix aktif) ---')
   await prisma.bookCopy.create({
@@ -158,22 +160,22 @@ async function main(): Promise<void> {
     data: { bookId: book.id, inventoryNumber: 'BC-000099', barcode: 'BC-000099', condition: 'GOOD', status: 'AVAILABLE', shelfLocation: 'R1' },
   })
   await setPrefix('BC')
-  expectEqual('healing ambil max INV=20', await allocateNew(1), [{ inventoryNumber: 'INV-000021', barcode: 'BC-000021' }])
+  expectEqual('healing ambil max INV=20', await allocateNew(1), [{ inventoryNumber: 'INV-000021', barcode: 'INV-000021' }])
   const seqAfterHeal = await prisma.inventorySequence.findUniqueOrThrow({ where: { id: 'default' } })
   expectEqual('lastNumber healing', seqAfterHeal.lastNumber, 21)
-  expectEqual('BC-000099 legacy diabaikan', await allocateNew(1), [{ inventoryNumber: 'INV-000022', barcode: 'BC-000022' }])
+  expectEqual('BC-000099 legacy diabaikan', await allocateNew(1), [{ inventoryNumber: 'INV-000022', barcode: 'INV-000022' }])
 
-  console.log('--- STEP 5: allocator LEGACY juga mengembalikan pasangan ---')
+  console.log('--- STEP 5: allocator LEGACY juga mengembalikan pasangan identik ---')
   await setPrefix('LGC')
   expectEqual(
     'legacy LGC allocate(2)',
     await allocateLegacy(2),
     [
-      { inventoryNumber: 'INV-000023', barcode: 'LGC-000023' },
-      { inventoryNumber: 'INV-000024', barcode: 'LGC-000024' },
+      { inventoryNumber: 'INV-000023', barcode: 'INV-000023' },
+      { inventoryNumber: 'INV-000024', barcode: 'INV-000024' },
     ]
   )
-  expectEqual('legacy LGC allocate(1)', await allocateLegacy(1), [{ inventoryNumber: 'INV-000025', barcode: 'LGC-000025' }])
+  expectEqual('legacy LGC allocate(1)', await allocateLegacy(1), [{ inventoryNumber: 'INV-000025', barcode: 'INV-000025' }])
 
   console.log('--- STEP 6: fallback INV bila prefix kosong ---')
   await setPrefix('')
@@ -202,7 +204,7 @@ async function main(): Promise<void> {
 
   console.log('--- STEP 8: allocator menormalkan lowercase prefix ---')
   await setPrefix('lwr')
-  expectEqual('lwr -> LWR uppercase', await allocateNew(1), [{ inventoryNumber: 'INV-000100', barcode: 'LWR-000100' }])
+  expectEqual('lwr -> LWR uppercase', await allocateNew(1), [{ inventoryNumber: 'INV-000100', barcode: 'INV-000100' }])
 
   console.log('--- STEP 9: reset database memakai prefix setting ---')
   await setPrefix('RST')

@@ -6,14 +6,15 @@ const PAD_LENGTH = 6
 
 // Alokasi nomor inventaris + barcode dari SATU counter yang sama.
 //   inventoryNumber SELALU 'INV-XXXXXX' (identitas stabil lintas perubahan
-//     prefix; kolom `barcode` yang boleh memakai prefix khusus).
-//   barcode = '<Setting.inventoryPrefix>-XXXXXX' (prefix konfigurable).
+//     prefix).
+//   barcode = inventoryNumber (identitas yang sama — konsumen barcode memakai
+//     kolom `inventoryNumber`). Setting.inventoryPrefix TIDAK lagi membentuk
+//     nilai barcode; prefix tetap disimpan di record InventorySequence
+//     (field kosmetik, DEPRECATED untuk alokasi) agar setting tidak hilang.
 // Keduanya memakai nomor urut yang sama dalam satu transaksi sehingga tetap
-// 1:1 per eksemplar. Prefix dibaca dari `Setting.inventoryPrefix` (fallback
-// 'INV') di dalam transaksi sehingga perubahan prefix langsung berlaku tanpa
-// restart. Nomor urut TIDAK di-reset saat prefix berubah — urutan berlanjut.
-// Healing membaca kolom `inventoryNumber` dengan needle TETAP 'INV-'; nilai
-// barcode/inventoryNumber ber-prefix lain TIDAK memengaruhi urutan.
+// 1:1 per eksemplar. Nomor urut TIDAK di-reset saat prefix berubah — urutan
+// berlanjut. Healing membaca kolom `inventoryNumber` dengan needle TETAP
+// 'INV-'; nilai ber-prefix lain TIDAK memengaruhi urutan.
 
 export interface InventoryAllocation {
   inventoryNumber: string
@@ -55,9 +56,10 @@ export class InventoryAllocator {
 
     return Array.from({ length: count }, (_, i) => {
       const seq = startNumber + i
+      const inventoryNumber = `${DEFAULT_PREFIX}-${seq.toString().padStart(PAD_LENGTH, '0')}`
       return {
-        inventoryNumber: `${DEFAULT_PREFIX}-${seq.toString().padStart(PAD_LENGTH, '0')}`,
-        barcode: `${prefix}-${seq.toString().padStart(PAD_LENGTH, '0')}`,
+        inventoryNumber,
+        barcode: inventoryNumber,
       }
     })
   }

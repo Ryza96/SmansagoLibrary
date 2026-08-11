@@ -5,7 +5,10 @@ const DEFAULT_PREFIX = 'INV'
 const PAD_LENGTH = 6
 
 // Alokasi nomor inventaris + barcode — sisi legacy (jalur tambah eksemplar).
-// inventoryNumber SELALU 'INV-XXXXXX'; barcode = '<Setting.inventoryPrefix>-XXXXXX'.
+// inventoryNumber SELALU 'INV-XXXXXX'; barcode = inventoryNumber (identitas
+// sama). Setting.inventoryPrefix TIDAK lagi membentuk nilai barcode; prefix
+// tetap disimpan di record InventorySequence (field kosmetik, DEPRECATED
+// untuk alokasi) agar setting tidak hilang.
 // Keduanya berbagi SATU counter (tidak di-reset saat prefix berubah).
 // Tanpa healing — urutan dari lastNumber; kolisi ditangani retry P2002 caller.
 // Prefix dibaca dari `Setting.inventoryPrefix` di dalam transaksi yang sama;
@@ -39,9 +42,10 @@ export class InventoryAllocator {
 
     return Array.from({ length: count }, (_, i) => {
       const seq = startNumber + i
+      const inventoryNumber = `${DEFAULT_PREFIX}-${seq.toString().padStart(PAD_LENGTH, '0')}`
       return {
-        inventoryNumber: `${DEFAULT_PREFIX}-${seq.toString().padStart(PAD_LENGTH, '0')}`,
-        barcode: `${prefix}-${seq.toString().padStart(PAD_LENGTH, '0')}`
+        inventoryNumber,
+        barcode: inventoryNumber
       }
     })
   }

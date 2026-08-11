@@ -497,7 +497,7 @@ export default function SettingsPage() {
       { label: LABELS.SETTINGS.ABOUT_NAME, value: appInfo?.name ?? 'APLibrary' },
       { label: LABELS.SETTINGS.ABOUT_VERSION, value: appInfo?.version ?? '—' },
       { label: LABELS.SETTINGS.ABOUT_COPYRIGHT, value: `© ${new Date().getFullYear()} APLibrary` },
-      { label: LABELS.SETTINGS.ABOUT_DEVELOPER, value: 'APLibrary' },
+      { label: LABELS.SETTINGS.ABOUT_DEVELOPER, value: 'Ryza Arshavin' },
     ]
     return (
       <Card title={LABELS.SETTINGS.TAB_ABOUT} subtitle={LABELS.SETTINGS.ABOUT_SUBTITLE}>

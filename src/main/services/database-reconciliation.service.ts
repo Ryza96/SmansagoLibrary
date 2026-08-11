@@ -24,9 +24,9 @@ export class DatabaseReconciliationService {
     const settingPrefix = (setting?.inventoryPrefix?.trim().toUpperCase() || DEFAULT_PREFIX)
 
     // maxInventoryNumber memakai needle TETAP 'INV-' pada kolom inventoryNumber —
-    // independen dari Setting.inventoryPrefix (inventoryNumber selalu INV-XXXXXX;
-    // hanya kolom barcode yang boleh ber-prefix khusus). Nilai prefix setting
-    // tetap ditulis ke record sequence (kosmetik/informasional).
+    // independen dari Setting.inventoryPrefix (inventoryNumber selalu INV-XXXXXX
+    // dan barcode = inventoryNumber). Nilai prefix setting tetap ditulis ke
+    // record sequence (kosmetik/informasional, DEPRECATED untuk alokasi).
     const maxInventoryNumber = this.maxInventoryNumber(copies.map((c) => c.inventoryNumber), DEFAULT_PREFIX)
     const duplicateInventoryNumbers = this.findDuplicates(copies.map((c) => c.inventoryNumber))
     const duplicateBarcodes = this.findDuplicates(copies.map((c) => c.barcode))
