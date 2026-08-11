@@ -35,7 +35,7 @@ async function main(): Promise<void> {
   const memberRepo = new MemberRepository()
   const enrollmentRepo = new EnrollmentRepository()
   const classRepo = new ClassRepository()
-  const memberService = new MemberService(memberRepo, new NumberGeneratorService(memberRepo), enrollmentRepo)
+  const memberService = new MemberService(memberRepo, new NumberGeneratorService(memberRepo), enrollmentRepo, classRepo)
   const enrollmentService = new EnrollmentService(enrollmentRepo, memberRepo, classRepo)
 
   const seedStudent = (memberNumber: string, fullName: string) =>

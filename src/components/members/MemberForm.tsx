@@ -2,9 +2,10 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { CreateMemberDTO, UpdateMemberDTO } from '../../shared/dto/member'
 import { LABELS } from '../../utils/labels'
-import { memberBorrowRights, isMemberTypeCode } from '../../shared/config/member-type'
+import { memberBorrowRights, isMemberTypeCode, MEMBER_TYPES } from '../../shared/config/member-type'
 import PersonalSection from './PersonalSection'
 import MembershipSection from './MembershipSection'
+import MemberClassSection from './MemberClassSection'
 import AddressSection from './AddressSection'
 import NotesSection from './NotesSection'
 import SummarySidebar from './SummarySidebar'
@@ -63,6 +64,8 @@ export default function MemberForm({ mode = 'create', initialData, memberId, def
       ? defaultMemberType.toLowerCase()
       : (editInitial.memberType ?? '')
   )
+  const [academicYearId, setAcademicYearId] = useState('')
+  const [classId, setClassId] = useState('')
   const [joinDate] = useState(editInitial.joinDate ?? todayISO())
   const [validUntil, setValidUntil] = useState(editInitial.validUntil ?? '')
   const [status, setStatus] = useState(editInitial.status ?? 'active')
@@ -80,17 +83,25 @@ export default function MemberForm({ mode = 'create', initialData, memberId, def
   const [errors, setErrors] = useState<Record<string, string>>({})
 
   const isEditMode = mode === 'edit'
+  const memberTypeCode = isMemberTypeCode(memberType) ? memberType : undefined
+  const isStudent = memberTypeCode === MEMBER_TYPES.student.code
 
   function validate(): boolean {
     const e: Record<string, string> = {}
     if (!fullName.trim()) e.fullName = 'Nama lengkap wajib diisi.'
     if (!gender) e.gender = 'Jenis kelamin wajib dipilih.'
     if (!memberType) e.memberType = 'Tipe anggota wajib dipilih.'
+    if (isEditMode) {
+      setErrors(e)
+      return Object.keys(e).length === 0
+    }
+    if (isStudent) {
+      if (!academicYearId) e.academicYearId = LABELS.MEMBER_CLASS.REQUIRED_STUDENT
+      if (!classId) e.classId = LABELS.MEMBER_CLASS.REQUIRED_STUDENT
+    }
     setErrors(e)
     return Object.keys(e).length === 0
   }
-
-  const memberTypeCode = isMemberTypeCode(memberType) ? memberType : undefined
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -118,7 +129,9 @@ export default function MemberForm({ mode = 'create', initialData, memberId, def
         birthDate: birthDate || undefined,
         address: address || undefined,
         phone: phone || undefined,
-        email: email || undefined
+        email: email || undefined,
+        academicYearId: isStudent ? academicYearId : undefined,
+        classId: isStudent ? classId : undefined
       }
       await api.members.create(payload)
     }
@@ -153,6 +166,16 @@ export default function MemberForm({ mode = 'create', initialData, memberId, def
               errors={errors}
               readonlyMemberType={readonlyMemberType}
             />
+            {!isEditMode && (
+              <MemberClassSection
+                memberType={memberType}
+                academicYearId={academicYearId}
+                setAcademicYearId={setAcademicYearId}
+                classId={classId}
+                setClassId={setClassId}
+                errors={errors}
+              />
+            )}
             <AddressSection
               address={address} setAddress={setAddress}
               district={district} setDistrict={setDistrict}

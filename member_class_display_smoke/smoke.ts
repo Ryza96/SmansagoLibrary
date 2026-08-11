@@ -1,6 +1,7 @@
 import { MemberService } from '../src/main/services/member.service'
 import { MemberRepository } from '../src/main/repositories/member.repository'
 import { EnrollmentRepository } from '../src/main/repositories/enrollment.repository'
+import { ClassRepository } from '../src/main/repositories/class.repository'
 import { NumberGeneratorService } from '../src/main/services/number-generator.service'
 import { getPrisma } from '../src/main/repositories/base/prisma'
 import type { MemberDTO } from '../src/shared/dto/member'
@@ -25,7 +26,7 @@ function classLabel(classInfo: MemberDTO['classInfo']): string | null {
 async function main(): Promise<void> {
   const prisma = getPrisma()
   const memberRepo = new MemberRepository()
-  const service = new MemberService(memberRepo, new NumberGeneratorService(memberRepo), new EnrollmentRepository())
+  const service = new MemberService(memberRepo, new NumberGeneratorService(memberRepo), new EnrollmentRepository(), new ClassRepository())
 
   console.log('--- STEP 0: seed ---')
   const curriculum = await prisma.curriculum.create({ data: { name: 'MERDEKA' } })

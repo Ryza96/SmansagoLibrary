@@ -48,7 +48,7 @@ async function main(): Promise<void> {
   const classRepo = new ClassRepository()
   const numberGenerator = new NumberGeneratorService(memberRepo)
   const enrollmentService = new EnrollmentService(enrollmentRepo, memberRepo, classRepo)
-  const memberService = new MemberService(memberRepo, numberGenerator, enrollmentRepo)
+  const memberService = new MemberService(memberRepo, numberGenerator, enrollmentRepo, classRepo)
   const borrowService = new BorrowService(
     new BorrowRepository(),
     new BorrowDetailRepository(),
@@ -118,12 +118,16 @@ async function main(): Promise<void> {
   check('student2 classId legacy tetap tersimpan', m2.classId === classA.id)
   check('student2 classInfo null (enrollment = SSOT)', m2.classInfo === null)
 
-  console.log('--- STEP 4: create TIDAK lagi menulis classId ---')
-  const created = await memberService.create({ fullName: 'Siswa Baru', memberType: 'student', classId: classB.id })
+  console.log('--- STEP 4: create siswa manual → Member + Enrollment ACTIVE (Opsi A) ---')
+  const created = await memberService.create({ fullName: 'Siswa Baru', memberType: 'student', academicYearId: yearA.id, classId: classB.id })
   const createdRow = await prisma.member.findUnique({ where: { id: created.id } })
   expectEqual('created DTO classId null', created.classId, null)
   expectEqual('created DB classId null', createdRow?.classId, null)
   expectEqual('created number ter-generate', created.memberNumber, 'S-000004')
+  const createdEnrollment = await enrollmentRepo.findActiveByMember(created.id)
+  check('create siswa → enrollment ACTIVE dibuat (SSOT kelas)', createdEnrollment?.classId === classB.id)
+  check('create siswa → enrollment academicYearId == yearA', createdEnrollment?.academicYearId === yearA.id)
+  expectEqual('create siswa → member status INACTIVE', createdRow?.status, 'INACTIVE')
 
   console.log('--- STEP 5: update TIDAK lagi menulis classId ---')
   await memberService.update(student2.id, { classId: classB.id })

@@ -48,6 +48,14 @@ export class MemberRepository extends BaseRepository {
     return this.prisma.member.create({ data })
   }
 
+  // WO Manual Student Entry (Opsi A) — create Member DI DALAM transaksi yang
+  // sama dengan pembuatan MemberEnrollment (mirror jalur import). Pola
+  // repository menerima `tx` (service mengorkestrasi transaksi via
+  // runTransaction(getPrisma(), ...)).
+  async createWithTx(tx: Prisma.TransactionClient, data: CreateMemberData): Promise<Member> {
+    return tx.member.create({ data })
+  }
+
   async update(id: string, data: UpdateMemberData): Promise<Member> {
     return this.prisma.member.update({ where: { id }, data })
   }

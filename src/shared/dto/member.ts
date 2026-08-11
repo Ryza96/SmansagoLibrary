@@ -42,6 +42,10 @@ export interface CreateMemberDTO {
   phone?: string
   email?: string
   classId?: string
+  // WO Manual Student Entry (Opsi A) — tahun ajaran penempatan kelas. Wajib
+  // bersama `classId` untuk anggota siswa: saat disimpan, MemberService membuat
+  // Member + MemberEnrollment(ACTIVE) dalam SATU transaksi (mirror jalur import).
+  academicYearId?: string
 }
 
 export interface UpdateMemberDTO {

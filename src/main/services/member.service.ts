@@ -1,6 +1,10 @@
 import { MemberRepository } from '../repositories/member.repository'
 import { EnrollmentRepository } from '../repositories/enrollment.repository'
+import { ClassRepository } from '../repositories/class.repository'
 import { NumberGeneratorService } from './number-generator.service'
+import { getPrisma } from '../repositories/base/prisma'
+import { runTransaction } from '../repositories/base/transaction'
+import { getMemberType } from '../../shared/config/member-type'
 import type { MemberDTO, CreateMemberDTO, UpdateMemberDTO } from '../../shared/dto/member'
 import { AppError } from '../../../electron/main/errorHandler'
 
@@ -63,7 +67,8 @@ export class MemberService {
   constructor(
     private memberRepository: MemberRepository,
     private numberGeneratorService: NumberGeneratorService,
-    private enrollmentRepository: EnrollmentRepository
+    private enrollmentRepository: EnrollmentRepository,
+    private classRepository: ClassRepository
   ) {}
 
   async findMany(search?: string, page?: number, limit?: number, memberType?: string) {
@@ -107,6 +112,57 @@ export class MemberService {
     await this.validateUniqueness(input)
 
     const memberNumber = await this.numberGeneratorService.generateMemberNumber(input.memberType)
+
+    // WO Manual Student Entry (Opsi A) — anggota siswa WAJIB membawa penempatan
+    // kelas (academicYearId + classId). Saat disimpan, Member + MemberEnrollment
+    // (ACTIVE) dibuat dalam SATU transaksi — mirror jalur import. Ini menutup
+    // dead-end manual entry lama (member siswa tanpa enrollment aktif sehingga
+    // tidak bisa meminjam, guard IT-1).
+    if (getMemberType(input.memberType)?.hasAcademicRecord) {
+      if (!input.classId || !input.academicYearId) {
+        throw new AppError(400, 'Validation Error', 'Anggota siswa wajib memilih Tahun Ajaran dan Kelas')
+      }
+      const klass = await this.classRepository.findById(input.classId)
+      if (!klass) {
+        throw new AppError(400, 'Validation Error', `Kelas ${input.classId} tidak ditemukan`)
+      }
+      if (klass.academicYearId !== input.academicYearId) {
+        throw new AppError(400, 'Validation Error', 'Kelas tidak termasuk Tahun Ajaran yang dipilih')
+      }
+
+      // Narrow `input.classId`/`input.academicYearId` ke local const agar TS
+      // tidak kehilangan narrowing di dalam closure transaksi (properti
+      // parameter tidak men-narrow melewati pemanggilan async/closure).
+      const studentClassId: string = input.classId
+      const studentAcademicYearId: string = input.academicYearId
+
+      const created = await runTransaction(getPrisma(), async (tx) => {
+        const member = await this.memberRepository.createWithTx(tx, {
+          memberNumber,
+          fullName: input.fullName,
+          memberType: input.memberType,
+          gender: input.gender,
+          nisn: input.nisn,
+          nip: input.nip,
+          nuptk: input.nuptk,
+          nik: input.nik,
+          birthPlace: input.birthPlace,
+          birthDate: input.birthDate ? new Date(input.birthDate) : undefined,
+          address: input.address,
+          phone: input.phone,
+          email: input.email,
+          status: 'INACTIVE'
+        })
+        await this.enrollmentRepository.createActiveWithTx(tx, {
+          memberId: member.id,
+          classId: studentClassId,
+          academicYearId: studentAcademicYearId
+        })
+        return member
+      })
+
+      return this.findById(created.id)
+    }
 
     const created = await this.memberRepository.create({
       memberNumber,

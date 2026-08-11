@@ -181,6 +181,17 @@ export const LABELS = {
     SUMMARY: 'Ringkasan Anggota',
     RIGHTS: 'Hak Peminjaman',
   },
+  MEMBER_CLASS: {
+    TITLE: 'Penempatan Kelas',
+    SUBTITLE: 'Pilih Tahun Ajaran dan Kelas untuk anggota siswa.',
+    ACADEMIC_YEAR: 'Tahun Ajaran',
+    SELECT_YEAR: 'Pilih Tahun Ajaran',
+    CLASS: 'Kelas',
+    SELECT_CLASS: 'Pilih Kelas',
+    YEAR_EMPTY: 'Tidak ada tahun ajaran untuk dipilih. Buat tahun ajaran terlebih dulu.',
+    CLASS_EMPTY: 'Tidak ada kelas pada tahun ajaran ini.',
+    REQUIRED_STUDENT: 'Anggota siswa wajib memilih Tahun Ajaran dan Kelas.',
+  },
   FIELD: {
     TITLE: 'Judul',
     ISBN: 'ISBN',

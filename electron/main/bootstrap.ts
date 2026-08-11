@@ -146,7 +146,8 @@ export function createContainer(paths: AppPaths, restoreWiring?: RestoreWiring):
   const newMemberRepository = new NewMemberRepository()
   const numberGeneratorService = new NumberGeneratorService(newMemberRepository)
   const enrollmentRepository = new EnrollmentRepository()
-  const memberService = new MemberService(newMemberRepository, numberGeneratorService, enrollmentRepository)
+  const classRepository = new ClassRepository()
+  const memberService = new MemberService(newMemberRepository, numberGeneratorService, enrollmentRepository, classRepository)
   const newBookCopyRepository = new NewBookCopyRepository()
   const borrowRepository = new BorrowRepository()
   const borrowDetailRepository = new BorrowDetailRepository()
@@ -166,7 +167,6 @@ export function createContainer(paths: AppPaths, restoreWiring?: RestoreWiring):
 
   const academicYearRepository = new AcademicYearRepository()
   const curriculumRepository = new CurriculumRepository()
-  const classRepository = new ClassRepository()
   const academicYearService = new AcademicYearService(academicYearRepository, classRepository)
   const curriculumService = new CurriculumService(curriculumRepository, classRepository)
   const classService = new ClassService(classRepository, academicYearRepository, curriculumRepository, enrollmentRepository)
