@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { BookDetailDTO, CreateBookDTO, UpdateBookDTO, SelectOption } from '../../types/dtos/book'
 import { LABELS } from '../../utils/labels'
 import SearchableSelect from '../ui/SearchableSelect'
@@ -38,9 +38,67 @@ export default function BookForm({
 
   const [errors, setErrors] = useState<Record<string, string>>({})
 
+  const [coverPreview, setCoverPreview] = useState<string | null>(null)
+  const [coverUploadPath, setCoverUploadPath] = useState<string | null>(null)
+  const [coverRemoved, setCoverRemoved] = useState(false)
+  const [coverLoading, setCoverLoading] = useState(false)
+  const [coverBusy, setCoverBusy] = useState(false)
+
   const [showAddAuthor, setShowAddAuthor] = useState(false)
   const [showAddPublisher, setShowAddPublisher] = useState(false)
   const [showAddCategory, setShowAddCategory] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    if (isEdit && initialData?.id) {
+      setCoverLoading(true)
+      window.electronAPI.books
+        .getCoverDataUri(initialData.id)
+        .then((uri) => {
+          if (!cancelled) setCoverPreview(uri)
+        })
+        .finally(() => {
+          if (!cancelled) setCoverLoading(false)
+        })
+    }
+    return () => {
+      cancelled = true
+    }
+  }, [isEdit, initialData?.id])
+
+  async function handlePickCover() {
+    setCoverBusy(true)
+    try {
+      const result = await window.electronAPI.books.pickCover()
+      if (!result.canceled) {
+        setCoverPreview(result.previewUri)
+        setCoverUploadPath(result.filePath)
+        setCoverRemoved(false)
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : LABELS.COVER.PICK_ERROR
+      window.alert(message)
+    } finally {
+      setCoverBusy(false)
+    }
+  }
+
+  async function handleRemoveCover() {
+    if (!isEdit || !initialData?.id) return
+    if (!window.confirm(LABELS.COVER.REMOVE_CONFIRM)) return
+    setCoverBusy(true)
+    try {
+      await window.electronAPI.books.removeCover(initialData.id)
+      setCoverPreview(null)
+      setCoverUploadPath(null)
+      setCoverRemoved(true)
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Gagal menghapus sampul buku.'
+      window.alert(message)
+    } finally {
+      setCoverBusy(false)
+    }
+  }
 
   function validate(): boolean {
     const newErrors: Record<string, string> = {}
@@ -65,6 +123,7 @@ export default function BookForm({
       edition: edition.trim() || undefined,
       language: language || undefined,
       pageCount: pageCount ? Number(pageCount) : undefined,
+      coverUpload: coverUploadPath ?? undefined,
     }
 
     await onSubmit(data)
@@ -234,14 +293,53 @@ export default function BookForm({
 
           <div className="w-80 flex-shrink-0 space-y-6">
             <Card title={LABELS.BOOK_SECTION.COVER}>
-              <div className="border-2 border-dashed border-slate-200 rounded-lg p-6 text-center hover:border-blue-300 transition-colors cursor-pointer">
-                <div className="mx-auto mb-3 w-16 h-16 bg-slate-50 rounded-lg flex items-center justify-center">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-slate-300"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+              {coverLoading ? (
+                <div className="border-2 border-dashed border-slate-200 rounded-lg p-6 text-center">
+                  <p className="text-xs text-slate-400">{LABELS.COVER.UPLOADING}</p>
                 </div>
-                <p className="text-sm font-medium text-slate-600">{LABELS.COVER.UPLOAD}</p>
-                <p className="text-xs text-slate-400 mt-1">{LABELS.COVER.FORMAT}</p>
-                <p className="text-xs text-slate-400">{LABELS.COVER.SIZE}</p>
-              </div>
+              ) : coverPreview ? (
+                <div className="space-y-3">
+                  <div className="flex justify-center">
+                    <img
+                      src={coverPreview}
+                      alt="Sampul Buku"
+                      className="w-40 h-56 object-cover rounded-lg border border-slate-200 shadow-sm"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2 justify-center">
+                    <button
+                      type="button"
+                      onClick={handlePickCover}
+                      disabled={coverBusy}
+                      className="px-3 py-1.5 border border-slate-300 text-slate-700 text-xs font-medium rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-50"
+                    >
+                      {coverBusy ? LABELS.COVER.PICKING : LABELS.COVER.CHANGE}
+                    </button>
+                    {isEdit && (
+                      <button
+                        type="button"
+                        onClick={handleRemoveCover}
+                        disabled={coverBusy}
+                        className="px-3 py-1.5 border border-red-200 text-red-600 text-xs font-medium rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50"
+                      >
+                        {LABELS.COVER.REMOVE}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div
+                  className="border-2 border-dashed border-slate-200 rounded-lg p-6 text-center hover:border-blue-300 transition-colors cursor-pointer"
+                  onClick={handlePickCover}
+                >
+                  <div className="mx-auto mb-3 w-16 h-16 bg-slate-50 rounded-lg flex items-center justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-slate-300"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                  </div>
+                  <p className="text-sm font-medium text-slate-600">{coverBusy ? LABELS.COVER.PICKING : LABELS.COVER.UPLOAD}</p>
+                  <p className="text-xs text-slate-400 mt-1">{LABELS.COVER.FORMAT}</p>
+                  <p className="text-xs text-slate-400">{LABELS.COVER.SIZE}</p>
+                </div>
+              )}
             </Card>
 
             <Card title={LABELS.BOOK_SECTION.SUMMARY}>

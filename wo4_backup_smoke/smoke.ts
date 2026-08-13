@@ -47,7 +47,7 @@ import {
 import { BACKUP_STATUS } from '../src/main/domain/backup/backup-status'
 import { DatabaseProvider, DATABASE_SNAPSHOT_FILENAME } from '../src/main/infrastructure/providers/database.provider'
 
-const EXPECTED_SCHEMA_VERSION = '20260803_wo2_f2a_master_data_akademik'
+const EXPECTED_SCHEMA_VERSION = '20260810_wo_book_cover'
 
 let passed = 0
 let failed = 0

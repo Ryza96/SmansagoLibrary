@@ -47,6 +47,8 @@ export interface CreateBookDTO {
   pageCount?: number
   description?: string
   authorIds: string[]
+  /** WO SAM — path absolut file sampul pilihan (diproses main-side). */
+  coverUpload?: string
 }
 
 export interface UpdateBookDTO {
@@ -60,6 +62,8 @@ export interface UpdateBookDTO {
   pageCount?: number | null
   description?: string
   authorIds?: string[]
+  /** WO SAM — path absolut file sampul pilihan (diproses main-side). */
+  coverUpload?: string
 }
 
 export interface CreateBookCopiesDTO {

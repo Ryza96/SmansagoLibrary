@@ -35,6 +35,9 @@ interface ElectronAPI {
     create: (input: import('../types/dtos/book').CreateBookDTO) => Promise<import('../types/dtos/book').BookDetailDTO>
     update: (id: string, input: import('../types/dtos/book').UpdateBookDTO) => Promise<import('../types/dtos/book').BookDetailDTO | null>
     delete: (id: string) => Promise<boolean>
+    pickCover: () => Promise<import('../../src/shared/dto/cover').PickCoverResult>
+    getCoverDataUri: (id: string) => Promise<string | null>
+    removeCover: (id: string) => Promise<void>
   }
   authors: {
     findMany: (query?: import('../types/dtos/master').FindAuthorsQueryDTO) => Promise<import('../types/dtos/master').AuthorDTO[]>

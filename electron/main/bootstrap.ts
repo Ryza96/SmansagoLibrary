@@ -1,3 +1,4 @@
+import path from 'path'
 import { BookService } from './services/book.service'
 import { BookRepository } from './repositories/book.repository'
 import { AuthorService } from './services/author.service'
@@ -58,12 +59,14 @@ import { ReportRepository } from '../../src/main/repositories/report.repository'
 import { AppPaths } from '../../src/main/infrastructure/paths'
 import { ProviderRegistry, RestoreHandlerRegistry } from '../../src/main/domain/provider/provider-registry'
 import { DatabaseProvider } from '../../src/main/infrastructure/providers/database.provider'
+import { AssetBackupProvider } from '../../src/main/infrastructure/providers/asset.provider'
 import { SchemaVersionReader } from '../../src/main/infrastructure/backup/schema-version.reader'
 import { ManifestBuilder } from '../../src/main/infrastructure/backup/manifest-builder'
 import { BackupPackager } from '../../src/main/infrastructure/backup/packager'
 import { BackupVerifier } from '../../src/main/infrastructure/backup/verifier'
 import { BackupService } from '../../src/main/infrastructure/backup/backup.service'
 import { DatabaseRestoreHandler } from '../../src/main/infrastructure/restore/database-restore.handler'
+import { AssetRestoreHandler } from '../../src/main/infrastructure/restore/asset-restore.handler'
 import { RestoreService, createRestoreDirs } from '../../src/main/infrastructure/restore/restore.service'
 import { resolveLiveDatabaseFile } from '../../src/main/infrastructure/database-path'
 import { BackupUIController, RestoreUIController, BackupInspector } from '../../src/main/services/backup-ui.service'
@@ -127,8 +130,10 @@ export interface Container {
   providerRegistry: ProviderRegistry
   restoreHandlerRegistry: RestoreHandlerRegistry
   databaseProvider: DatabaseProvider
+  assetBackupProvider: AssetBackupProvider
   backupService: BackupService
   databaseRestoreHandler: DatabaseRestoreHandler
+  assetRestoreHandler: AssetRestoreHandler
   restoreService: RestoreService
   backupUIController: BackupUIController
   restoreUIController: RestoreUIController
@@ -139,7 +144,8 @@ export interface Container {
 
 export function createContainer(paths: AppPaths, restoreWiring?: RestoreWiring): Container {
   const bookRepository = new BookRepository()
-  const bookService = new BookService(bookRepository)
+  const assetBookCoversDir = path.join(paths.assetsDir, 'book-covers')
+  const bookService = new BookService(bookRepository, assetBookCoversDir)
   const authorService = new AuthorService(new AuthorRepository(), bookRepository)
   const publisherService = new PublisherService(new PublisherRepository(), bookRepository)
   const categoryService = new CategoryService(new CategoryRepository(), bookRepository)
@@ -212,8 +218,10 @@ export function createContainer(paths: AppPaths, restoreWiring?: RestoreWiring):
   const reportService = new ReportService(new ReportRepository())
 
   const databaseProvider = new DatabaseProvider({ stagingDir: paths.tempDir })
+  const assetBackupProvider = new AssetBackupProvider({ assetDir: assetBookCoversDir, stagingDir: paths.tempDir })
   const providerRegistry = new ProviderRegistry()
   providerRegistry.register(databaseProvider)
+  providerRegistry.register(assetBackupProvider)
   const restoreHandlerRegistry = new RestoreHandlerRegistry()
 
   const backupService = new BackupService({
@@ -223,7 +231,10 @@ export function createContainer(paths: AppPaths, restoreWiring?: RestoreWiring):
     packager: new BackupPackager(),
     verifier: new BackupVerifier({ tempDir: paths.tempDir }),
     paths,
-    providerStagingDirs: new Map([[databaseProvider.id.fullName, paths.tempDir]]),
+    providerStagingDirs: new Map([
+      [databaseProvider.id.fullName, paths.tempDir],
+      [assetBackupProvider.id.fullName, paths.tempDir],
+    ]),
   })
 
   const restoreDirs = createRestoreDirs(paths.tempDir)
@@ -239,6 +250,14 @@ export function createContainer(paths: AppPaths, restoreWiring?: RestoreWiring):
     reconnectLiveClients: restoreWiring?.reconnectLiveClients ?? defaultReconnectLiveClients,
   })
   restoreHandlerRegistry.register(databaseRestoreHandler)
+
+  const assetRestoreHandler = new AssetRestoreHandler({
+    extractDir: restoreDirs.extractDir,
+    stagingDir: restoreDirs.stagingDir,
+    archiveDir: restoreDirs.archiveDir,
+    liveDir: assetBookCoversDir,
+  })
+  restoreHandlerRegistry.register(assetRestoreHandler)
 
   const restoreService = new RestoreService({
     verifier: new BackupVerifier({ tempDir: paths.tempDir }),
@@ -297,8 +316,10 @@ export function createContainer(paths: AppPaths, restoreWiring?: RestoreWiring):
     providerRegistry,
     restoreHandlerRegistry,
     databaseProvider,
+    assetBackupProvider,
     backupService,
     databaseRestoreHandler,
+    assetRestoreHandler,
     restoreService,
     backupUIController,
     restoreUIController,

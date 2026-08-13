@@ -40,7 +40,7 @@ import { resolveWithin, moveFilePreserving, removeSideFiles } from '../src/main/
 import { resolveLiveDatabaseFile } from '../src/main/infrastructure/database-path'
 import { getPrisma, connectPrisma, disconnectPrisma } from '../src/main/repositories/base/prisma'
 
-const EXPECTED_SCHEMA_VERSION = '20260803_wo2_f2a_master_data_akademik'
+const EXPECTED_SCHEMA_VERSION = '20260810_wo_book_cover'
 const PROBE_TABLE = 'smoke_probe'
 
 let passed = 0
@@ -100,7 +100,7 @@ function testSchemaCompare(): void {
   check('same: identik → same', compareSchemaVersions(f2a, f2a) === 'same')
   check(
     'same: nilai sama (trim) → same',
-    compareSchemaVersions(SchemaVersion.of(' 20260803_wo2_f2a_master_data_akademik '), f2a) === 'same'
+    compareSchemaVersions(SchemaVersion.of(` ${EXPECTED_SCHEMA_VERSION} `), f2a) === 'same'
   )
   check(
     'older: backup lama vs live → older',

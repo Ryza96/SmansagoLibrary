@@ -20,6 +20,9 @@ export const bookAPI = {
     findById: (id: string) => invokeClean('books:findById', id),
     create: (input: CreateBookDTO) => invokeClean('books:create', input),
     update: (id: string, input: UpdateBookDTO) => invokeClean('books:update', id, input),
-    delete: (id: string) => invokeClean('books:delete', id)
+    delete: (id: string) => invokeClean('books:delete', id),
+    pickCover: () => invokeClean('books:pickCover'),
+    getCoverDataUri: (id: string) => invokeClean('books:getCoverDataUri', id),
+    removeCover: (id: string) => invokeClean('books:removeCover', id)
   }
 }

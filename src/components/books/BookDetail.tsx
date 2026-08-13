@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Plus, Trash2, AlertTriangle, Printer } from 'lucide-react'
 import { BookDetailDTO, BookCopyDTO, CreateBookCopiesDTO } from '../../types/dtos/book'
@@ -37,6 +37,22 @@ export default function BookDetail({ book, copies, onAddCopies, onDecommissionCo
   const [acquisitionNotes, setAcquisitionNotes] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const [coverUri, setCoverUri] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    window.electronAPI.books
+      .getCoverDataUri(book.id)
+      .then((uri) => {
+        if (!cancelled) setCoverUri(uri)
+      })
+      .catch(() => {
+        if (!cancelled) setCoverUri(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [book.id])
 
   async function handleAdd() {
     if (!shelfLocation.trim()) {
@@ -93,11 +109,21 @@ export default function BookDetail({ book, copies, onAddCopies, onDecommissionCo
     <div className="space-y-8">
       <section>
         <h2 className="text-lg font-semibold text-slate-800 mb-4">Informasi Buku</h2>
-        <div className="grid grid-cols-2 gap-x-8 gap-y-4">
-          <div>
-            <h3 className="text-sm font-medium text-slate-500 mb-1">{LABELS.FIELD.TITLE}</h3>
-            <p className="text-slate-800">{book.title}</p>
-          </div>
+        <div className="flex gap-6">
+          {coverUri && (
+            <div className="flex-shrink-0">
+              <img
+                src={coverUri}
+                alt="Sampul Buku"
+                className="w-36 h-48 object-cover rounded-lg border border-slate-200 shadow-sm"
+              />
+            </div>
+          )}
+          <div className={`grid grid-cols-2 gap-x-8 gap-y-4 ${coverUri ? 'flex-1 min-w-0' : ''}`}>
+            <div>
+              <h3 className="text-sm font-medium text-slate-500 mb-1">{LABELS.FIELD.TITLE}</h3>
+              <p className="text-slate-800">{book.title}</p>
+            </div>
           <div>
             <h3 className="text-sm font-medium text-slate-500 mb-1">{LABELS.FIELD.ISBN}</h3>
             <p className="text-slate-800">{book.isbn ?? '-'}</p>
@@ -138,6 +164,7 @@ export default function BookDetail({ book, copies, onAddCopies, onDecommissionCo
               <p className="text-slate-800">{book.pageCount}</p>
             </div>
           )}
+        </div>
         </div>
         {book.description && (
           <div className="mt-4">

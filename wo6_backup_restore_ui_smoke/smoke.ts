@@ -39,7 +39,7 @@ import {
 } from '../src/main/services/backup-ui.service'
 import { getPrisma, connectPrisma, disconnectPrisma } from '../src/main/repositories/base/prisma'
 
-const EXPECTED_SCHEMA_VERSION = '20260803_wo2_f2a_master_data_akademik'
+const EXPECTED_SCHEMA_VERSION = '20260810_wo_book_cover'
 
 let passed = 0
 let failed = 0
