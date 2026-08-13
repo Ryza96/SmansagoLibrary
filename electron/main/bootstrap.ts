@@ -17,6 +17,8 @@ import { MemberDuplicateChecker } from '../../src/main/services/member-duplicate
 import { MemberClassResolver } from '../../src/main/services/member-class-resolver.service'
 import { MemberImportService } from '../../src/main/services/member-import.service'
 import { NumberGeneratorService } from '../../src/main/services/number-generator.service'
+import { TeacherDuplicateChecker } from '../../src/main/services/teacher-duplicate-checker.service'
+import { TeacherImportService } from '../../src/main/services/teacher-import.service'
 import { MemberRepository as NewMemberRepository } from '../../src/main/repositories/member.repository'
 import { BorrowService } from '../../src/main/services/borrow.service'
 import { BorrowRepository } from '../../src/main/repositories/borrow.repository'
@@ -98,6 +100,8 @@ export interface Container {
   bookCopyService: BookCopyService
   memberService: MemberService
   memberImportService: MemberImportService
+  teacherDuplicateChecker: TeacherDuplicateChecker
+  teacherImportService: TeacherImportService
   borrowService: BorrowService
   printService: PrintService
   academicYearService: AcademicYearService
@@ -193,6 +197,13 @@ export function createContainer(paths: AppPaths, restoreWiring?: RestoreWiring):
     enrollmentRepository
   )
 
+  const teacherDuplicateChecker = new TeacherDuplicateChecker(newMemberRepository)
+  const teacherImportService = new TeacherImportService(
+    teacherDuplicateChecker,
+    numberGeneratorService,
+    newMemberRepository
+  )
+
   const matchingEngine = new MatchingEngineService(createProductionStrategies())
   const autoCreateService = new AutoCreateService(new NewAuthorRepository(), new NewPublisherRepository(), new NewCategoryRepository())
   const bookImportService = new BookImportService(new NewBookRepository(), new NewBookCopyRepository(), autoCreateService)
@@ -259,6 +270,8 @@ export function createContainer(paths: AppPaths, restoreWiring?: RestoreWiring):
     bookCopyService,
     memberService,
     memberImportService,
+    teacherDuplicateChecker,
+    teacherImportService,
     borrowService,
     printService,
     academicYearService,

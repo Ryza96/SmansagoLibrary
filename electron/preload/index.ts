@@ -3,6 +3,7 @@ import { appAPI } from './app.preload'
 import { bookAPI } from './book.preload'
 import { bookCopyAPI } from './book-copy.preload'
 import { memberAPI } from './member.preload'
+import { teacherAPI } from './teacher.preload'
 import { borrowAPI } from './borrow.preload'
 import { authorAPI } from './author.preload'
 import { publisherAPI } from './publisher.preload'
@@ -27,6 +28,7 @@ const electronAPI = {
   ...bookAPI,
   ...bookCopyAPI,
   ...memberAPI,
+  ...teacherAPI,
   ...borrowAPI,
   ...authorAPI,
   ...publisherAPI,

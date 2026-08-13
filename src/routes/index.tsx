@@ -80,7 +80,7 @@ export const router = createHashRouter([
       { path: 'books/:id/labels-preview', element: <LabelPreviewPage /> },
       { path: 'members', element: <Navigate to="/members/students" replace /> },
       { path: 'members/students', element: <MemberListPage memberType={MEMBER_TYPES.student.code} title="Daftar Siswa" newButtonLabel="Tambah Siswa" /> },
-      { path: 'members/teachers', element: <MemberListPage memberType={MEMBER_TYPES.teacher.code} title="Daftar Guru" newButtonLabel="Tambah Guru" /> },
+      { path: 'members/teachers', element: <MemberListPage memberType={MEMBER_TYPES.teacher.code} title="Daftar Guru/Staff" newButtonLabel="Tambah Guru/Staff" /> },
       { path: 'members/general', element: <MemberListPage memberType={MEMBER_TYPES.general.code} title="Daftar Anggota Umum" newButtonLabel="Tambah Anggota Umum" /> },
       { path: 'members/new', element: <MemberCreatePage /> },
       { path: 'members/:id', element: <MemberDetailPage /> },

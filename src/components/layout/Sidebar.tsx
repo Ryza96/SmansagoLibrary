@@ -30,7 +30,7 @@ const menuItems = [
 
 const memberSubItems = [
   { to: '/members/students', label: 'Siswa' },
-  { to: '/members/teachers', label: 'Guru' },
+  { to: '/members/teachers', label: 'Guru/Staff' },
   { to: '/members/general', label: 'Umum' }
 ]
 

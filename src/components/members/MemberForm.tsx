@@ -28,6 +28,7 @@ interface FormData {
   birthDate?: string
   phone?: string
   email?: string
+  nip?: string
   memberType?: string
   joinDate?: string
   validUntil?: string
@@ -57,6 +58,7 @@ export default function MemberForm({ mode = 'create', initialData, memberId, def
   const [birthDate, setBirthDate] = useState(editInitial.birthDate ?? '')
   const [phone, setPhone] = useState(editInitial.phone ?? '')
   const [email, setEmail] = useState(editInitial.email ?? '')
+  const [nip, setNip] = useState(editInitial.nip ?? '')
 
   const readonlyMemberType = mode === 'create' && !!defaultMemberType
   const [memberType, setMemberType] = useState(
@@ -85,12 +87,14 @@ export default function MemberForm({ mode = 'create', initialData, memberId, def
   const isEditMode = mode === 'edit'
   const memberTypeCode = isMemberTypeCode(memberType) ? memberType : undefined
   const isStudent = memberTypeCode === MEMBER_TYPES.student.code
+  const isTeacher = memberTypeCode === MEMBER_TYPES.teacher.code
 
   function validate(): boolean {
     const e: Record<string, string> = {}
     if (!fullName.trim()) e.fullName = 'Nama lengkap wajib diisi.'
     if (!gender) e.gender = 'Jenis kelamin wajib dipilih.'
     if (!memberType) e.memberType = 'Tipe anggota wajib dipilih.'
+    if (!isEditMode && isTeacher && !nip.trim()) e.nip = 'NIP wajib diisi.'
     if (isEditMode) {
       setErrors(e)
       return Object.keys(e).length === 0
@@ -117,6 +121,7 @@ export default function MemberForm({ mode = 'create', initialData, memberId, def
         address: address || undefined,
         phone: phone || undefined,
         email: email || undefined,
+        nip: isTeacher ? (nip || undefined) : undefined,
         status: status ? status.toUpperCase() : undefined
       }
       await api.members.update(memberId!, payload)
@@ -130,6 +135,7 @@ export default function MemberForm({ mode = 'create', initialData, memberId, def
         address: address || undefined,
         phone: phone || undefined,
         email: email || undefined,
+        nip: isTeacher ? (nip || undefined) : undefined,
         academicYearId: isStudent ? academicYearId : undefined,
         classId: isStudent ? classId : undefined
       }
@@ -155,6 +161,7 @@ export default function MemberForm({ mode = 'create', initialData, memberId, def
               phone={phone} setPhone={setPhone}
               email={email} setEmail={setEmail}
               errors={errors}
+              nip={nip} setNip={setNip} showNip={isTeacher}
             />
             <MembershipSection
               memberNumber={memberNumber}

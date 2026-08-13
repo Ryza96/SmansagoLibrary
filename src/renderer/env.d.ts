@@ -113,6 +113,12 @@ interface ElectronAPI {
     import: (rows: import('../../src/shared/dto/member').MemberImportRowInput[], scope: import('../../src/shared/dto/member').MemberImportScope) => Promise<import('../../src/shared/dto/member').MemberImportResultDTO>,
     onProgress: (callback: (event: import('../../src/shared/dto/member').MemberImportProgressEvent) => void) => () => void,
   }
+  teacherImport: {
+    downloadTemplate: () => Promise<import('../types/import').DownloadTemplateResult>,
+    previewCheck: (rows: import('../../src/shared/dto/teacher').TeacherImportRowInput[]) => Promise<import('../../src/shared/dto/teacher').TeacherImportPreviewDTO>,
+    import: (rows: import('../../src/shared/dto/teacher').TeacherImportRowInput[]) => Promise<import('../../src/shared/dto/teacher').TeacherImportResultDTO>,
+    onProgress: (callback: (stage: string) => void) => () => void,
+  }
   borrowings: {
     findMany: (search?: string, page?: number, limit?: number) => Promise<{
       data: Array<{

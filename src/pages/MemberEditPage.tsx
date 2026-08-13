@@ -25,6 +25,7 @@ export default function MemberEditPage() {
         birthDate: member.birthDate ?? '',
         phone: member.phone ?? '',
         email: member.email ?? '',
+        nip: member.nip ?? '',
         memberType: member.memberType ?? '',
         status: member.status.toLowerCase(),
         address: member.address ?? ''

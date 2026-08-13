@@ -7,6 +7,7 @@ import type { BookCopyService as LegacyBookCopyService } from '../main/services/
 import type { BookCopyService } from '../../src/main/services/book-copy.service'
 import type { MemberService } from '../../src/main/services/member.service'
 import type { MemberImportService } from '../../src/main/services/member-import.service'
+import type { TeacherImportService } from '../../src/main/services/teacher-import.service'
 import type { BorrowService } from '../../src/main/services/borrow.service'
 import type { ReturnService as NewReturnService } from '../../src/main/services/return.service'
 import type { PrintService } from '../main/services/print.service'
@@ -35,6 +36,7 @@ import { registerBookImportHandlers } from './book-import.ipc'
 import { registerBookHandlers } from './book.ipc'
 import { registerBookCopyHandlers } from './book-copy.ipc'
 import { registerMemberHandlers } from './member.ipc'
+import { registerTeacherHandlers } from './teacher.ipc'
 import { registerBorrowHandlers } from './borrow.ipc'
 import { registerAuthorHandlers } from './author.ipc'
 import { registerPublisherHandlers } from './publisher.ipc'
@@ -62,6 +64,7 @@ export function registerAllHandlers(
     bookCopyService: LegacyBookCopyService
     memberService: MemberService
     memberImportService: MemberImportService
+    teacherImportService: TeacherImportService
     borrowService: BorrowService
     printService: PrintService
     academicYearService: AcademicYearService
@@ -96,6 +99,7 @@ export function registerAllHandlers(
   registerBookHandlers(services.bookService)
   registerBookCopyHandlers(services.bookCopyService, services.newBookCopyService)
   registerMemberHandlers(services.memberService, services.memberImportService)
+  registerTeacherHandlers(services.teacherImportService)
   registerBorrowHandlers(services.borrowService, services.newReturnService, services.borrowDetailRepository, services.borrowRepository)
   registerAuthorHandlers(services.authorService)
   registerPublisherHandlers(services.publisherService)

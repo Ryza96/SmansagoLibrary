@@ -22,6 +22,7 @@ extraResources:
     filter:
       - "Template_Import_Buku_v2.0.xlsx"
       - "Template_Import_Anggota_v1.0.xlsx"
+      - "Template_Import_Guru_v1.0.xlsx"
 
 win:
   target:

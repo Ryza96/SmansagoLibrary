@@ -6,6 +6,7 @@ import { LABELS } from '../utils/labels'
 import { memberEditPath } from '../utils/navigation'
 import { memberTypeLabel, MEMBER_TYPES } from '../shared/config/member-type'
 import MemberImportDialog from '../components/members/MemberImportDialog'
+import TeacherImportDialog from '../components/members/TeacherImportDialog'
 
 const api = window.electronAPI
 
@@ -74,7 +75,7 @@ export default function MemberListPage({ memberType, title, newButtonLabel }: Me
             >
               <RefreshCw size={16} className="text-slate-500" />
             </button>
-            {memberType === MEMBER_TYPES.student.code && (
+            {(memberType === MEMBER_TYPES.student.code || memberType === MEMBER_TYPES.teacher.code) && (
               <button
                 onClick={() => {
                   setImportOpen(true)
@@ -82,7 +83,7 @@ export default function MemberListPage({ memberType, title, newButtonLabel }: Me
                 className="flex items-center gap-1.5 px-3 py-2 border border-blue-600 text-blue-600 text-sm font-medium rounded-lg hover:bg-blue-50 transition-colors"
               >
                 <FileUp size={16} />
-                Import Siswa
+                {memberType === MEMBER_TYPES.student.code ? 'Import Siswa' : 'Import Guru'}
               </button>
             )}
             <button
@@ -203,8 +204,16 @@ export default function MemberListPage({ memberType, title, newButtonLabel }: Me
         </div>
       </div>
 
-      {importOpen && (
+      {importOpen && memberType === MEMBER_TYPES.student.code && (
         <MemberImportDialog
+          onClose={() => {
+            setImportOpen(false)
+            fetchMembers()
+          }}
+        />
+      )}
+      {importOpen && memberType === MEMBER_TYPES.teacher.code && (
+        <TeacherImportDialog
           onClose={() => {
             setImportOpen(false)
             fetchMembers()

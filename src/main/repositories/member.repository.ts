@@ -156,6 +156,19 @@ export class MemberRepository extends BaseRepository {
     return found
   }
 
+  async findManyByNIPs(nips: string[]): Promise<Member[]> {
+    const unique = [...new Set(nips)]
+    const chunk = IMPORT_CONFIG.MEMBER_IMPORT_LOOKUP_CHUNK
+    const found: Member[] = []
+    for (let i = 0; i < unique.length; i += chunk) {
+      const rows = await this.prisma.member.findMany({
+        where: { nip: { in: unique.slice(i, i + chunk) } }
+      })
+      found.push(...rows)
+    }
+    return found
+  }
+
   async findLastMemberNumberByPrefix(prefix: string, tx?: Prisma.TransactionClient): Promise<string | null> {
     const client = tx ?? this.prisma
     const row = await client.member.findFirst({
