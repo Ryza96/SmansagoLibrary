@@ -90,7 +90,7 @@ export class BookImportService {
     }
 
     const copyCount = this.valueToInteger(row.canonicalRow.values['copyCount']) ?? 1
-    if (!Number.isInteger(copyCount) || copyCount < 1 || copyCount > 100) {
+    if (!Number.isInteger(copyCount) || copyCount < 1 || copyCount > 1000) {
       issue(BOOK_COPY_CREATE_FAILED_MESSAGE_KEY)
       return issues
     }

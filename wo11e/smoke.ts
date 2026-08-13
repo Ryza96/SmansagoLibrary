@@ -13,7 +13,7 @@ import { BOOK_IMPORT_TEMPLATE, LEGACY_BOOK_IMPORT_TEMPLATE } from '../src/config
 import type {
   CanonicalRow,
   ImportCellValue,
-  MatchedWorkbook,
+  ImportResultDTO,
   RawWorkbook,
   ValidatedWorkbook,
 } from '../src/types/import'
@@ -86,8 +86,8 @@ async function main(): Promise<void> {
     check('V1: canonical row memuat copyCount=5', r.canonicalRows[0]?.values['copyCount'] === 5)
   }
   {
-    const codes = issueCodes(v2Workbook([v2Row({ 5: 150 })]))
-    check('V2: copyCount=150 -> IMP-015', codes.includes('IMP-015'), codes.join(','))
+    const codes = issueCodes(v2Workbook([v2Row({ 5: 1001 })]))
+    check('V2: copyCount=1001 -> IMP-015', codes.includes('IMP-015'), codes.join(','))
   }
   {
     const codes = issueCodes(v2Workbook([v2Row({ 5: 0 })]))
@@ -98,8 +98,8 @@ async function main(): Promise<void> {
     check('V4: copyCount=2.5 (bukan integer) -> IMP-015', codes.includes('IMP-015'), codes.join(','))
   }
   {
-    const r = validationEngineService.validate(v2Workbook([v2Row({ 5: 100 })]))
-    check('V5: copyCount=100 (batas atas) valid', r.validationResult.valid, `errors=${r.validationResult.errors.map((e) => e.code).join(',')}`)
+    const r = validationEngineService.validate(v2Workbook([v2Row({ 5: 1000 })]))
+    check('V5: copyCount=1000 (batas atas) valid', r.validationResult.valid, `errors=${r.validationResult.errors.map((e) => e.code).join(',')}`)
   }
   {
     const wb: RawWorkbook = { sheets: [{ name: 'Sheet1', rows: [V1_HEADER, ['WO11E V1', 'WO11E Penulis', 'WO11E Penerbit', 2024, 'WO11E Kategori', null]] }] }
@@ -114,12 +114,11 @@ async function main(): Promise<void> {
     new PublisherRepository(),
     new CategoryRepository()
   )
-  const bookImport = new BookImportService(new BookRepository(), new BookCopyRepository())
+  const bookImport = new BookImportService(new BookRepository(), new BookCopyRepository(), autoCreate)
 
-  const runImport = async (rows: CanonicalRow[]): Promise<MatchedWorkbook> => {
+  const runImport = async (rows: CanonicalRow[]): Promise<ImportResultDTO> => {
     const wb = toValidatedWorkbook(rows)
     const matched = await engine.match(wb)
-    await autoCreate.apply(matched)
     return bookImport.importBooks(matched)
   }
 
@@ -140,7 +139,7 @@ async function main(): Promise<void> {
   {
     const book = await prisma.book.findUnique({ where: { isbn: '978-000-200-000-1' } })
     const copies = book ? await prisma.bookCopy.findMany({ where: { bookId: book.id } }) : []
-    check('P1: tidak ada error', r1.matchingResult.errors.length === 0, r1.matchingResult.errors.map((e) => e.messageKey).join(','))
+    check('P1: tidak ada error', r1.failedRows.length === 0, r1.failedRows.map((e) => e.messageKey).join(','))
     check('P1: Book dibuat', book !== null)
     check('P1: copyCount=1 -> 1 copy', copies.length === 1, `count=${copies.length}`)
     check('P1: inventoryNumber=INV-000001', copies[0]?.inventoryNumber === 'INV-000001', copies[0]?.inventoryNumber)
@@ -166,7 +165,7 @@ async function main(): Promise<void> {
     const copies = book ? await prisma.bookCopy.findMany({ where: { bookId: book.id }, orderBy: { inventoryNumber: 'asc' } }) : []
     const expected = Array.from({ length: 10 }, (_, i) => `INV-${String(i + 2).padStart(6, '0')}`)
     const actual = copies.map((c) => c.inventoryNumber)
-    check('P2: tidak ada error', r2.matchingResult.errors.length === 0, r2.matchingResult.errors.map((e) => e.messageKey).join(','))
+    check('P2: tidak ada error', r2.failedRows.length === 0, r2.failedRows.map((e) => e.messageKey).join(','))
     check('P2: copyCount=10 -> 10 copy', copies.length === 10, `count=${copies.length}`)
     check('P2: nomor berurutan INV-000002..000011', JSON.stringify(actual) === JSON.stringify(expected), actual.join(','))
     check('P2: semua barcode === inventoryNumber', copies.every((c) => c.barcode === c.inventoryNumber))
@@ -189,7 +188,7 @@ async function main(): Promise<void> {
   {
     const book = await prisma.book.findUnique({ where: { isbn: '978-000-200-000-3' } })
     const copies = book ? await prisma.bookCopy.findMany({ where: { bookId: book.id } }) : []
-    check('P3: tidak ada error', r3.matchingResult.errors.length === 0, r3.matchingResult.errors.map((e) => e.messageKey).join(','))
+    check('P3: tidak ada error', r3.failedRows.length === 0, r3.failedRows.map((e) => e.messageKey).join(','))
     check('P3: v1 (tanpa copyCount) -> 1 copy', copies.length === 1, `count=${copies.length}`)
     check('P3: inventoryNumber=INV-000012', copies[0]?.inventoryNumber === 'INV-000012', copies[0]?.inventoryNumber)
   }
@@ -204,14 +203,14 @@ async function main(): Promise<void> {
         publisher: 'WO11E Penerbit',
         category: 'WO11E Kategori',
         year: 2024,
-        copyCount: 150,
+        copyCount: 1001,
       },
     },
   ])
   {
-    const keys = r4.matchingResult.errors.map((e) => e.messageKey)
+    const keys = r4.failedRows.map((e) => e.messageKey)
     const book = await prisma.book.findUnique({ where: { isbn: '978-000-200-000-4' } })
-    check('P4: copyCount=150 ditolak guard', keys.includes('bookImport.copyCreateFailed'), keys.join(','))
+    check('P4: copyCount=1001 ditolak guard', keys.includes('bookImport.copyCreateFailed'), keys.join(','))
     check('P4: tidak ada Book dibuat', book === null)
     const seq = await prisma.inventorySequence.findUnique({ where: { id: 'default' } })
     check('P4: sequence tidak berubah (12)', seq?.lastNumber === 12, `lastNumber=${seq?.lastNumber}`)
@@ -244,14 +243,16 @@ async function main(): Promise<void> {
     },
   ])
   {
-    const keys = r5.matchingResult.errors.map((e) => e.messageKey)
     const book = await prisma.book.findUnique({ where: { isbn: '978-000-200-000-5' } })
+    const newCopies = book ? await prisma.bookCopy.findMany({ where: { bookId: book.id }, orderBy: { inventoryNumber: 'asc' } }) : []
+    const expected = Array.from({ length: 10 }, (_, i) => `INV-${String(43 + i).padStart(6, '0')}`)
     const copiesAfter = await prisma.bookCopy.count()
     const seq = await prisma.inventorySequence.findUnique({ where: { id: 'default' } })
-    check('P5: createMany bentrok -> error', keys.includes('bookImport.createFailed'), keys.join(','))
-    check('P5: Book di-rollback (tidak ada)', book === null)
-    check('P5: semua BookCopy di-rollback (tetap 42)', copiesAfter === 42, `count=${copiesAfter}`)
-    check('P5: sequence di-rollback (12)', seq?.lastNumber === 12, `lastNumber=${seq?.lastNumber}`)
+    check('P5: healing urutan — tidak ada error', r5.failedRows.length === 0, r5.failedRows.map((e) => e.messageKey).join(','))
+    check('P5: Book dibuat', book !== null)
+    check('P5: alokasi lanjut INV-000043..000052 (healing lewat seed)', JSON.stringify(newCopies.map((c) => c.inventoryNumber)) === JSON.stringify(expected), newCopies.map((c) => c.inventoryNumber).join(','))
+    check('P5: total copy 52 (42 + 10)', copiesAfter === 52, `count=${copiesAfter}`)
+    check('P5: sequence healed ke 52', seq?.lastNumber === 52, `lastNumber=${seq?.lastNumber}`)
   }
 
   {

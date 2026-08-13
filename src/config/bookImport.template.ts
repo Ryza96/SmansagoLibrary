@@ -111,7 +111,7 @@ export const BOOK_IMPORT_TEMPLATE = {
       dataType: 'number',
       nullable: false,
       min: 1,
-      max: 100,
+      max: 1000,
     },
     {
       key: 'isbn',

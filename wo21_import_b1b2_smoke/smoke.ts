@@ -233,6 +233,52 @@ async function main(): Promise<void> {
     check('B1: tidak ada baris yatim di failedRows (rowNumber selalu ada)', r1.failedRows.every((f) => f.rowNumber !== null))
   }
 
+  // STEP 8 — WO11J: boundary copyCount 1..1000 valid, 0 & 1001 ditolak (guard pipeline)
+  const boundary = [
+    { label: 'copyCount=1', copyCount: 1, expectFail: false },
+    { label: 'copyCount=100', copyCount: 100, expectFail: false },
+    { label: 'copyCount=127', copyCount: 127, expectFail: false },
+    { label: 'copyCount=128', copyCount: 128, expectFail: false },
+    { label: 'copyCount=999', copyCount: 999, expectFail: false },
+    { label: 'copyCount=1000', copyCount: 1000, expectFail: false },
+    { label: 'copyCount=0', copyCount: 0, expectFail: true },
+    { label: 'copyCount=1001', copyCount: 1001, expectFail: true },
+  ]
+  for (const [i, bc] of boundary.entries()) {
+    const r = await runImport([
+      {
+        rowNumber: 1,
+        values: {
+          title: `WO21 Boundary ${bc.label}`,
+          isbn: `978-000-400-${String(i + 1).padStart(3, '0')}-0`,
+          authors: 'WO21 Penulis Boundary',
+          publisher: 'WO21 Penerbit Boundary',
+          category: 'WO21 Kategori Boundary',
+          copyCount: bc.copyCount,
+        },
+      },
+    ])
+    if (bc.expectFail) {
+      check(
+        `boundary ${bc.label}: ditolak (copyCreateFailed)`,
+        r.importedBooks === 0 && r.importedCopies === 0 && failedKeys(r).includes('bookImport.copyCreateFailed'),
+        `failed=${JSON.stringify(r.failedRows)}`
+      )
+    } else {
+      check(
+        `boundary ${bc.label}: PASS importedCopies=${bc.copyCount}`,
+        r.importedBooks === 1 && r.importedCopies === bc.copyCount && r.failedRows.length === 0,
+        `copies=${r.importedCopies}`
+      )
+    }
+  }
+  {
+    const after = await state(prisma)
+    check('boundary: DB buku bertambah 6 (dari 6)', after.books.length === 12, `books=${after.books.length}`)
+    check('boundary: DB copy bertambah 2355 (dari 7)', after.copies.length === 2362, `copies=${after.copies.length}`)
+    check('boundary: ISBN 1001/0 TIDAK dibuat', !after.books.some((b) => b.title === 'WO21 Boundary copyCount=1001') && !after.books.some((b) => b.title === 'WO21 Boundary copyCount=0'))
+  }
+
   console.log('FINAL_DB ' + JSON.stringify({
     books: (await state(prisma)).books.length,
     copies: (await state(prisma)).copies.length,
