@@ -8,6 +8,8 @@ export const enrollmentAPI = {
       ipcRenderer.invoke('enrollments:close', enrollmentId, input),
     repoint: (enrollmentId: string, input: Record<string, unknown>) =>
       ipcRenderer.invoke('enrollments:repoint', enrollmentId, input),
+    transfer: (enrollmentId: string, input: Record<string, unknown>) =>
+      ipcRenderer.invoke('enrollments:transfer', enrollmentId, input),
     findActiveByMember: (memberId: string) =>
       ipcRenderer.invoke('enrollments:findActiveByMember', memberId),
     historyByMember: (memberId: string) =>

@@ -32,3 +32,9 @@ export interface RepointEnrollmentDTO {
   targetClassId: string
   note?: string
 }
+
+export interface TransferEnrollmentDTO {
+  targetAcademicYearId: string
+  targetClassId: string
+  note?: string
+}

@@ -199,6 +199,7 @@ interface ElectronAPI {
     enroll: (input: import('../../src/shared/dto/enrollment').CreateEnrollmentDTO) => Promise<import('../../src/shared/dto/enrollment').EnrollmentDTO>
     close: (enrollmentId: string, input: import('../../src/shared/dto/enrollment').CloseEnrollmentDTO) => Promise<import('../../src/shared/dto/enrollment').EnrollmentDTO>
     repoint: (enrollmentId: string, input: import('../../src/shared/dto/enrollment').RepointEnrollmentDTO) => Promise<import('../../src/shared/dto/enrollment').EnrollmentDTO>
+    transfer: (enrollmentId: string, input: import('../../src/shared/dto/enrollment').TransferEnrollmentDTO) => Promise<import('../../src/shared/dto/enrollment').EnrollmentDTO>
     findActiveByMember: (memberId: string) => Promise<import('../../src/shared/dto/enrollment').EnrollmentDTO | null>
     historyByMember: (memberId: string) => Promise<import('../../src/shared/dto/enrollment').EnrollmentDTO[]>
   }

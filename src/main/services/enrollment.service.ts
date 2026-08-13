@@ -1,7 +1,13 @@
 import { EnrollmentRepository } from '../repositories/enrollment.repository'
 import { MemberRepository } from '../repositories/member.repository'
 import { ClassRepository } from '../repositories/class.repository'
-import type { EnrollmentDTO, CreateEnrollmentDTO, CloseEnrollmentDTO, RepointEnrollmentDTO } from '../../shared/dto/enrollment'
+import type {
+  EnrollmentDTO,
+  CreateEnrollmentDTO,
+  CloseEnrollmentDTO,
+  RepointEnrollmentDTO,
+  TransferEnrollmentDTO
+} from '../../shared/dto/enrollment'
 import { ACADEMIC_STATUS, isTerminalAcademicStatus } from '../../shared/config/academic-status'
 import { getMemberType } from '../../shared/config/member-type'
 import { getPrisma } from '../repositories/base/prisma'
@@ -141,6 +147,57 @@ export class EnrollmentService {
       throw new AppError(500, 'Internal', `Enrollment ${created.id} tidak ditemukan setelah repoint`)
     }
     return toDTO(full)
+  }
+
+  // RFC §4.1 / WO EDIT STUDENT CLASS PLACEMENT — TRANSFER (perpindahan antar
+  // TAHUN AJARAN): close(TRANSFERRED) + buka enrollment ACTIVE di kelas target
+  // tahun target, dalam SATU transaksi. DILARANG close() → enroll() terpisah dari
+  // UI (risiko CRITICAL: close sukses + enroll gagal = siswa kehilangan enrollment
+  // ACTIVE). Seluruh operasi atomik; kegagalan apa pun = rollback penuh.
+  // Riwayat dipertahankan (tidak pernah DELETE); invarian satu-ACTIVE dijaga.
+  async transfer(enrollmentId: string, input: TransferEnrollmentDTO): Promise<EnrollmentDTO> {
+    const existing = await this.repository.findById(enrollmentId)
+    if (!existing) {
+      throw new AppError(404, 'Not Found', `Enrollment ${enrollmentId} tidak ditemukan`)
+    }
+    if (existing.status !== ACADEMIC_STATUS.active) {
+      throw new AppError(400, 'Conflict', `Enrollment ${enrollmentId} tidak aktif (status=${existing.status})`)
+    }
+    if (input.targetAcademicYearId === existing.academicYearId) {
+      throw new AppError(
+        400,
+        'Conflict',
+        'Tahun ajaran target harus berbeda dari tahun ajaran saat ini — gunakan repoint untuk perubahan kelas dalam tahun yang sama'
+      )
+    }
+
+    const target = await this.classRepository.findById(input.targetClassId)
+    if (!target) {
+      throw new AppError(404, 'Not Found', `Kelas target ${input.targetClassId} tidak ditemukan`)
+    }
+    if (target.academicYearId !== input.targetAcademicYearId) {
+      throw new AppError(
+        400,
+        'Conflict',
+        `Kelas target ${target.educationLevel} ${target.parallel} bukan milik tahun ajaran ${input.targetAcademicYearId}`
+      )
+    }
+
+    await runTransaction(getPrisma(), async (tx) => {
+      await this.repository.closeWithTx(tx, enrollmentId, ACADEMIC_STATUS.transferred, input.note ?? '')
+      await this.repository.createActiveWithTx(tx, {
+        memberId: existing.memberId,
+        classId: input.targetClassId,
+        academicYearId: input.targetAcademicYearId,
+        note: input.note
+      })
+    })
+
+    const active = await this.repository.findActiveByMember(existing.memberId)
+    if (!active) {
+      throw new AppError(500, 'Internal', `Enrollment ${enrollmentId} gagal dipindahkan ke tahun ${input.targetAcademicYearId}`)
+    }
+    return toDTO(active)
   }
 
   // RFC §1.3 / §4.1 — konsumsi "kelas sekarang" dari enrollment aktif (status=ACTIVE, leftAt=null).

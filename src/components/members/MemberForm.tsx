@@ -39,6 +39,8 @@ interface FormData {
   city?: string
   postalCode?: string
   notes?: string
+  academicYearId?: string
+  classId?: string
 }
 
 interface MemberFormProps {
@@ -46,9 +48,10 @@ interface MemberFormProps {
   initialData?: FormData
   memberId?: string
   defaultMemberType?: string
+  activeEnrollment?: Pick<import('../../shared/dto/enrollment').EnrollmentDTO, 'id' | 'academicYearId' | 'classId'> | null
 }
 
-export default function MemberForm({ mode = 'create', initialData, memberId, defaultMemberType }: MemberFormProps) {
+export default function MemberForm({ mode = 'create', initialData, memberId, defaultMemberType, activeEnrollment }: MemberFormProps) {
   const navigate = useNavigate()
   const editInitial = mode === 'edit' ? (initialData ?? {}) : {}
 
@@ -66,8 +69,8 @@ export default function MemberForm({ mode = 'create', initialData, memberId, def
       ? defaultMemberType.toLowerCase()
       : (editInitial.memberType ?? '')
   )
-  const [academicYearId, setAcademicYearId] = useState('')
-  const [classId, setClassId] = useState('')
+  const [academicYearId, setAcademicYearId] = useState(editInitial.academicYearId ?? '')
+  const [classId, setClassId] = useState(editInitial.classId ?? '')
   const [joinDate] = useState(editInitial.joinDate ?? todayISO())
   const [validUntil, setValidUntil] = useState(editInitial.validUntil ?? '')
   const [status, setStatus] = useState(editInitial.status ?? 'active')
@@ -95,10 +98,6 @@ export default function MemberForm({ mode = 'create', initialData, memberId, def
     if (!gender) e.gender = 'Jenis kelamin wajib dipilih.'
     if (!memberType) e.memberType = 'Tipe anggota wajib dipilih.'
     if (!isEditMode && isTeacher && !nip.trim()) e.nip = 'NIP wajib diisi.'
-    if (isEditMode) {
-      setErrors(e)
-      return Object.keys(e).length === 0
-    }
     if (isStudent) {
       if (!academicYearId) e.academicYearId = LABELS.MEMBER_CLASS.REQUIRED_STUDENT
       if (!classId) e.classId = LABELS.MEMBER_CLASS.REQUIRED_STUDENT
@@ -125,6 +124,22 @@ export default function MemberForm({ mode = 'create', initialData, memberId, def
         status: status ? status.toUpperCase() : undefined
       }
       await api.members.update(memberId!, payload)
+      // Penempatan kelas (enrollment) TIDAK dikirim via members.update — dikelola
+      // lewat domain enrollment. Siswa tanpa enrollment ACTIVE → enroll; Tahun
+      // Ajaran berubah → transfer (atomik); hanya kelas berubah (tahun sama) →
+      // repoint; tanpa perubahan → tidak ada operasi.
+      if (isStudent) {
+        if (!activeEnrollment) {
+          await api.enrollments.enroll({ memberId: memberId!, classId, academicYearId })
+        } else if (activeEnrollment.academicYearId !== academicYearId) {
+          await api.enrollments.transfer(activeEnrollment.id, {
+            targetAcademicYearId: academicYearId,
+            targetClassId: classId
+          })
+        } else if (activeEnrollment.classId !== classId) {
+          await api.enrollments.repoint(activeEnrollment.id, { targetClassId: classId })
+        }
+      }
     } else {
       const payload: CreateMemberDTO = {
         fullName,
@@ -173,16 +188,14 @@ export default function MemberForm({ mode = 'create', initialData, memberId, def
               errors={errors}
               readonlyMemberType={readonlyMemberType}
             />
-            {!isEditMode && (
-              <MemberClassSection
-                memberType={memberType}
-                academicYearId={academicYearId}
-                setAcademicYearId={setAcademicYearId}
-                classId={classId}
-                setClassId={setClassId}
-                errors={errors}
-              />
-            )}
+            <MemberClassSection
+              memberType={memberType}
+              academicYearId={academicYearId}
+              setAcademicYearId={setAcademicYearId}
+              classId={classId}
+              setClassId={setClassId}
+              errors={errors}
+            />
             <AddressSection
               address={address} setAddress={setAddress}
               district={district} setDistrict={setDistrict}

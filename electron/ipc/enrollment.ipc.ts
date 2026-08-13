@@ -1,6 +1,6 @@
 import { ipcMain } from 'electron'
 import type { EnrollmentService } from '../../src/main/services/enrollment.service'
-import type { CreateEnrollmentDTO, CloseEnrollmentDTO, RepointEnrollmentDTO } from '../../src/shared/dto/enrollment'
+import type { CreateEnrollmentDTO, CloseEnrollmentDTO, RepointEnrollmentDTO, TransferEnrollmentDTO } from '../../src/shared/dto/enrollment'
 
 export function registerEnrollmentHandlers(service: EnrollmentService): void {
   ipcMain.handle('enrollments:enroll', async (_event, input: CreateEnrollmentDTO) =>
@@ -11,6 +11,9 @@ export function registerEnrollmentHandlers(service: EnrollmentService): void {
   )
   ipcMain.handle('enrollments:repoint', async (_event, enrollmentId: string, input: RepointEnrollmentDTO) =>
     service.repoint(enrollmentId, input)
+  )
+  ipcMain.handle('enrollments:transfer', async (_event, enrollmentId: string, input: TransferEnrollmentDTO) =>
+    service.transfer(enrollmentId, input)
   )
   ipcMain.handle('enrollments:findActiveByMember', async (_event, memberId: string) =>
     service.findActiveByMember(memberId)
