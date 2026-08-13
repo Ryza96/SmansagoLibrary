@@ -106,7 +106,7 @@ function testFilename(): void {
   check('APBACKUP_EXTENSION === ".apbackup"', APBACKUP_EXTENSION === '.apbackup')
   check('MANIFEST_FILENAME === "manifest.json"', MANIFEST_FILENAME === 'manifest.json')
   const fn = buildBackupFilename(d, 'BKP-abc123')
-  check('filename diawali APLibrary-backup-<timestamp>', fn.startsWith('APLibrary-backup-20260806-103045-'))
+  check('filename diawali BAM-backup-<timestamp>', fn.startsWith('BAM-backup-20260806-103045-'))
   check('filename diakhiri .apbackup', fn.endsWith(APBACKUP_EXTENSION))
   check('filename memuat ekor session', fn.includes('abc123'))
   check('filename menstripan karakter ilegal', buildBackupFilename(d, 'BKP: x/y').includes('BKPxy'))

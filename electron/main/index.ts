@@ -34,6 +34,7 @@ function createWindow(): void {
     minWidth: 1024,
     minHeight: 600,
     show: false,
+    title: 'BAM',
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.js'),
       contextIsolation: true,
@@ -43,6 +44,7 @@ function createWindow(): void {
   })
 
   mainWindow.on('ready-to-show', () => {
+    mainWindow?.maximize()
     mainWindow?.show()
   })
 

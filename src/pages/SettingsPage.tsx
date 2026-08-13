@@ -17,6 +17,7 @@ import {
   Lock,
 } from 'lucide-react'
 import { LABELS } from '../utils/labels'
+import { APP } from '../utils/app'
 import { ROUTES } from '../utils/navigation'
 import { useNotification } from '../notification/NotificationContext'
 import type { PrinterInfoDTO } from '../shared/dto/print'
@@ -494,9 +495,9 @@ export default function SettingsPage() {
 
   function renderAbout() {
     const rows = [
-      { label: LABELS.SETTINGS.ABOUT_NAME, value: appInfo?.name ?? 'APLibrary' },
+      { label: LABELS.SETTINGS.ABOUT_NAME, value: APP.NAME },
       { label: LABELS.SETTINGS.ABOUT_VERSION, value: appInfo?.version ?? '—' },
-      { label: LABELS.SETTINGS.ABOUT_COPYRIGHT, value: `© ${new Date().getFullYear()} APLibrary` },
+      { label: LABELS.SETTINGS.ABOUT_COPYRIGHT, value: `© ${new Date().getFullYear()} ${APP.NAME}` },
       { label: LABELS.SETTINGS.ABOUT_DEVELOPER, value: 'Ryza Arshavin' },
     ]
     return (

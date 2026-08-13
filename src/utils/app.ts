@@ -1,5 +1,5 @@
 export const APP = {
-  NAME: 'APLibrary',
-  VERSION: '0.1.0',
+  NAME: 'BAM',
+  VERSION: '0.1.1',
   DB_TYPE: 'SQLite',
 } as const

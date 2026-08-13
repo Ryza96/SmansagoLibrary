@@ -79,7 +79,7 @@ export function buildBackupFilename(startedAt: Date, sessionId: string): string 
   const date = `${startedAt.getFullYear()}${pad(startedAt.getMonth() + 1)}${pad(startedAt.getDate())}`
   const time = `${pad(startedAt.getHours())}${pad(startedAt.getMinutes())}${pad(startedAt.getSeconds())}`
   const shortId = sessionId.replace(/[^a-zA-Z0-9-]/g, '').slice(-8)
-  return `APLibrary-backup-${date}-${time}-${shortId}${APBACKUP_EXTENSION}`
+  return `BAM-backup-${date}-${time}-${shortId}${APBACKUP_EXTENSION}`
 }
 
 export class BackupService {

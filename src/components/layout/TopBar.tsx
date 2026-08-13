@@ -31,7 +31,7 @@ export default function TopBar() {
     <header className="flex items-center justify-between h-12 px-4 bg-slate-900 text-white select-none draggable">
       <div className="flex items-center gap-2">
         <FileMenuDropdown />
-        <span className="font-bold text-lg tracking-wide">APLibrary</span>
+        <span className="font-bold text-lg tracking-wide">BAM</span>
       </div>
 
       <div className="flex items-center gap-3">

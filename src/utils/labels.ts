@@ -870,7 +870,7 @@ export const LABELS = {
     PRINTER_REFRESH: 'Muat Ulang',
   },
   AUTH: {
-    APP_NAME: 'APLibrary',
+    APP_NAME: 'BAM',
     APP_SUBTITLE: 'Sistem Manajemen Perpustakaan',
     SETUP_TITLE: 'Setup Awal Admin',
     SETUP_SUBTITLE:

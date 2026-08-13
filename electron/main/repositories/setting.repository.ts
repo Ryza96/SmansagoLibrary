@@ -4,7 +4,7 @@ import type { Prisma } from '@prisma/client'
 type SettingData = Prisma.SettingCreateInput
 
 const DEFAULT_SETTINGS: SettingData = {
-  libraryName: 'APLibrary',
+  libraryName: 'BAM',
   schoolName: '',
   address: '',
   phone: '',

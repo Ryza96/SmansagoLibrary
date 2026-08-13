@@ -136,8 +136,8 @@ async function dbBackedSection(tempRoot: string): Promise<void> {
   const target = controller.getTargetInfo()
   check('target.backupDir === backupManualDir', target.backupDir === paths.backupManualDir)
   check(
-    'target.sampleFilename ber-awalan APLibrary-backup-',
-    /^APLibrary-backup-\d{8}-\d{6}-[0-9a-f-]{8}\.apbackup$/.test(target.sampleFilename)
+    'target.sampleFilename ber-awalan BAM-backup-',
+    /^BAM-backup-\d{8}-\d{6}-[0-9a-f-]{8}\.apbackup$/.test(target.sampleFilename)
   )
   check('target.extension === .apbackup', target.extension === '.apbackup')
 

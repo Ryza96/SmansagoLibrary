@@ -1,8 +1,8 @@
 {
   "name": "aplibrary",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "author": "Ryza Arshavin",
-  "description": "Aplikasi Perpustakaan Desktop - APLibrary",
+  "description": "Aplikasi Perpustakaan Desktop - BAM",
   "main": "./out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",

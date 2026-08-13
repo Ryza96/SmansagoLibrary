@@ -1,5 +1,5 @@
 appId: com.kontenyou.aplibrary
-productName: APLibrary
+productName: BAM
 directories:
   buildResources: resources
   output: dist
@@ -29,14 +29,17 @@ win:
     - target: nsis
       arch:
         - x64
+  icon: resources/icon.ico
   signAndEditExecutable: false
+
+afterPack: scripts/after-pack.cjs
 
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
   createStartMenuShortcut: true
-  shortcutName: APLibrary
+  shortcutName: BAM
 
 asarUnpack:
   - "**/*.node"
