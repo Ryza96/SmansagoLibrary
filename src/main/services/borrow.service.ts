@@ -7,11 +7,6 @@ import type { BorrowingDTO, BorrowingItemDetailDTO, CreateBorrowingInput } from 
 import { getMemberType } from '../../shared/config/member-type'
 import { AppError } from '../../../electron/main/errorHandler'
 
-// TECHNICAL DEBT: MAX_BOOKS masih hardcoded.
-// Nantinya akan dipindahkan ke configuration / application settings.
-// Bukan bagian dari WO-006.
-const MAX_BOOKS = 20
-
 function generateBorrowNumber(lastNumber: string | null): string {
   const now = new Date()
   const yyyy = now.getFullYear().toString()
@@ -149,9 +144,17 @@ export class BorrowService {
       throw new AppError(400, 'Validation Error', `Member ${member.fullName} tidak memiliki enrollment aktif`)
     }
 
+    const borrowDate = new Date()
     const dueDate = new Date(input.dueDate)
-    if (dueDate <= new Date()) {
+    if (dueDate <= borrowDate) {
       throw new AppError(400, 'Validation Error', 'Tanggal jatuh tempo harus setelah hari ini')
+    }
+
+    // PO Decision (MEMBER BORROWING RIGHTS): batas hari pinjam = maxDays dari
+    // config MemberType (SSOT). dueDate boleh PAS 90 hari (<=), lebih → ditolak.
+    const maxDays = memberType.borrowRights.maxDays
+    if (dueDate.getTime() > borrowDate.getTime() + maxDays * 24 * 60 * 60 * 1000) {
+      throw new AppError(400, 'Validation Error', `Masa pinjam tidak boleh melebihi ${maxDays} hari`)
     }
 
     if (input.bookCopyIds.length === 0) {
@@ -176,9 +179,13 @@ export class BorrowService {
       }
     }
 
+    // PO Decision (MEMBER BORROWING RIGHTS): batas jumlah eksemplar = maxBooks
+    // dari config MemberType (SSOT). Guard awal di Service (advisory fast-fail);
+    // guard ATOMIK diduplikasi DI DALAM transaksi createWithItems (anti TOCTOU).
+    const maxBooks = memberType.borrowRights.maxBooks
     const activeCount = await this.borrowDetailRepository.countActiveByMemberId(input.memberId)
-    if (activeCount + input.bookCopyIds.length > MAX_BOOKS) {
-      throw new AppError(400, 'Validation Error', `Total buku yang dipinjam tidak boleh melebihi ${MAX_BOOKS} eksemplar`)
+    if (activeCount + input.bookCopyIds.length > maxBooks) {
+      throw new AppError(400, 'Validation Error', `Total buku yang dipinjam tidak boleh melebihi ${maxBooks} eksemplar`)
     }
 
     const lastNumber = await this.borrowRepository.getLastBorrowNumber()
@@ -192,7 +199,7 @@ export class BorrowService {
         memberId: input.memberId,
         memberName: member.fullName,
         memberNumber: member.memberNumber,
-        borrowDate: new Date(),
+        borrowDate,
         dueDate,
         notes: input.notes,
         className
@@ -200,7 +207,8 @@ export class BorrowService {
       input.bookCopyIds.map((bookCopyId, i) => ({
         bookCopyId,
         bookTitle: bookCopies[i]?.book?.title ?? ''
-      }))
+      })),
+      maxBooks
     )
 
     // FIRST BORROW ACTIVATION — Membership Status (bukan Academic Status):

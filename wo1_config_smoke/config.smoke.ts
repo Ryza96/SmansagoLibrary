@@ -46,20 +46,20 @@ expectEqual('default prefix (empty)', memberNumberPrefix(''), 'S')
 expectEqual('default prefix (undefined)', memberNumberPrefix(undefined), 'S')
 const studentRights = memberBorrowRights('student')
 check(
-  'student rights 2/7/1x',
-  studentRights?.maxBooks === 2 && studentRights?.maxDays === 7 && studentRights?.extensions === '1x',
+  'student rights 20/90/1x',
+  studentRights?.maxBooks === 20 && studentRights?.maxDays === 90 && studentRights?.extensions === '1x',
   JSON.stringify(studentRights)
 )
 const teacherRights = memberBorrowRights('teacher')
 check(
-  'teacher rights 5/30/3x',
-  teacherRights?.maxBooks === 5 && teacherRights?.maxDays === 30 && teacherRights?.extensions === '3x',
+  'teacher rights 20/90/3x',
+  teacherRights?.maxBooks === 20 && teacherRights?.maxDays === 90 && teacherRights?.extensions === '3x',
   JSON.stringify(teacherRights)
 )
 const generalRights = memberBorrowRights('general')
 check(
-  'general rights 10/90/Tidak Terbatas',
-  generalRights?.maxBooks === 10 &&
+  'general rights 20/90/Tidak Terbatas',
+  generalRights?.maxBooks === 20 &&
     generalRights?.maxDays === 90 &&
     generalRights?.extensions === 'Tidak Terbatas',
   JSON.stringify(generalRights)
@@ -88,7 +88,7 @@ check(
   getMemberType('student')?.code === 'student' &&
     getMemberType('student')?.hasAcademicRecord === true &&
     getMemberType('student')?.memberNumberPrefix === 'S' &&
-    getMemberType('student')?.borrowRights.maxBooks === 2
+    getMemberType('student')?.borrowRights.maxBooks === 20
 )
 expectEqual('getMemberType(teacher).label', getMemberType('teacher')?.label, 'Guru')
 expectEqual('getMemberType(general).prefix', getMemberType('general')?.memberNumberPrefix, 'U')

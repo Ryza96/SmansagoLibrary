@@ -13,25 +13,27 @@ export interface MemberTypeDefinition {
 }
 
 export const MEMBER_TYPES = {
+  // PO Decision (MEMBER BORROWING RIGHTS): seluruh tipe anggota distandarkan ke
+  // maxBooks 20 & maxDays 90. `extensions` (kebijakan perpanjangan) TIDAK diubah.
   student: {
     code: 'student',
     label: 'Siswa',
     memberNumberPrefix: 'S',
-    borrowRights: { maxBooks: 2, maxDays: 7, extensions: '1x' },
+    borrowRights: { maxBooks: 20, maxDays: 90, extensions: '1x' },
     hasAcademicRecord: true
   },
   teacher: {
     code: 'teacher',
     label: 'Guru',
     memberNumberPrefix: 'G',
-    borrowRights: { maxBooks: 5, maxDays: 30, extensions: '3x' },
+    borrowRights: { maxBooks: 20, maxDays: 90, extensions: '3x' },
     hasAcademicRecord: false
   },
   general: {
     code: 'general',
     label: 'Umum',
     memberNumberPrefix: 'U',
-    borrowRights: { maxBooks: 10, maxDays: 90, extensions: 'Tidak Terbatas' },
+    borrowRights: { maxBooks: 20, maxDays: 90, extensions: 'Tidak Terbatas' },
     hasAcademicRecord: false
   }
 } as const satisfies Record<string, MemberTypeDefinition>

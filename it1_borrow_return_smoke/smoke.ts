@@ -122,7 +122,8 @@ async function main(): Promise<void> {
         [
           { bookCopyId: copy2, bookTitle: 'Buku Uji IT-1' },
           { bookCopyId: copy1, bookTitle: 'Buku Uji IT-1' }
-        ]
+        ],
+        20
       ),
     'tidak tersedia'
   )

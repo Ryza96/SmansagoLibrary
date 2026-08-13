@@ -105,9 +105,28 @@ export class BorrowRepository extends BaseRepository {
       className?: string
       notes?: string
     },
-    itemsData: Array<{ bookCopyId: string; bookTitle: string }>
+    itemsData: Array<{ bookCopyId: string; bookTitle: string }>,
+    maxBooks: number
   ) {
     return this.prisma.$transaction(async (tx) => {
+      // MEMBER BORROWING RIGHTS — guard ATOMIK maxBooks DI DALAM transaksi.
+      // Hitung ulang detail aktif member dalam tx (bukan dari state luar) lalu
+      // tolak bila menembus batas. Ini melindungi dari TOCTOU / race antar
+      // request; Service-level check tetap ada sebagai fast-fail advisory.
+      const activeCount = await tx.borrowDetail.count({
+        where: {
+          returnedAt: null,
+          borrow: {
+            memberId: borrowData.memberId,
+            returnDate: null
+          }
+        }
+      })
+
+      if (activeCount + itemsData.length > maxBooks) {
+        throw new AppError(400, 'Validation Error', `Total buku yang dipinjam tidak boleh melebihi ${maxBooks} eksemplar`)
+      }
+
       const created = await tx.borrow.create({
         data: {
           borrowNumber: borrowData.borrowNumber,

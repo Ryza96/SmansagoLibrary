@@ -9,6 +9,7 @@ import { ClassRepository } from '../src/main/repositories/class.repository'
 import { AcademicYearRepository } from '../src/main/repositories/academic-year.repository'
 import { CurriculumRepository } from '../src/main/repositories/curriculum.repository'
 import { getPrisma } from '../src/main/repositories/base/prisma'
+import { memberBorrowRights } from '../src/shared/config/member-type'
 
 let pass = 0
 let fail = 0
@@ -41,8 +42,9 @@ async function main(): Promise<void> {
   const academicYearRepo = new AcademicYearRepository()
   const curriculumRepo = new CurriculumRepository()
   const enrollmentService = new EnrollmentService(enrollmentRepo, memberRepo, classRepo)
+  const borrowRepo = new BorrowRepository()
   const borrowService = new BorrowService(
-    new BorrowRepository(),
+    borrowRepo,
     new BorrowDetailRepository(),
     memberRepo,
     new BookCopyRepository(),
@@ -141,6 +143,101 @@ async function main(): Promise<void> {
     async () => await borrowService.create({ memberId: unk.id, dueDate: futureDate(), bookCopyIds: [await makeCopy()] }),
     'Tipe anggota'
   )
+
+  console.log('--- CASE 8: maxBooks boundary (20 eksemplar, config-driven) ---')
+  const s8 = await prisma.member.create({
+    data: { memberNumber: 'S-000008', fullName: 'Siswa Batas Buku', memberType: 'student', status: 'INACTIVE' }
+  })
+  await enrollmentService.enroll({ memberId: s8.id, classId: classX.id, academicYearId: yearA.id })
+
+  const c8a = await Promise.all(Array.from({ length: 19 }, () => makeCopy()))
+  const b8a = await borrowService.create({ memberId: s8.id, dueDate: futureDate(), bookCopyIds: c8a })
+  check('case8 borrow 19 buku dalam 1 transaksi → ok', b8a.id !== '')
+
+  const b8b = await borrowService.create({ memberId: s8.id, dueDate: futureDate(), bookCopyIds: [await makeCopy()] })
+  check('case8 19+1 = 20 buku → ok', b8b.id !== '')
+
+  await expectRejected(
+    'case8 20+1 = 21 buku → ditolak',
+    async () => await borrowService.create({ memberId: s8.id, dueDate: futureDate(), bookCopyIds: [await makeCopy()] }),
+    'tidak boleh melebihi 20 eksemplar'
+  )
+
+  await borrowRepo.processReturn(b8a.items[0].id, 'BAIK', null)
+  const b8d = await borrowService.create({ memberId: s8.id, dueDate: futureDate(), bookCopyIds: [await makeCopy()] })
+  check('case8 return 1 → 19 aktif → borrow lagi → ok (returned tak dihitung)', b8d.id !== '')
+
+  const s8b = await prisma.member.create({
+    data: { memberNumber: 'S-000009', fullName: 'Siswa Batas Buku 2', memberType: 'student', status: 'INACTIVE' }
+  })
+  await enrollmentService.enroll({ memberId: s8b.id, classId: classX.id, academicYearId: yearA.id })
+  const c8e = await Promise.all(Array.from({ length: 21 }, () => makeCopy()))
+  await expectRejected(
+    'case8 21 buku dalam 1 transaksi → ditolak',
+    async () => await borrowService.create({ memberId: s8b.id, dueDate: futureDate(), bookCopyIds: c8e }),
+    'tidak boleh melebihi 20 eksemplar'
+  )
+
+  console.log('--- CASE 8b: guard ATOMIK maxBooks in-transaction (bypass pre-check) ---')
+  const c8f = await Promise.all(Array.from({ length: 2 }, () => makeCopy()))
+  await expectRejected(
+    'case8b createWithItems langsung (20 aktif + 2) → dibatalkan atomik',
+    async () =>
+      await borrowRepo.createWithItems(
+        {
+          borrowNumber: 'PJ/202608/CASE8ATOMIC',
+          memberId: s8.id,
+          memberName: 'Siswa Batas Buku',
+          memberNumber: 'S-000008',
+          borrowDate: new Date(),
+          dueDate: new Date(Date.now() + 24 * 60 * 60 * 1000)
+        },
+        c8f.map((id) => ({ bookCopyId: id, bookTitle: 'Buku Uji Eligibilitas' })),
+        20
+      ),
+    'tidak boleh melebihi 20 eksemplar'
+  )
+  const s8Active = await new BorrowDetailRepository().countActiveByMemberId(s8.id)
+  check('case8b rollback: detail aktif tetap 20', s8Active === 20, `active=${s8Active}`)
+  const c8fStatuses = await prisma.bookCopy.findMany({ where: { id: { in: c8f } }, select: { status: true } })
+  check('case8b rollback: 2 copy tetap AVAILABLE (no partial)', c8fStatuses.every((x) => x.status === 'AVAILABLE'))
+
+  console.log('--- CASE 9: maxDays boundary (90 hari, config-driven) ---')
+  const s9 = await prisma.member.create({
+    data: { memberNumber: 'S-000010', fullName: 'Siswa Batas Hari', memberType: 'student', status: 'INACTIVE' }
+  })
+  await enrollmentService.enroll({ memberId: s9.id, classId: classX.id, academicYearId: yearA.id })
+
+  const d30 = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+  const b9a = await borrowService.create({ memberId: s9.id, dueDate: d30, bookCopyIds: [await makeCopy()] })
+  check('case9 dueDate +30 hari → ok', b9a.id !== '')
+
+  const d90 = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString()
+  const b9b = await borrowService.create({ memberId: s9.id, dueDate: d90, bookCopyIds: [await makeCopy()] })
+  check('case9 dueDate PAS 90 hari → ok (<= maxDays)', b9b.id !== '')
+
+  await expectRejected(
+    'case9 dueDate 91 hari → ditolak',
+    async () => await borrowService.create({ memberId: s9.id, dueDate: new Date(Date.now() + 91 * 24 * 60 * 60 * 1000).toISOString(), bookCopyIds: [await makeCopy()] }),
+    'Masa pinjam tidak boleh melebihi 90 hari'
+  )
+
+  await expectRejected(
+    'case9 dueDate hari ini → ditolak',
+    async () => await borrowService.create({ memberId: s9.id, dueDate: new Date().toISOString(), bookCopyIds: [await makeCopy()] }),
+    'harus setelah hari ini'
+  )
+
+  console.log('--- CASE 10: kesetaraan hak pinjam semua tipe (config SSOT) ---')
+  for (const code of ['student', 'teacher', 'general'] as const) {
+    const rights = memberBorrowRights(code)
+    check(`case10 ${code} maxBooks=20`, rights?.maxBooks === 20)
+    check(`case10 ${code} maxDays=90`, rights?.maxDays === 90)
+  }
+  check('case10 extensions tetap (1x/3x/Tidak Terbatas)',
+    memberBorrowRights('student')?.extensions === '1x' &&
+      memberBorrowRights('teacher')?.extensions === '3x' &&
+      memberBorrowRights('general')?.extensions === 'Tidak Terbatas')
 
   await prisma.$disconnect()
   console.log(`\n${pass} passed, ${fail} failed`)
