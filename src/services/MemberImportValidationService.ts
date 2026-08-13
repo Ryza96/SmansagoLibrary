@@ -85,9 +85,6 @@ export class MemberImportValidationService {
     if (isBlank(row.alamat)) {
       errors.push({ messageKey: ERROR_REQUIRED_VALUE, label: 'Alamat' })
     }
-    if (isBlank(row.whatsapp)) {
-      errors.push({ messageKey: ERROR_REQUIRED_VALUE, label: 'No. WhatsApp' })
-    }
     if (!isBlank(row.tanggalLahir) && !isDateLike(row.tanggalLahir)) {
       errors.push({ messageKey: ERROR_INVALID_DATE, label: 'Tanggal Lahir' })
     }

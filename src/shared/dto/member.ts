@@ -74,7 +74,7 @@ export interface MemberImportRowInput {
   birthPlace?: string
   birthDate?: string
   address: string
-  phone: string
+  phone?: string
   email?: string
 }
 
