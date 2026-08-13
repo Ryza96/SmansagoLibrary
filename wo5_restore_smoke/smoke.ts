@@ -40,7 +40,7 @@ import { resolveWithin, moveFilePreserving, removeSideFiles } from '../src/main/
 import { resolveLiveDatabaseFile } from '../src/main/infrastructure/database-path'
 import { getPrisma, connectPrisma, disconnectPrisma } from '../src/main/repositories/base/prisma'
 
-const EXPECTED_SCHEMA_VERSION = '20260810_wo_book_cover'
+const EXPECTED_SCHEMA_VERSION = '20260811_wo_member_photo'
 const PROBE_TABLE = 'smoke_probe'
 
 let passed = 0

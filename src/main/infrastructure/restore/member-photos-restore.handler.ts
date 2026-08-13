@@ -1,5 +1,6 @@
-// WO SAM: SAMPUL BUKU — AssetRestoreHandler (implementasi RestoreHandler untuk
-// aset sampul buku — sisi kebalikan AssetBackupProvider).
+// WO MEMBER PHOTO — MemberPhotosRestoreHandler (implementasi RestoreHandler untuk
+// aset foto anggota — sisi kebalikan MemberPhotosBackupProvider), klon pola
+// AssetRestoreHandler (book-covers).
 // RFC-004 §8 / ADR-001 §3.4:
 //   stage()        — salin arsip hasil extract ke staging handler
 //   verifyStaged() — ukuran + sha256 + buka ZIP (integritas arsip)
@@ -8,6 +9,9 @@
 //                    tengah → direktori live dibuang & arsip dipulihkan.
 //   rollbackFrom() — no-op (jaringan pengaman restore = snapshot aman database).
 //   cleanup()      — buang artefak staging handler.
+// Routing: matches() memeriksa path PERSIS arsip foto anggota (bukan sekadar
+// kind ASSET) agar tidak bentrok dengan AssetRestoreHandler (book-covers) —
+// RestoreService menolak entri yang cocok dengan >1 handler.
 // Implementasi infra: menyentuh filesystem + zip — kontraknya di domain.
 
 import fs from 'fs'
@@ -18,33 +22,33 @@ import { RestoreHandler, RestoreVerifyResult, restoreVerifyResultOf } from '../.
 import { ProviderId } from '../../domain/provider/provider-id'
 import { PROVIDER_KINDS } from '../../domain/provider/provider-kind'
 import { ManifestEntry, MANIFEST_ENTRY_KINDS } from '../../domain/manifest/entry'
-import { ASSET_BOOK_COVERS_ARCHIVE_FILENAME, ASSET_BOOK_COVERS_ARCHIVE_RELATIVE_PATH } from '../providers/asset.provider'
+import { MEMBER_PHOTOS_ARCHIVE_FILENAME, MEMBER_PHOTOS_ARCHIVE_RELATIVE_PATH } from '../providers/member-photos.provider'
 import { moveFilePreserving, resolveWithin } from './fs-utils'
 
-export interface AssetRestoreHandlerOptions {
+export interface MemberPhotosRestoreHandlerOptions {
   extractDir: string
   stagingDir: string
   archiveDir: string
   liveDir: string
 }
 
-export class AssetRestoreHandler implements RestoreHandler {
+export class MemberPhotosRestoreHandler implements RestoreHandler {
   readonly id: ProviderId
   readonly kind = PROVIDER_KINDS.ASSET
   readonly requirement = 'optional' as const
 
-  constructor(private readonly options: AssetRestoreHandlerOptions) {
-    this.id = ProviderId.of({ name: 'book-covers', version: '1.0.0' })
+  constructor(private readonly options: MemberPhotosRestoreHandlerOptions) {
+    this.id = ProviderId.of({ name: 'member-photos', version: '1.0.0' })
   }
 
   get stagedArchivePath(): string {
-    return path.join(this.options.stagingDir, ASSET_BOOK_COVERS_ARCHIVE_FILENAME)
+    return path.join(this.options.stagingDir, MEMBER_PHOTOS_ARCHIVE_FILENAME)
   }
 
   matches(entry: ManifestEntry): boolean {
-    // Routing berbasis path PERSIS arsip sendiri (WO MEMBER PHOTO: ada >1 aset
-    // ASSET — MemberPhotosRestoreHandler) agar entri tidak cocok dengan 2 handler.
-    return entry.kind === MANIFEST_ENTRY_KINDS.ASSET && entry.path === ASSET_BOOK_COVERS_ARCHIVE_RELATIVE_PATH
+    return (
+      entry.kind === MANIFEST_ENTRY_KINDS.ASSET && entry.path === MEMBER_PHOTOS_ARCHIVE_RELATIVE_PATH
+    )
   }
 
   async stage(entry: ManifestEntry): Promise<void> {
@@ -86,7 +90,7 @@ export class AssetRestoreHandler implements RestoreHandler {
     if (!fs.existsSync(this.stagedArchivePath)) {
       throw new Error(`file aset staging tidak ditemukan: ${this.stagedArchivePath}`)
     }
-    const archiveBackup = path.join(this.options.archiveDir, ASSET_BOOK_COVERS_ARCHIVE_FILENAME)
+    const archiveBackup = path.join(this.options.archiveDir, MEMBER_PHOTOS_ARCHIVE_FILENAME)
     fs.mkdirSync(this.options.archiveDir, { recursive: true })
 
     if (fs.existsSync(this.options.liveDir)) {

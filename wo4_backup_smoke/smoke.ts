@@ -47,7 +47,7 @@ import {
 import { BACKUP_STATUS } from '../src/main/domain/backup/backup-status'
 import { DatabaseProvider, DATABASE_SNAPSHOT_FILENAME } from '../src/main/infrastructure/providers/database.provider'
 
-const EXPECTED_SCHEMA_VERSION = '20260810_wo_book_cover'
+const EXPECTED_SCHEMA_VERSION = '20260811_wo_member_photo'
 
 let passed = 0
 let failed = 0

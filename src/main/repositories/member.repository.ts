@@ -17,6 +17,7 @@ type CreateMemberData = Pick<Member, 'memberNumber' | 'fullName'> & {
   address?: string
   phone?: string
   email?: string
+  photoPath?: string | null
   classId?: string
   status?: string
 }

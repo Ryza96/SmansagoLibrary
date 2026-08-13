@@ -20,6 +20,7 @@ function toDTO(member: NonNullable<Awaited<ReturnType<MemberRepository['findById
     email: member.email,
     classId: member.classId,
     classInfo: null,
+    photoPath: member.photoPath,
     status: member.status,
     createdAt: member.createdAt.toISOString(),
     updatedAt: member.updatedAt.toISOString()

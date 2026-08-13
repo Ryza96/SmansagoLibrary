@@ -7,6 +7,31 @@ import { runTransaction } from '../repositories/base/transaction'
 import { getMemberType } from '../../shared/config/member-type'
 import type { MemberDTO, CreateMemberDTO, UpdateMemberDTO } from '../../shared/dto/member'
 import { AppError } from '../../../electron/main/errorHandler'
+import { promises as fsp } from 'fs'
+import path from 'path'
+import { randomUUID } from 'crypto'
+import {
+  MEMBER_PHOTO_MIME,
+  validateMemberPhotoFile,
+} from '../infrastructure/asset/member-photo-config'
+import { resizeMemberPhotoImage } from '../infrastructure/asset/member-photo-resize'
+import { moveFilePreserving, resolveWithin } from '../infrastructure/restore/fs-utils'
+
+// WO MEMBER PHOTO — foto anggota diperluas pada MemberService existing.
+// Mengikuti pola WO SAM (BookService.saveCover) yang sama dengan sampul buku:
+//   • ctor menerima assetMemberPhotosDir (direktori penyimpanan foto);
+//   • savePhoto / removePhoto — satu-satunya manipulasi file foto;
+//   • validasi & resize di main (downscale-only ≤ 512×512, contain);
+//   • invariant: file foto lama TIDAK dihapus sebelum DB commit; gagal di
+//     tengah → rollback penuh (kondisi seperti sebelum replace);
+//   • renderer TIDAK pernah menyentuh file; semua error via AppError(err.message).
+// Path yang disimpan di DB = relatif ('assets/member-photos/<file>'), bukan absolut.
+
+const PHOTO_ERROR_MESSAGES: Record<string, string> = {
+  UNSUPPORTED_FORMAT: 'Format file tidak didukung. Gunakan PNG, JPG, JPEG, atau WEBP.',
+  EMPTY: 'File foto kosong.',
+  TOO_LARGE: 'Ukuran file foto melebihi 2 MB.',
+}
 
 function classInfoFrom(
   enrollment:
@@ -55,6 +80,7 @@ function toDTO(
     address: member.address,
     phone: member.phone,
     email: member.email,
+    photoPath: member.photoPath,
     classId: member.classId,
     classInfo: classInfoFrom(enrollment),
     status: member.status,
@@ -68,7 +94,8 @@ export class MemberService {
     private memberRepository: MemberRepository,
     private numberGeneratorService: NumberGeneratorService,
     private enrollmentRepository: EnrollmentRepository,
-    private classRepository: ClassRepository
+    private classRepository: ClassRepository,
+    private assetMemberPhotosDir: string
   ) {}
 
   async findMany(search?: string, page?: number, limit?: number, memberType?: string) {
@@ -90,6 +117,7 @@ export class MemberService {
         address: m.address,
         phone: m.phone,
         email: m.email,
+        photoPath: m.photoPath,
         classId: m.classId,
         classInfo: classInfoFrom(m.memberEnrollments?.[0]),
         status: m.status,
@@ -161,6 +189,13 @@ export class MemberService {
         return member
       })
 
+      // WO MEMBER PHOTO — simpan foto (jika dipilih pada form) SETELAH member
+      // dibuat (id sudah ada). Transaksi student create tetap SATU (photo save
+      // di luar transaksi; kegagalan foto TIDAK menggagalkan pembuatan member).
+      if (typeof input.photoUpload === 'string' && input.photoUpload.length > 0) {
+        await this.savePhoto(created.id, input.photoUpload)
+      }
+
       return this.findById(created.id)
     }
 
@@ -181,6 +216,11 @@ export class MemberService {
       status: 'INACTIVE'
     })
 
+    // WO MEMBER PHOTO — simpan foto (jika dipilih pada form) setelah member dibuat.
+    if (typeof input.photoUpload === 'string' && input.photoUpload.length > 0) {
+      await this.savePhoto(created.id, input.photoUpload)
+    }
+
     return this.findById(created.id)
   }
 
@@ -192,21 +232,30 @@ export class MemberService {
 
     await this.validateUniqueness(input, id)
 
+    // WO MEMBER PHOTO — photoUpload adalah path temp hasil dialog OS; dipisahkan
+    // dari data member (tidak pernah disimpan ke DB). Disimpan sebagai file di
+    // assetMemberPhotosDir; DB hanya menyimpan path relatif (photoPath).
+    const { photoUpload, ...memberData } = input
+
     await this.memberRepository.update(id, {
-      fullName: input.fullName,
-      memberType: input.memberType,
-      gender: input.gender,
-      nisn: input.nisn,
-      nip: input.nip,
-      nuptk: input.nuptk,
-      nik: input.nik,
-      birthPlace: input.birthPlace,
-      birthDate: input.birthDate ? new Date(input.birthDate) : undefined,
-      address: input.address,
-      phone: input.phone,
-      email: input.email,
-      status: input.status
+      fullName: memberData.fullName,
+      memberType: memberData.memberType,
+      gender: memberData.gender,
+      nisn: memberData.nisn,
+      nip: memberData.nip,
+      nuptk: memberData.nuptk,
+      nik: memberData.nik,
+      birthPlace: memberData.birthPlace,
+      birthDate: memberData.birthDate ? new Date(memberData.birthDate) : undefined,
+      address: memberData.address,
+      phone: memberData.phone,
+      email: memberData.email,
+      status: memberData.status
     })
+
+    if (typeof photoUpload === 'string' && photoUpload.length > 0) {
+      await this.savePhoto(id, photoUpload)
+    }
 
     return this.findById(id)
   }
@@ -223,6 +272,153 @@ export class MemberService {
     }
 
     await this.memberRepository.delete(id)
+  }
+
+  // WO MEMBER PHOTO — preview hasil dialog pilih file foto (main-side), pola
+  // BookService.pickCoverPreview: validasi → resize → data URI untuk renderer.
+  async pickPhotoPreview(filePath: string): Promise<{
+    filePath: string
+    sizeBytes: number
+    previewUri: string
+  }> {
+    const extension = path.extname(filePath).toLowerCase()
+    const sizeBytes = (await fsp.stat(filePath)).size
+    this.assertValidPhoto(extension, sizeBytes)
+    const buffer = await this.resizeWithError(filePath)
+    const mime = MEMBER_PHOTO_MIME[extension]
+    const previewUri = `data:${mime};base64,${buffer.toString('base64')}`
+    return { filePath, sizeBytes, previewUri }
+  }
+
+  // WO MEMBER PHOTO — simpan foto dengan pola atomic save (BookService.saveCover):
+  // validasi → resize → tulis temp → sisihkan target lama ke backup →
+  // rename temp ke target → update DB → sukses: hapus backup + file lama.
+  // Gagal di tengah → rollback penuh (disk & DB kembali ke keadaan sebelum save).
+  async savePhoto(memberId: string, sourcePath: string): Promise<void> {
+    const extension = path.extname(sourcePath).toLowerCase()
+    const sizeBytes = (await fsp.stat(sourcePath)).size
+    this.assertValidPhoto(extension, sizeBytes)
+    const buffer = await this.resizeWithError(sourcePath)
+
+    const dir = this.assetMemberPhotosDir
+    await fsp.mkdir(dir, { recursive: true })
+    const targetName = `member-photo-${memberId}${extension}`
+    const target = resolveWithin(dir, targetName)
+    const temp = resolveWithin(dir, `.${targetName}.tmp-${randomUUID()}`)
+    const oldBackup = resolveWithin(dir, `.${targetName}.old-${randomUUID()}`)
+    const hadTarget = await this.pathExists(target)
+    // Tangkap path foto lama SEBELUM update menimpa photoPath di DB (file lama
+    // bisa beda ekstensi — member-photo-<id>.jpg vs .png). Bila dibaca setelah
+    // update, nama lama === nama baru sehingga file lama tak pernah bersih.
+    const existingBefore = await this.memberRepository.findById(memberId)
+    const previousPhotoPath = existingBefore?.photoPath ?? null
+
+    try {
+      await fsp.writeFile(temp, buffer)
+      if (hadTarget) {
+        // replace di tempat (ext sama): sisihkan foto lama agar tidak tertimpa
+        // rename — backup inilah yang dipulihkan bila operasi gagal.
+        await fsp.rename(target, oldBackup)
+      }
+      moveFilePreserving(temp, target)
+      await this.memberRepository.update(memberId, { photoPath: `assets/member-photos/${targetName}` })
+    } catch {
+      // ROLLBACK — kembalikan ke keadaan sebelum save:
+      //   hadTarget + backup ada → target = file baru → hapus, lalu pulihkan lama;
+      //   hadTarget + backup tidak ada (rename sisih gagal) → target masih lama → jangan sentuh;
+      //   !hadTarget → target (jika ada) = file baru → hapus.
+      if (hadTarget) {
+        if (await this.pathExists(oldBackup)) {
+          await this.tryUnlink(target)
+          try {
+            await fsp.rename(oldBackup, target)
+          } catch {
+            // best-effort — backup dipertahankan (satu-satunya salinan foto lama)
+          }
+        }
+      } else {
+        await this.tryUnlink(target)
+      }
+      await this.tryUnlink(temp)
+      throw new AppError(500, 'PhotoSaveError', 'Gagal menyimpan foto anggota.')
+    }
+
+    // SUCCESS — DB sudah menunjuk target: hapus backup (ext sama) + file foto
+    // lama yang tak terpakai (member-photo-* ext beda, ditangkap sebelum update).
+    try {
+      await this.tryUnlink(oldBackup)
+      if (previousPhotoPath) {
+        const previousName = path.basename(previousPhotoPath)
+        if (previousName !== targetName) {
+          await this.tryUnlink(resolveWithin(dir, previousName))
+        }
+      }
+    } catch {
+      // best-effort — foto baru sudah tersimpan & DB sudah commit
+    }
+  }
+
+  // WO MEMBER PHOTO — hapus foto anggota. DB di-null-kan TERLEBIH DAHULU (commit
+  // sumber kebenaran), lalu file dihapus best-effort.
+  async removePhoto(memberId: string): Promise<void> {
+    const existing = await this.memberRepository.findById(memberId)
+    if (!existing) return
+    if (!existing.photoPath) return
+
+    await this.memberRepository.update(memberId, { photoPath: null })
+
+    const dir = this.assetMemberPhotosDir
+    const fileName = path.basename(existing.photoPath)
+    try {
+      await fsp.unlink(resolveWithin(dir, fileName))
+    } catch {
+      // best-effort — DB sudah commit; file mungkin sudah tidak ada
+    }
+  }
+
+  // WO MEMBER PHOTO — baca foto sebagai data URI untuk renderer (detail anggota).
+  async getPhotoDataUri(memberId: string): Promise<string | null> {
+    const existing = await this.memberRepository.findById(memberId)
+    if (!existing || !existing.photoPath) return null
+
+    const dir = this.assetMemberPhotosDir
+    const fileName = path.basename(existing.photoPath)
+    const extension = path.extname(fileName).toLowerCase()
+    const buffer = await fsp.readFile(resolveWithin(dir, fileName))
+    const mime = MEMBER_PHOTO_MIME[extension] ?? 'image/webp'
+    return `data:${mime};base64,${buffer.toString('base64')}`
+  }
+
+  private assertValidPhoto(extension: string, sizeBytes: number): void {
+    const error = validateMemberPhotoFile({ extension, sizeBytes })
+    if (error) {
+      throw new AppError(400, 'PhotoValidationError', PHOTO_ERROR_MESSAGES[error])
+    }
+  }
+
+  private async resizeWithError(sourcePath: string): Promise<Buffer> {
+    try {
+      return await resizeMemberPhotoImage(sourcePath)
+    } catch {
+      throw new AppError(400, 'PhotoValidationError', 'File tidak dapat diproses sebagai gambar.')
+    }
+  }
+
+  private async pathExists(filePath: string): Promise<boolean> {
+    try {
+      await fsp.access(filePath)
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  private async tryUnlink(filePath: string): Promise<void> {
+    try {
+      await fsp.unlink(filePath)
+    } catch {
+      // best-effort
+    }
   }
 
   private async validateUniqueness(

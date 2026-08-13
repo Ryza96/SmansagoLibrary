@@ -109,6 +109,9 @@ interface ElectronAPI {
     create: (input: import('../../src/shared/dto/member').CreateMemberDTO) => Promise<import('../../src/shared/dto/member').MemberDTO>
     update: (id: string, input: import('../../src/shared/dto/member').UpdateMemberDTO) => Promise<import('../../src/shared/dto/member').MemberDTO>
     delete: (id: string) => Promise<void>
+    pickPhoto: () => Promise<import('../../src/shared/dto/member-photo').PickMemberPhotoResult>
+    getPhotoDataUri: (id: string) => Promise<string | null>
+    removePhoto: (id: string) => Promise<void>
   }
   memberImport: {
     downloadTemplate: () => Promise<import('../types/import').DownloadTemplateResult>,

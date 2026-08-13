@@ -176,6 +176,7 @@ model Member {
   address      String?
   phone        String?
   email        String?
+  photoPath    String?
   classId      String?
   status       String    @default("INACTIVE")
   createdAt    DateTime  @default(now())

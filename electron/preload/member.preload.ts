@@ -1,6 +1,19 @@
 import { ipcRenderer } from 'electron'
 import type { MemberImportProgressEvent, MemberImportRowInput, MemberImportScope } from '../../src/shared/dto/member'
 
+async function invokeClean(channel: string, ...args: unknown[]): Promise<unknown> {
+  try {
+    return await ipcRenderer.invoke(channel, ...args)
+  } catch (err) {
+    const raw = err instanceof Error ? err.message : String(err)
+    const idx = raw.indexOf(': ')
+    const clean = idx !== -1 ? raw.slice(idx + 2) : raw
+    const marker = 'AppError: '
+    const finalMsg = clean.startsWith(marker) ? clean.slice(marker.length) : clean
+    throw new Error(finalMsg || raw)
+  }
+}
+
 export const memberAPI = {
   members: {
     findMany: (search?: string, page?: number, limit?: number, memberType?: string) =>
@@ -12,7 +25,10 @@ export const memberAPI = {
     update: (id: string, input: Record<string, unknown>) =>
       ipcRenderer.invoke('members:update', id, input),
     delete: (id: string) =>
-      ipcRenderer.invoke('members:delete', id)
+      ipcRenderer.invoke('members:delete', id),
+    pickPhoto: () => invokeClean('members:pickPhoto'),
+    getPhotoDataUri: (id: string) => invokeClean('members:getPhotoDataUri', id),
+    removePhoto: (id: string) => invokeClean('members:removePhoto', id)
   },
   memberImport: {
     downloadTemplate: () => ipcRenderer.invoke('members:downloadTemplate'),

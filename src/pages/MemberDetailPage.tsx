@@ -85,6 +85,7 @@ export default function MemberDetailPage() {
   const [activeBookCount, setActiveBookCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
+  const [photoUri, setPhotoUri] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -96,6 +97,11 @@ export default function MemberDetailPage() {
         const m = await api.members.findById(id)
         if (cancelled) return
         setMember(toView(m))
+        if (m.photoPath) {
+          api.members.getPhotoDataUri(m.id).then((uri) => {
+            if (!cancelled) setPhotoUri(uri)
+          })
+        }
         const [borrowResult, stats] = await Promise.all([
           api.borrowings.findMany(m.memberNumber, 1, 50),
           api.borrowings.getMemberBorrowingStats(m.id).catch(() => null)
@@ -130,7 +136,7 @@ export default function MemberDetailPage() {
   return (
     <div>
       <Header member={member} onEdit={() => navigate(memberEditPath(member.id))} onBack={() => navigate(-1)} onHistory={() => navigate(enrollmentHistoryPath(member.id))} />
-      <ProfileSection member={member} />
+      <ProfileSection member={member} photoUri={photoUri} />
       <div className="flex gap-6">
         <div className="flex-1 min-w-0">
           <TabBar tabs={TAB_OPTIONS} active={activeTab} onChange={(id) => setActiveTab(id)} />
@@ -218,12 +224,16 @@ function Header({ member, onEdit, onBack, onHistory }: { member: MemberView; onE
   )
 }
 
-function ProfileSection({ member }: { member: MemberView }) {
+function ProfileSection({ member, photoUri }: { member: MemberView; photoUri: string | null }) {
   return (
     <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6 mb-6">
       <div className="flex gap-6">
-        <div className="w-24 h-24 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0">
-          <User size={40} className="text-slate-400" />
+        <div className="w-24 h-24 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0 overflow-hidden">
+          {photoUri ? (
+            <img src={photoUri} alt="Foto Anggota" className="w-full h-full object-cover" />
+          ) : (
+            <User size={40} className="text-slate-400" />
+          )}
         </div>
         <div className="flex-1 grid grid-cols-3 gap-x-8 gap-y-3">
           <SummaryField label={LABELS.FIELD.FULL_NAME} value={member.name} />

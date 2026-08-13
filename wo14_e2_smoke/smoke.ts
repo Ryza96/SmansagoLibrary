@@ -13,6 +13,8 @@ import { BorrowDetailRepository } from '../src/main/repositories/borrow-detail.r
 import { BookCopyRepository } from '../src/main/repositories/book-copy.repository'
 import { getPrisma } from '../src/main/repositories/base/prisma'
 import { ACADEMIC_STATUS } from '../src/shared/config/academic-status'
+import os from 'os'
+import path from 'path'
 
 let pass = 0
 let fail = 0
@@ -48,7 +50,13 @@ async function main(): Promise<void> {
   const classRepo = new ClassRepository()
   const numberGenerator = new NumberGeneratorService(memberRepo)
   const enrollmentService = new EnrollmentService(enrollmentRepo, memberRepo, classRepo)
-  const memberService = new MemberService(memberRepo, numberGenerator, enrollmentRepo, classRepo)
+  const memberService = new MemberService(
+    memberRepo,
+    numberGenerator,
+    enrollmentRepo,
+    classRepo,
+    path.join(os.tmpdir(), 'member-photos-wo14-e2')
+  )
   const borrowService = new BorrowService(
     new BorrowRepository(),
     new BorrowDetailRepository(),

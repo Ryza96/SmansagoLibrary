@@ -60,6 +60,7 @@ import { AppPaths } from '../../src/main/infrastructure/paths'
 import { ProviderRegistry, RestoreHandlerRegistry } from '../../src/main/domain/provider/provider-registry'
 import { DatabaseProvider } from '../../src/main/infrastructure/providers/database.provider'
 import { AssetBackupProvider } from '../../src/main/infrastructure/providers/asset.provider'
+import { MemberPhotosBackupProvider } from '../../src/main/infrastructure/providers/member-photos.provider'
 import { SchemaVersionReader } from '../../src/main/infrastructure/backup/schema-version.reader'
 import { ManifestBuilder } from '../../src/main/infrastructure/backup/manifest-builder'
 import { BackupPackager } from '../../src/main/infrastructure/backup/packager'
@@ -67,6 +68,7 @@ import { BackupVerifier } from '../../src/main/infrastructure/backup/verifier'
 import { BackupService } from '../../src/main/infrastructure/backup/backup.service'
 import { DatabaseRestoreHandler } from '../../src/main/infrastructure/restore/database-restore.handler'
 import { AssetRestoreHandler } from '../../src/main/infrastructure/restore/asset-restore.handler'
+import { MemberPhotosRestoreHandler } from '../../src/main/infrastructure/restore/member-photos-restore.handler'
 import { RestoreService, createRestoreDirs } from '../../src/main/infrastructure/restore/restore.service'
 import { resolveLiveDatabaseFile } from '../../src/main/infrastructure/database-path'
 import { BackupUIController, RestoreUIController, BackupInspector } from '../../src/main/services/backup-ui.service'
@@ -131,9 +133,11 @@ export interface Container {
   restoreHandlerRegistry: RestoreHandlerRegistry
   databaseProvider: DatabaseProvider
   assetBackupProvider: AssetBackupProvider
+  memberPhotosBackupProvider: MemberPhotosBackupProvider
   backupService: BackupService
   databaseRestoreHandler: DatabaseRestoreHandler
   assetRestoreHandler: AssetRestoreHandler
+  memberPhotosRestoreHandler: MemberPhotosRestoreHandler
   restoreService: RestoreService
   backupUIController: BackupUIController
   restoreUIController: RestoreUIController
@@ -157,7 +161,7 @@ export function createContainer(paths: AppPaths, restoreWiring?: RestoreWiring):
   const numberGeneratorService = new NumberGeneratorService(newMemberRepository)
   const enrollmentRepository = new EnrollmentRepository()
   const classRepository = new ClassRepository()
-  const memberService = new MemberService(newMemberRepository, numberGeneratorService, enrollmentRepository, classRepository)
+  const memberService = new MemberService(newMemberRepository, numberGeneratorService, enrollmentRepository, classRepository, paths.assetMemberPhotosDir)
   const newBookCopyRepository = new NewBookCopyRepository()
   const borrowRepository = new BorrowRepository()
   const borrowDetailRepository = new BorrowDetailRepository()
@@ -219,9 +223,11 @@ export function createContainer(paths: AppPaths, restoreWiring?: RestoreWiring):
 
   const databaseProvider = new DatabaseProvider({ stagingDir: paths.tempDir })
   const assetBackupProvider = new AssetBackupProvider({ assetDir: assetBookCoversDir, stagingDir: paths.tempDir })
+  const memberPhotosBackupProvider = new MemberPhotosBackupProvider({ assetDir: paths.assetMemberPhotosDir, stagingDir: paths.tempDir })
   const providerRegistry = new ProviderRegistry()
   providerRegistry.register(databaseProvider)
   providerRegistry.register(assetBackupProvider)
+  providerRegistry.register(memberPhotosBackupProvider)
   const restoreHandlerRegistry = new RestoreHandlerRegistry()
 
   const backupService = new BackupService({
@@ -234,6 +240,7 @@ export function createContainer(paths: AppPaths, restoreWiring?: RestoreWiring):
     providerStagingDirs: new Map([
       [databaseProvider.id.fullName, paths.tempDir],
       [assetBackupProvider.id.fullName, paths.tempDir],
+      [memberPhotosBackupProvider.id.fullName, paths.tempDir],
     ]),
   })
 
@@ -258,6 +265,14 @@ export function createContainer(paths: AppPaths, restoreWiring?: RestoreWiring):
     liveDir: assetBookCoversDir,
   })
   restoreHandlerRegistry.register(assetRestoreHandler)
+
+  const memberPhotosRestoreHandler = new MemberPhotosRestoreHandler({
+    extractDir: restoreDirs.extractDir,
+    stagingDir: restoreDirs.stagingDir,
+    archiveDir: restoreDirs.archiveDir,
+    liveDir: paths.assetMemberPhotosDir,
+  })
+  restoreHandlerRegistry.register(memberPhotosRestoreHandler)
 
   const restoreService = new RestoreService({
     verifier: new BackupVerifier({ tempDir: paths.tempDir }),
@@ -317,9 +332,11 @@ export function createContainer(paths: AppPaths, restoreWiring?: RestoreWiring):
     restoreHandlerRegistry,
     databaseProvider,
     assetBackupProvider,
+    memberPhotosBackupProvider,
     backupService,
     databaseRestoreHandler,
     assetRestoreHandler,
+    memberPhotosRestoreHandler,
     restoreService,
     backupUIController,
     restoreUIController,

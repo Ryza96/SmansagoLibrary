@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { CreateMemberDTO, UpdateMemberDTO } from '../../shared/dto/member'
 import { LABELS } from '../../utils/labels'
@@ -83,6 +83,11 @@ export default function MemberForm({ mode = 'create', initialData, memberId, def
 
   const [notes, setNotes] = useState(editInitial.notes ?? '')
 
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null)
+  const [photoUploadPath, setPhotoUploadPath] = useState<string | null>(null)
+  const [photoLoading, setPhotoLoading] = useState(false)
+  const [photoBusy, setPhotoBusy] = useState(false)
+
   const memberNumber = mode === 'edit' ? (editInitial.memberNumber ?? '-') : ''
 
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -121,7 +126,8 @@ export default function MemberForm({ mode = 'create', initialData, memberId, def
         phone: phone || undefined,
         email: email || undefined,
         nip: isTeacher ? (nip || undefined) : undefined,
-        status: status ? status.toUpperCase() : undefined
+        status: status ? status.toUpperCase() : undefined,
+        photoUpload: photoUploadPath ?? undefined
       }
       await api.members.update(memberId!, payload)
       // Penempatan kelas (enrollment) TIDAK dikirim via members.update — dikelola
@@ -152,11 +158,62 @@ export default function MemberForm({ mode = 'create', initialData, memberId, def
         email: email || undefined,
         nip: isTeacher ? (nip || undefined) : undefined,
         academicYearId: isStudent ? academicYearId : undefined,
-        classId: isStudent ? classId : undefined
+        classId: isStudent ? classId : undefined,
+        photoUpload: photoUploadPath ?? undefined
       }
       await api.members.create(payload)
     }
     navigate(-1)
+  }
+
+  useEffect(() => {
+    let cancelled = false
+    if (isEditMode && memberId) {
+      setPhotoLoading(true)
+      api.members
+        .getPhotoDataUri(memberId)
+        .then((uri) => {
+          if (!cancelled) setPhotoPreview(uri)
+        })
+        .finally(() => {
+          if (!cancelled) setPhotoLoading(false)
+        })
+    }
+    return () => {
+      cancelled = true
+    }
+  }, [isEditMode, memberId])
+
+  async function handlePickPhoto() {
+    setPhotoBusy(true)
+    try {
+      const result = await api.members.pickPhoto()
+      if (!result.canceled) {
+        setPhotoPreview(result.previewUri)
+        setPhotoUploadPath(result.filePath)
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : LABELS.MEMBER_COVER.PICK_ERROR
+      window.alert(message)
+    } finally {
+      setPhotoBusy(false)
+    }
+  }
+
+  async function handleRemovePhoto() {
+    if (!isEditMode || !memberId) return
+    if (!window.confirm(LABELS.MEMBER_COVER.REMOVE_CONFIRM)) return
+    setPhotoBusy(true)
+    try {
+      await api.members.removePhoto(memberId)
+      setPhotoPreview(null)
+      setPhotoUploadPath(null)
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : LABELS.MEMBER_COVER.REMOVE_ERROR
+      window.alert(message)
+    } finally {
+      setPhotoBusy(false)
+    }
   }
 
   const rights = memberBorrowRights(memberType)
@@ -210,14 +267,53 @@ export default function MemberForm({ mode = 'create', initialData, memberId, def
 
           <div className="w-80 flex-shrink-0 space-y-6">
             <Card title={LABELS.MEMBER_SECTION.PHOTO}>
-              <div className="border-2 border-dashed border-slate-200 rounded-lg p-6 text-center hover:border-blue-300 transition-colors cursor-pointer">
-                <div className="mx-auto mb-3 w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-slate-300"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              {photoLoading ? (
+                <div className="border-2 border-dashed border-slate-200 rounded-lg p-6 text-center">
+                  <p className="text-xs text-slate-400">{LABELS.MEMBER_COVER.UPLOADING}</p>
                 </div>
-                <p className="text-sm font-medium text-slate-600">{LABELS.MEMBER_COVER.UPLOAD}</p>
-                <p className="text-xs text-slate-400 mt-1">{LABELS.MEMBER_COVER.FORMAT}</p>
-                <p className="text-xs text-slate-400">{LABELS.MEMBER_COVER.SIZE}</p>
-              </div>
+              ) : photoPreview ? (
+                <div className="space-y-3">
+                  <div className="flex justify-center">
+                    <img
+                      src={photoPreview}
+                      alt="Foto Anggota"
+                      className="w-28 h-36 object-cover rounded-lg border border-slate-200 shadow-sm"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2 justify-center">
+                    <button
+                      type="button"
+                      onClick={handlePickPhoto}
+                      disabled={photoBusy}
+                      className="px-3 py-1.5 border border-slate-300 text-slate-700 text-xs font-medium rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-50"
+                    >
+                      {photoBusy ? LABELS.MEMBER_COVER.PICKING : LABELS.MEMBER_COVER.CHANGE}
+                    </button>
+                    {isEditMode && (
+                      <button
+                        type="button"
+                        onClick={handleRemovePhoto}
+                        disabled={photoBusy}
+                        className="px-3 py-1.5 border border-red-200 text-red-600 text-xs font-medium rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50"
+                      >
+                        {LABELS.MEMBER_COVER.REMOVE}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div
+                  className="border-2 border-dashed border-slate-200 rounded-lg p-6 text-center hover:border-blue-300 transition-colors cursor-pointer"
+                  onClick={handlePickPhoto}
+                >
+                  <div className="mx-auto mb-3 w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-slate-300"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                  </div>
+                  <p className="text-sm font-medium text-slate-600">{photoBusy ? LABELS.MEMBER_COVER.PICKING : LABELS.MEMBER_COVER.UPLOAD}</p>
+                  <p className="text-xs text-slate-400 mt-1">{LABELS.MEMBER_COVER.FORMAT}</p>
+                  <p className="text-xs text-slate-400">{LABELS.MEMBER_COVER.SIZE}</p>
+                </div>
+              )}
             </Card>
 
             <SummarySidebar

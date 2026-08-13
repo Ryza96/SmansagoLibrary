@@ -26,6 +26,7 @@ export default function MemberListPage({ memberType, title, newButtonLabel }: Me
   const [query, setQuery] = useState({ search: '', page: 1 })
   const limit = 10
   const [importOpen, setImportOpen] = useState(false)
+  const [photoUris, setPhotoUris] = useState<Record<string, string>>({})
 
   async function fetchMembers() {
     setLoading(true)
@@ -34,6 +35,18 @@ export default function MemberListPage({ memberType, title, newButtonLabel }: Me
       setData(result.data)
       setTotal(result.total)
       setTotalPages(result.totalPages)
+      // WO MEMBER PHOTO — muat data URI foto hanya utk baris ber-foto (display only).
+      const withPhoto = result.data.filter((m) => m.photoPath)
+      if (withPhoto.length === 0) {
+        setPhotoUris({})
+      } else {
+        const uris: Record<string, string> = {}
+        for (const m of withPhoto) {
+          const uri = await api.members.getPhotoDataUri(m.id)
+          if (uri) uris[m.id] = uri
+        }
+        setPhotoUris(uris)
+      }
     } finally {
       setLoading(false)
     }
@@ -118,7 +131,18 @@ export default function MemberListPage({ memberType, title, newButtonLabel }: Me
                   {data.map((m) => (
                     <tr key={m.id} className="border-b border-slate-100 hover:bg-slate-50">
                       <td className="py-3 text-slate-700">{m.memberNumber}</td>
-                      <td className="py-3 text-slate-700">{m.fullName}</td>
+                      <td className="py-3 text-slate-700">
+                        <div className="flex items-center gap-2.5">
+                          {photoUris[m.id] && (
+                            <img
+                              src={photoUris[m.id]}
+                              alt=""
+                              className="w-8 h-8 rounded-full object-cover border border-slate-200 flex-shrink-0"
+                            />
+                          )}
+                          <span>{m.fullName}</span>
+                        </div>
+                      </td>
                       <td className="py-3">
                         <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${
                           m.status === 'ACTIVE'

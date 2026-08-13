@@ -47,7 +47,7 @@ import { BookRepository } from '../electron/main/repositories/book.repository'
 import { BookService } from '../electron/main/services/book.service'
 import { AppError } from '../electron/main/errorHandler'
 
-const EXPECTED_SCHEMA_VERSION = '20260810_wo_book_cover'
+const EXPECTED_SCHEMA_VERSION = '20260811_wo_member_photo'
 const PROBE_TABLE = 'smoke_probe'
 const COVERS_DIRNAME = 'book-covers'
 

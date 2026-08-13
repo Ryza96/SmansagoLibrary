@@ -9,6 +9,8 @@ import { BorrowRepository } from '../src/main/repositories/borrow.repository'
 import { BorrowDetailRepository } from '../src/main/repositories/borrow-detail.repository'
 import { BookCopyRepository } from '../src/main/repositories/book-copy.repository'
 import { getPrisma } from '../src/main/repositories/base/prisma'
+import os from 'os'
+import path from 'path'
 
 let pass = 0
 let fail = 0
@@ -44,7 +46,7 @@ async function main(): Promise<void> {
   const classRepo = new ClassRepository()
   const numberGenerator = new NumberGeneratorService(memberRepo)
   const enrollmentService = new EnrollmentService(enrollmentRepo, memberRepo, classRepo)
-  const memberService = new MemberService(memberRepo, numberGenerator, enrollmentRepo, classRepo)
+  const memberService = new MemberService(memberRepo, numberGenerator, enrollmentRepo, classRepo, path.join(os.tmpdir(), 'member-photos-manual-entry'))
   const borrowService = new BorrowService(
     new BorrowRepository(),
     new BorrowDetailRepository(),

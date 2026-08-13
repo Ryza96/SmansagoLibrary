@@ -6,6 +6,8 @@ import { NumberGeneratorService } from '../src/main/services/number-generator.se
 import { MemberService } from '../src/main/services/member.service'
 import { getPrisma } from '../src/main/repositories/base/prisma'
 import { ACADEMIC_STATUS } from '../src/shared/config/academic-status'
+import os from 'os'
+import path from 'path'
 
 let pass = 0
 let fail = 0
@@ -35,7 +37,13 @@ async function main(): Promise<void> {
   const memberRepo = new MemberRepository()
   const enrollmentRepo = new EnrollmentRepository()
   const classRepo = new ClassRepository()
-  const memberService = new MemberService(memberRepo, new NumberGeneratorService(memberRepo), enrollmentRepo, classRepo)
+  const memberService = new MemberService(
+    memberRepo,
+    new NumberGeneratorService(memberRepo),
+    enrollmentRepo,
+    classRepo,
+    path.join(os.tmpdir(), 'member-photos-wo15-e3')
+  )
   const enrollmentService = new EnrollmentService(enrollmentRepo, memberRepo, classRepo)
 
   const seedStudent = (memberNumber: string, fullName: string) =>

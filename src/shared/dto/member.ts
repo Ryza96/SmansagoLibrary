@@ -15,6 +15,7 @@ export interface MemberDTO {
   address: string | null
   phone: string | null
   email: string | null
+  photoPath: string | null
   classId: string | null
   classInfo: {
     id: string
@@ -46,6 +47,9 @@ export interface CreateMemberDTO {
   // bersama `classId` untuk anggota siswa: saat disimpan, MemberService membuat
   // Member + MemberEnrollment(ACTIVE) dalam SATU transaksi (mirror jalur import).
   academicYearId?: string
+  // WO Member Photo — path temp absolut file foto dari dialog OS. Diproses &
+  // di-resize di main; database hanya menyimpan path RELATIF (photoPath).
+  photoUpload?: string
 }
 
 export interface UpdateMemberDTO {
@@ -63,6 +67,9 @@ export interface UpdateMemberDTO {
   email?: string
   classId?: string
   status?: string
+  // WO Member Photo — path temp absolut file foto dari dialog OS. Diproses &
+  // di-resize di main; database hanya menyimpan path RELATIF (photoPath).
+  photoUpload?: string
 }
 
 export interface MemberImportRowInput {
