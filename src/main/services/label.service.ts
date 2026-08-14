@@ -41,11 +41,20 @@ const BOOK_ICON_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="#12235a" str
 // Ikon pin lokasi (putih) untuk footer bar navy.
 const PIN_ICON_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 1 1 16 0z"/><circle cx="12" cy="10" r="3"/></svg>`
 
-// Logo label — gambar data URI bila tersedia, selainnya monogram (fallback wajar
-// tanpa ruang kosong: inisial schoolName/libraryName; kosong penuh → ikon buku).
+// Logo label — dirender via CSS background-image (var --label-logo-url) bila
+// data URI logo tersedia, selainnya monogram (fallback wajar tanpa ruang kosong:
+// inisial schoolName/libraryName; kosong penuh → ikon buku).
+//
+// OPSI A (FIX BOOK LABEL DATA-URL SIZE): data URI logo TIDAK lagi di-render
+// sebagai <img src="data:..."> per label. Logo disematkan SATU KALI di blok
+// <style> (custom property --label-logo-url) dan setiap .label-logo menampilkan
+// via background-image. Ini menurunkan ukuran data URL HTML dari N× (logo) menjadi
+// 1× (logo), sehingga 12/24 label jauh di bawah batas Chromium url::kMaxURLChars
+// (2,097,152). Saat logo hadir, labelLogoHtml() mengembalikan '' (CSS yang
+// menggambar); saat kosong, monogram SVG (tanpa data URI) dimuat di dalam div.
 function labelLogoHtml(data: BookLabelData): string {
   if (data.logo) {
-    return `<img class="label-logo-img" src="${escapeHtml(data.logo)}" alt="">`
+    return ''
   }
   return generateLogoMonogramSvg(data.schoolName ?? '', data.libraryName ?? '')
 }
@@ -156,7 +165,14 @@ ${cutMarksHtml}
 <meta charset="utf-8">
 <title>Label Buku</title>
 <style>
-  @page {
+${
+  data.logo
+    ? `  :root {
+    --label-logo-url: url("${data.logo}");
+  }
+`
+    : ``
+}  @page {
     size: A4;
     margin: 0;
   }
@@ -252,7 +268,13 @@ ${cutMarksHtml}
     display: flex;
     align-items: center;
     justify-content: center;
-    background: #ffffff;
+    background-color: #ffffff;
+    background-image: var(--label-logo-url, none);
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
   .label-logo svg,
   .label-logo img {
