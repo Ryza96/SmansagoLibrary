@@ -55,10 +55,25 @@ const A6_PRINTER_NAME_HINTS: ReadonlyArray<string> = [
 // printHtml memilih printer A6 secara eksplisit via getPrintersAsync();
 // `preferredDeviceName` (dari Settings → borrowCardPrinter) DIUTAMAKAN daripada
 // heuristik nama.
+//
+// `timeoutMs` (opsional) adalah batas waktu maksimal SELURUH operasi cetak
+// (P0-1). Default PRINT_HTML_TIMEOUT_MS (120 s) dipakai bila tidak diisi; nilai
+// khusus (mis. 300) dipakai smoke untuk menguji jalur timeout tanpa menunggu
+// 120 detik. Field ini TIDAK diteruskan ke webContents.print (di-strip di
+// resolvePrintOptions) agar tidak bocor ke dialog/driver.
 type PrintHtmlOptions = Electron.WebContentsPrintOptions & {
   resolveA6DeviceName?: boolean
   preferredDeviceName?: string
+  timeoutMs?: number
 }
+
+// P0-1 — batas waktu cetak (ms). Nilai sengaja lapang (120 s): alur cetak
+// memakai dialog OS non-silent dan operator bisa memerlukan waktu untuk memilih
+// printer/kertas/mengklik Cetak pada perangkat lambat. Fungsi timeout adalah
+// mengikat hang yang TIDAK PERNAH selesai (callback webContents.print tidak
+// datang / dialog tersembunyi), bukan menagih operator yang wajar. Bila dialog
+// dipakai normal, 120 s praktis tidak akan tercapai.
+const PRINT_HTML_TIMEOUT_MS = 120_000
 
 export class PrintService {
   constructor(
@@ -368,8 +383,25 @@ export class PrintService {
 </body></html>`
   }
 
+  // P0-1 — printHtml fail-safe. Kontrak lama (resolve/reject) tidak berubah;
+  // seluruh hardening bersifat aditif di dalam implementasi:
+  //  - TIMEOUT menyeluruh (default PRINT_HTML_TIMEOUT_MS, override via
+  //    printOptions.timeoutMs) → operasi cetak TIDAK bisa menggantung selamanya
+  //    bila callback webContents.print tidak pernah datang.
+  //  - CLEANUP DIJAMIN — BrowserWindow selalu ditutup tepat satu kali setelah
+  //    sukses / error / timeout (settlement tunggal + teardown terpusat di
+  //    `finish`; event listener dilepas sebelum close).
+  //  - loadURL di-await; rejection ditangani. did-fail-load dipertahankan
+  //    sebagai sumber detail error (errorCode/errorDescription).
+  //  - DUA JALUR error (callback gagal, did-fail-load, loadURL reject, timeout,
+  //    close) TIDAK bisa resolve/reject dua kali (guard `settled`).
+  //  - Logging [Print] tahap per-tahap untuk diagnosis (mulai / loadURL /
+  //    print invoked / callback / timeout / cleanup).
   private printHtml(html: string, printOptions?: PrintHtmlOptions): Promise<void> {
     return new Promise((resolve, reject) => {
+      let settled = false
+      let timer: NodeJS.Timeout | null = null
+
       const printWindow = new BrowserWindow({
         width: 800,
         height: 600,
@@ -380,29 +412,89 @@ export class PrintService {
         }
       })
 
-      printWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`)
+      const timeoutMs = printOptions?.timeoutMs ?? PRINT_HTML_TIMEOUT_MS
+      console.log(`[Print] printHtml start (timeout=${timeoutMs}ms)`)
+
+      // Settlement tunggal + cleanup terpusat. Setelah settled, semua jalur
+      // (event, callback print, timer) menjadi no-op — mencegah double
+      // resolve/reject dan menjamin window ditutup TEPAT SATU KALI.
+      const finish = (action: () => void): void => {
+        if (settled) return
+        settled = true
+        if (timer) {
+          clearTimeout(timer)
+          timer = null
+        }
+        if (!printWindow.isDestroyed()) {
+          // Lepas handler event agar teardown window tidak memicu event
+          // did-finish-load / did-fail-load tambahan setelah settlement.
+          printWindow.webContents.removeAllListeners('did-finish-load')
+          printWindow.webContents.removeAllListeners('did-fail-load')
+          try {
+            printWindow.close()
+          } catch (error) {
+            console.warn('[Print] cleanup: gagal menutup window print:', error)
+          }
+        }
+        console.log('[Print] cleanup: window print ditutup')
+        action()
+      }
+      const succeed = (): void => finish(resolve)
+      const fail = (error: Error): void => finish(() => reject(error))
+
+      timer = setTimeout(() => {
+        console.log(
+          `[Print] timeout ${timeoutMs}ms tercapai — proses cetak tidak selesai, dibatalkan`
+        )
+        fail(
+          new Error(
+            `Cetak tidak selesai dalam ${timeoutMs} ms — dialog cetak mungkin tersembunyi atau proses native tidak merespons. Silakan coba lagi.`
+          )
+        )
+      }, timeoutMs)
 
       printWindow.webContents.on('did-finish-load', async () => {
+        if (settled) return
         try {
+          console.log('[Print] loadURL selesai')
           const options = await this.resolvePrintOptions(printWindow, printOptions)
+          if (settled || printWindow.isDestroyed()) return
+          console.log(
+            `[Print] print invoked (silent=${options.silent}, deviceName=${options.deviceName ?? 'default'})`
+          )
           printWindow.webContents.print(options, (success, failureReason) => {
-            if (!printWindow.isDestroyed()) printWindow.close()
             if (success) {
-              resolve()
+              console.log('[Print] print callback success')
+              succeed()
             } else {
-              reject(new Error(failureReason ?? 'Gagal mencetak'))
+              console.log(`[Print] print callback gagal: ${failureReason ?? 'unknown'}`)
+              fail(new Error(failureReason ?? 'Gagal mencetak'))
             }
           })
         } catch (error) {
-          if (!printWindow.isDestroyed()) printWindow.close()
-          reject(error instanceof Error ? error : new Error(String(error)))
+          console.warn('[Print] gagal menyiapkan opsi cetak:', error)
+          fail(error instanceof Error ? error : new Error(String(error)))
         }
       })
 
       printWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription) => {
-        if (!printWindow.isDestroyed()) printWindow.close()
-        reject(new Error(`Gagal memuat halaman cetak: ${errorDescription}`))
+        console.warn(`[Print] did-fail-load (code=${errorCode}): ${errorDescription}`)
+        fail(new Error(`Gagal memuat halaman cetak: ${errorDescription}`))
       })
+
+      // loadURL di-await + rejection ditangani. did-fail-load dipertahankan
+      // sebagai sumber detail; guard `settled` mencegah double-reject dari dua
+      // jalur yang keduanya bisa aktif.
+      void printWindow
+        .loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`)
+        .catch((error) => {
+          console.warn('[Print] loadURL gagal:', error)
+          fail(
+            error instanceof Error
+              ? error
+              : new Error(`Gagal memuat halaman cetak: ${String(error)}`)
+          )
+        })
     })
   }
 
@@ -411,6 +503,11 @@ export class PrintService {
     printOptions?: PrintHtmlOptions
   ): Promise<Electron.WebContentsPrintOptions> {
     const { resolveA6DeviceName, preferredDeviceName, ...rest } = printOptions ?? {}
+
+    // P0-1 — timeoutMs adalah opsi INTERNAL printHtml (batas waktu), bukan opsi
+    // native webContents.print. Dihapus di sini agar tidak bocor ke dialog/driver
+    // (mencegah TypeScript/Electron melempar pada properti tak dikenal).
+    delete rest.timeoutMs
 
     // Base opsi DIEKSPLISITKAN (tidak mengandalkan default Chromium) agar driver
     // tidak menerapkan orientasi/scaling sendiri:
