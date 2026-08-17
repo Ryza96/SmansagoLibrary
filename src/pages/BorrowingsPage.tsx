@@ -235,6 +235,7 @@ export default function BorrowingPage() {
               onSearch={fetchMembers}
               placeholder="Cari nama / nomor anggota..."
               label="Cari Anggota"
+              selectedOption={selectedMember ? { id: selectedMember.id, name: selectedMember.fullName } : undefined}
             />
             {selectedMember && (
               <button

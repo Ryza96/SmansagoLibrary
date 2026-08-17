@@ -12,6 +12,7 @@ interface SearchableSelectProps {
   error?: string
   multiple?: boolean
   onSearch?: (query: string) => void
+  selectedOption?: { id: string; name: string }
 }
 
 export default function SearchableSelect({
@@ -24,7 +25,8 @@ export default function SearchableSelect({
   required,
   error,
   multiple = false,
-  onSearch
+  onSearch,
+  selectedOption
 }: SearchableSelectProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [search, setSearch] = useState('')
@@ -78,7 +80,8 @@ export default function SearchableSelect({
 
   const displayValue = multiple
     ? selectedLabels.join(', ')
-    : options.find((o) => o.id === value)?.name || ''
+    : options.find((o) => o.id === value)?.name
+      ?? (selectedOption?.id === value ? selectedOption.name : '')
 
   return (
     <div ref={containerRef} className="relative">
