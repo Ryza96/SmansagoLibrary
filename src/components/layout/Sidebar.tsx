@@ -4,8 +4,7 @@ import {
   LayoutDashboard,
   BookOpen,
   Users,
-  BookmarkCheck,
-  Undo2,
+  ArrowLeftRight,
   ClipboardList,
   BarChart3,
   TrendingUp,
@@ -19,13 +18,16 @@ import {
 const menuItems = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/books', label: 'Buku', icon: BookOpen },
-  { to: '/borrowings', label: 'Peminjaman', icon: BookmarkCheck },
-  { to: '/returns', label: 'Pengembalian', icon: Undo2 },
   { to: '/inventory', label: 'Inventaris', icon: ClipboardList },
   { to: '/promotions/run', label: 'Promosi', icon: PlayCircle },
   { to: '/promotions', label: 'Riwayat Promosi', icon: TrendingUp },
   { to: '/reports', label: 'Laporan', icon: BarChart3 },
   { to: '/settings', label: 'Pengaturan', icon: Settings }
+]
+
+const transactionSubItems = [
+  { to: '/borrowings', label: 'Peminjaman' },
+  { to: '/returns', label: 'Pengembalian' }
 ]
 
 const memberSubItems = [
@@ -45,9 +47,13 @@ const masterSubItems = [
 
 export default function Sidebar() {
   const location = useLocation()
+  const [transactionOpen, setTransactionOpen] = useState(true)
   const [memberOpen, setMemberOpen] = useState(true)
   const [masterOpen, setMasterOpen] = useState(true)
 
+  const isTransactionActive =
+    location.pathname.startsWith('/borrowings') ||
+    location.pathname.startsWith('/returns')
   const isMemberActive = location.pathname.startsWith('/members')
 
   return (
@@ -68,6 +74,42 @@ export default function Sidebar() {
           <span>{item.label}</span>
         </NavLink>
       ))}
+
+      <div>
+        <button
+          onClick={() => setTransactionOpen(!transactionOpen)}
+          className={`flex items-center gap-3 w-full px-4 py-2.5 text-sm transition-colors ${
+            isTransactionActive
+              ? 'bg-slate-700 text-white border-l-2 border-blue-500'
+              : 'hover:bg-slate-700/50 hover:text-white'
+          }`}
+        >
+          <ArrowLeftRight size={18} />
+          <span className="flex-1 text-left">Transaksi</span>
+          {transactionOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+        </button>
+
+        {transactionOpen && (
+          <div className="ml-2">
+            {transactionSubItems.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                className={({ isActive }) =>
+                  `flex items-center gap-3 px-4 py-2 text-sm transition-colors ${
+                    isActive
+                      ? 'bg-slate-700 text-white border-l-2 border-blue-500'
+                      : 'hover:bg-slate-700/50 hover:text-white'
+                  }`
+                }
+              >
+                <span className="w-[18px]" />
+                <span>{item.label}</span>
+              </NavLink>
+            ))}
+          </div>
+        )}
+      </div>
 
       <div>
         <button
