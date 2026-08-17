@@ -32,6 +32,7 @@ export default function BorrowingPage() {
   const { notify } = useNotification()
   const barcodeRef = useRef<HTMLInputElement>(null)
   const [barcode, setBarcode] = useState('')
+  const [scanning, setScanning] = useState(false)
   const [books, setBooks] = useState<BookEntry[]>([])
   const [memberOptions, setMemberOptions] = useState<{ id: string; name: string }[]>([])
   const [selectedMember, setSelectedMember] = useState<MemberDTO | null>(null)
@@ -45,6 +46,12 @@ export default function BorrowingPage() {
   useEffect(() => {
     barcodeRef.current?.focus()
   }, [])
+
+  useEffect(() => {
+    if (!scanning) {
+      barcodeRef.current?.focus()
+    }
+  }, [scanning])
 
   useEffect(() => {
     if (!selectedMember) return
@@ -94,42 +101,45 @@ export default function BorrowingPage() {
 
   async function handleBarcodeKeyDown(e: React.KeyboardEvent) {
     if (e.key !== 'Enter' || !barcode.trim()) return
+    if (scanning) return
     e.preventDefault()
 
     const existing = books.find((b) => b.barcode === barcode.trim())
     if (existing) {
-      alert('Buku sudah dipilih.')
+      notify.warning('Buku sudah dipilih.')
       setBarcode('')
       barcodeRef.current?.focus()
       return
     }
 
-    const copy = await window.electronAPI.bookCopies.findByBarcode(barcode.trim())
-    if (!copy) {
-      alert('Barcode tidak ditemukan.')
-      setBarcode('')
-      barcodeRef.current?.focus()
-      return
-    }
-
-    if (copy.status !== 'AVAILABLE') {
-      alert('Buku tidak tersedia.')
-      setBarcode('')
-      barcodeRef.current?.focus()
-      return
-    }
-
-    setBooks((prev) => [
-      ...prev,
-      {
-        bookCopyId: copy.id,
-        barcode: copy.barcode ?? '',
-        inventoryNumber: copy.inventoryNumber,
-        title: copy.book?.title ?? ''
+    setScanning(true)
+    try {
+      const copy = await window.electronAPI.bookCopies.findByBarcode(barcode.trim())
+      if (!copy) {
+        notify.warning('Barcode tidak ditemukan.')
+        return
       }
-    ])
-    setBarcode('')
-    barcodeRef.current?.focus()
+
+      if (copy.status !== 'AVAILABLE') {
+        notify.warning('Buku tidak tersedia.')
+        return
+      }
+
+      setBooks((prev) => [
+        ...prev,
+        {
+          bookCopyId: copy.id,
+          barcode: copy.barcode ?? '',
+          inventoryNumber: copy.inventoryNumber,
+          title: copy.book?.title ?? ''
+        }
+      ])
+    } catch {
+      notify.error('Gagal memproses barcode.')
+    } finally {
+      setScanning(false)
+      setBarcode('')
+    }
   }
 
   function removeBook(bookCopyId: string) {
@@ -156,7 +166,7 @@ export default function BorrowingPage() {
       barcodeRef.current?.focus()
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Terjadi kesalahan saat menyimpan transaksi.'
-      alert(message)
+      notify.error(message)
     } finally {
       setSaving(false)
     }
@@ -179,7 +189,8 @@ export default function BorrowingPage() {
               onChange={(e) => setBarcode(e.target.value)}
               onKeyDown={handleBarcodeKeyDown}
               placeholder="Input Barcode"
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              disabled={scanning}
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
             />
           </div>
 
