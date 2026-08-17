@@ -128,7 +128,7 @@ export class PrintService {
     }
   }
 
-  async buildBorrowCardHtml(borrowingId: string): Promise<string> {
+  async buildBorrowCardHtml(borrowingId: string, options?: { activeOnly?: boolean }): Promise<string> {
     const [borrowing, settings] = await Promise.all([
       this.borrowRepository.findById(borrowingId),
       this.settingService.get()
@@ -146,18 +146,19 @@ export class PrintService {
       { ...settings, logoPath: resolvedLogoPath ?? '' },
       {
         readFileAsDataUri: this.readFileAsDataUri.bind(this)
-      }
+      },
+      options
     )
     return generateBorrowCardHtml(data)
   }
 
-  async getBorrowCardPreviewHtml(borrowingId: string): Promise<string> {
-    return this.buildBorrowCardHtml(borrowingId)
+  async getBorrowCardPreviewHtml(borrowingId: string, options?: { activeOnly?: boolean }): Promise<string> {
+    return this.buildBorrowCardHtml(borrowingId, options)
   }
 
-  async printBorrowCard(borrowingId: string, options?: { silent?: boolean }): Promise<void> {
+  async printBorrowCard(borrowingId: string, options?: { silent?: boolean; activeOnly?: boolean }): Promise<void> {
     const [html, settings] = await Promise.all([
-      this.buildBorrowCardHtml(borrowingId),
+      this.buildBorrowCardHtml(borrowingId, { activeOnly: options?.activeOnly }),
       this.settingService.get()
     ])
 
@@ -213,10 +214,10 @@ export class PrintService {
     }
   }
 
-  async saveBorrowCardPdf(borrowingId: string): Promise<{ saved: boolean; filePath?: string }> {
+  async saveBorrowCardPdf(borrowingId: string, options?: { activeOnly?: boolean }): Promise<{ saved: boolean; filePath?: string }> {
     const [borrowing, html] = await Promise.all([
       this.borrowRepository.findById(borrowingId),
-      this.buildBorrowCardHtml(borrowingId)
+      this.buildBorrowCardHtml(borrowingId, { activeOnly: options?.activeOnly })
     ])
     if (!borrowing) {
       throw new AppError(404, 'Not Found', 'Data peminjaman tidak ditemukan.')

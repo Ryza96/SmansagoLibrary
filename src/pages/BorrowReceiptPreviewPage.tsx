@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import {
   ArrowLeft,
   ChevronLeft,
@@ -25,6 +25,8 @@ function clampZoom(zoom: number): number {
 export default function BorrowReceiptPreviewPage() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const location = useLocation()
+  const activeOnly = (location.state as { activeOnly?: boolean } | null)?.activeOnly === true
 
   const [html, setHtml] = useState('')
   const [loading, setLoading] = useState(true)
@@ -37,8 +39,6 @@ export default function BorrowReceiptPreviewPage() {
   const [busyPrint, setBusyPrint] = useState(false)
   const [busyPdf, setBusyPdf] = useState(false)
   const [pdfStatus, setPdfStatus] = useState('')
-  // Default silent = true: cetak langsung tanpa dialog OS (driver/printer sudah
-  // di-set custom paper size A6). Checkbox tetap tersedia untuk menonaktifkan.
   const [silentPrint, setSilentPrint] = useState(true)
 
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -51,7 +51,7 @@ export default function BorrowReceiptPreviewPage() {
     setLoading(true)
     setError('')
     Promise.all([
-      window.electronAPI.print.borrowCardPreview(id),
+      window.electronAPI.print.borrowCardPreview(id, activeOnly ? { activeOnly: true } : undefined),
       window.electronAPI.borrowings.findById(id)
     ])
       .then(([previewHtml, borrowing]) => {
@@ -70,7 +70,7 @@ export default function BorrowReceiptPreviewPage() {
     return () => {
       cancelled = true
     }
-  }, [id])
+  }, [id, activeOnly])
 
   useEffect(() => {
     if (!html || !contentRef.current) return
@@ -151,7 +151,7 @@ export default function BorrowReceiptPreviewPage() {
     setBusyPrint(true)
     setPdfStatus('')
     try {
-      await window.electronAPI.print.borrowCard(id, { silent: silentPrint })
+      await window.electronAPI.print.borrowCard(id, { silent: silentPrint, activeOnly })
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : LABELS.RECEIPT_PREVIEW.PRINT_ERROR
       alert(message)
@@ -165,7 +165,7 @@ export default function BorrowReceiptPreviewPage() {
     setBusyPdf(true)
     setPdfStatus('')
     try {
-      const result = await window.electronAPI.print.borrowCardPdf(id)
+      const result = await window.electronAPI.print.borrowCardPdf(id, { activeOnly })
       if (result.saved && result.filePath) {
         setPdfStatus(LABELS.RECEIPT_PREVIEW.PDF_SAVED + result.filePath)
       }
@@ -200,7 +200,9 @@ export default function BorrowReceiptPreviewPage() {
         >
           <ArrowLeft size={20} />
         </button>
-        <h1 className="text-2xl font-bold text-slate-800">{LABELS.RECEIPT_PREVIEW.TITLE}</h1>
+        <h1 className="text-2xl font-bold text-slate-800">
+          {activeOnly ? LABELS.RECEIPT_PREVIEW.TITLE_ACTIVE_ONLY : LABELS.RECEIPT_PREVIEW.TITLE}
+        </h1>
         {borrowNumber && (
           <span className="text-sm text-slate-500 font-mono bg-slate-200 px-2 py-0.5 rounded">
             {borrowNumber}

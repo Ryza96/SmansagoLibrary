@@ -155,9 +155,9 @@ interface ElectronAPI {
     borrowReceipt: (borrowingId: string) => Promise<void>
     returnReceipt: (borrowingId: string) => Promise<void>
     bookLabels: (input: import('../../src/shared/dto/print').BookLabelData) => Promise<void>
-    borrowCardPreview: (borrowingId: string) => Promise<string>
-    borrowCard: (borrowingId: string, options?: { silent?: boolean }) => Promise<void>
-    borrowCardPdf: (borrowingId: string) => Promise<{ saved: boolean; filePath?: string }>
+    borrowCardPreview: (borrowingId: string, options?: { activeOnly?: boolean }) => Promise<string>
+    borrowCard: (borrowingId: string, options?: { silent?: boolean; activeOnly?: boolean }) => Promise<void>
+    borrowCardPdf: (borrowingId: string, options?: { activeOnly?: boolean }) => Promise<{ saved: boolean; filePath?: string }>
   }
   academicYears: {
     findMany: (search?: string, page?: number, limit?: number) => Promise<{

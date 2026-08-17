@@ -108,7 +108,7 @@ export default function BorrowCardPrintPage() {
                   <td className="px-4 py-2.5 text-center">
                     <button
                       type="button"
-                      onClick={() => navigate(receiptPreviewPath(row.id))}
+                      onClick={() => navigate(receiptPreviewPath(row.id), { state: { activeOnly: true } })}
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 transition-colors"
                     >
                       <Eye size={14} />

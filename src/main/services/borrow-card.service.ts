@@ -276,6 +276,7 @@ export interface BorrowCardSourceBorrowing {
   details: Array<{
     bookTitle: string
     bookCopy: { inventoryNumber: string; book: { title: string } } | null
+    returnedAt: Date | null
   }>
 }
 
@@ -290,16 +291,26 @@ export interface BorrowCardBuildDeps {
   readFileAsDataUri: (path: string) => Promise<string | null>
 }
 
+export interface BorrowCardBuildOptions {
+  /** When true, only books with returnedAt === null (currently borrowed) are shown. */
+  activeOnly?: boolean
+}
+
 export async function buildBorrowCardData(
   borrowing: BorrowCardSourceBorrowing,
   settings: BorrowCardSourceSettings,
-  deps: BorrowCardBuildDeps
+  deps: BorrowCardBuildDeps,
+  options?: BorrowCardBuildOptions
 ): Promise<BorrowCardData> {
   const fullName = borrowing.member?.fullName ?? borrowing.memberName
   const memberNumber = borrowing.member?.memberNumber ?? borrowing.memberNumber
   const memberType = memberTypeLabel(borrowing.member?.memberType) ?? borrowing.member?.memberType ?? ''
 
   const logo = settings.logoPath ? await deps.readFileAsDataUri(settings.logoPath) : null
+
+  const activeDetails = options?.activeOnly
+    ? borrowing.details.filter((d) => d.returnedAt === null)
+    : borrowing.details
 
   return {
     header: {
@@ -320,12 +331,12 @@ export async function buildBorrowCardData(
       borrowDate: formatCardDate(borrowing.borrowDate),
       dueDate: formatCardDate(borrowing.dueDate)
     },
-    books: borrowing.details.map((d) => ({
+    books: activeDetails.map((d) => ({
       title: d.bookCopy?.book?.title ?? d.bookTitle,
       inventoryNumber: d.bookCopy?.inventoryNumber ?? ''
     })),
     footer: {
-      totalBooks: borrowing.details.length,
+      totalBooks: activeDetails.length,
       borrowStatus: deriveBorrowStatus(borrowing.returnDate, borrowing.dueDate),
       qrSvg: generateQrCodeSvg(borrowing.id),
       officerName: settings.librarianName
