@@ -1,5 +1,9 @@
 import { ipcRenderer } from 'electron'
-import type { CreateBorrowingInput, ReturnBookInput } from '../../src/shared/dto/borrowing'
+import type {
+  BatchReturnInput,
+  CreateBorrowingInput,
+  ReturnBookInput
+} from '../../src/shared/dto/borrowing'
 
 export const borrowAPI = {
   borrowings: {
@@ -10,6 +14,8 @@ export const borrowAPI = {
   },
   returns: {
     findByBarcode: (barcode: string) => ipcRenderer.invoke('returns:findByBarcode', barcode),
-    returnBook: (input: ReturnBookInput) => ipcRenderer.invoke('returns:returnBook', input)
+    returnBook: (input: ReturnBookInput) => ipcRenderer.invoke('returns:returnBook', input),
+    findByBorrowNumber: (borrowNumber: string) => ipcRenderer.invoke('returns:findByBorrowNumber', borrowNumber),
+    batchReturn: (input: BatchReturnInput) => ipcRenderer.invoke('returns:batchReturn', input)
   }
 }

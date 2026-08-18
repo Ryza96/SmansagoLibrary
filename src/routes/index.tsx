@@ -22,6 +22,7 @@ import EnrollmentHistoryPage from '../pages/EnrollmentHistoryPage'
 import BorrowingsPage from '../pages/BorrowingsPage'
 import BorrowCardPrintPage from '../pages/BorrowCardPrintPage'
 import ReturnsPage from '../pages/ReturnsPage'
+import ReturnReceiptPreviewPage from '../pages/ReturnReceiptPreviewPage'
 import InventoryPage from '../pages/InventoryPage'
 import InventoryDetailPage from '../pages/InventoryDetailPage'
 import ReportsPage from '../pages/ReportsPage'
@@ -90,6 +91,7 @@ export const router = createHashRouter([
       { path: 'borrowings/print-card', element: <BorrowCardPrintPage /> },
       { path: 'borrowings/:id/receipt-preview', element: <BorrowReceiptPreviewPage /> },
       { path: 'returns', element: <ReturnsPage /> },
+      { path: 'returns/:id/receipt-preview', element: <ReturnReceiptPreviewPage /> },
       { path: 'inventory', element: <InventoryPage /> },
       { path: 'inventory/:id', element: <InventoryDetailPage /> },
       { path: 'promotions/run', element: <PromotionPage /> },

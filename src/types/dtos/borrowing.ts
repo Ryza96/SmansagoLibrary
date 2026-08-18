@@ -6,5 +6,8 @@ export type {
   ReturnDTO,
   ReturnBookInput,
   BorrowingByBarcodeResult,
-  ReturnCondition
+  ReturnCondition,
+  BatchReturnInput,
+  BatchReturnBookItem,
+  BatchReturnResult
 } from '../../shared/dto/borrowing'

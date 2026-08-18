@@ -52,6 +52,13 @@ export class BorrowRepository extends BaseRepository {
     return this.prisma.borrow.findUnique({ where: { borrowNumber } })
   }
 
+  async findByBorrowNumberActiveWithDetails(borrowNumber: string): Promise<BorrowWithRelations | null> {
+    return this.prisma.borrow.findFirst({
+      where: { borrowNumber, returnDate: null },
+      include: borrowInclude
+    })
+  }
+
   async findMany(options?: FindOptions) {
     const { skip, take } = getPaginationParams(options?.pagination)
 

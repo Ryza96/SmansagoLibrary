@@ -12,6 +12,8 @@ export const printAPI = {
     borrowCard: (borrowingId: string, options?: { silent?: boolean; activeOnly?: boolean }) =>
       ipcRenderer.invoke('printing:borrowCard', borrowingId, options),
     borrowCardPdf: (borrowingId: string, options?: { activeOnly?: boolean }) =>
-      ipcRenderer.invoke('printing:borrowCardPdf', borrowingId, options) as Promise<{ saved: boolean; filePath?: string }>
+      ipcRenderer.invoke('printing:borrowCardPdf', borrowingId, options) as Promise<{ saved: boolean; filePath?: string }>,
+    returnReceiptPreview: (borrowingId: string, detailIds?: string[]) =>
+      ipcRenderer.invoke('printing:returnReceiptPreview', borrowingId, detailIds)
   }
 }

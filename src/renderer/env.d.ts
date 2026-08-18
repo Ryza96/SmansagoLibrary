@@ -149,6 +149,8 @@ interface ElectronAPI {
   returns: {
     findByBarcode: (barcode: string) => Promise<import('../types/dtos/borrowing').BorrowingByBarcodeResult>
     returnBook: (input: import('../types/dtos/borrowing').ReturnBookInput) => Promise<import('../types/dtos/borrowing').BorrowingDTO>
+    findByBorrowNumber: (borrowNumber: string) => Promise<import('../types/dtos/borrowing').BorrowingDTO>
+    batchReturn: (input: import('../types/dtos/borrowing').BatchReturnInput) => Promise<import('../types/dtos/borrowing').BatchReturnResult>
   }
   print: {
     getLabelPreviewHtml: (input: import('../../src/shared/dto/print').BookLabelData) => Promise<string>
@@ -158,6 +160,7 @@ interface ElectronAPI {
     borrowCardPreview: (borrowingId: string, options?: { activeOnly?: boolean }) => Promise<string>
     borrowCard: (borrowingId: string, options?: { silent?: boolean; activeOnly?: boolean }) => Promise<void>
     borrowCardPdf: (borrowingId: string, options?: { activeOnly?: boolean }) => Promise<{ saved: boolean; filePath?: string }>
+    returnReceiptPreview: (borrowingId: string, detailIds?: string[]) => Promise<string>
   }
   academicYears: {
     findMany: (search?: string, page?: number, limit?: number) => Promise<{

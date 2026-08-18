@@ -19,6 +19,7 @@ export const ROUTES = {
   BORROWINGS: '/borrowings',
   BORROW_CARD_PRINT: '/borrowings/print-card',
   RETURNS: '/returns',
+  RETURN_RECEIPT_PREVIEW: '/returns/:id/receipt-preview',
   INVENTORY: '/inventory',
   INVENTORY_DETAIL: '/inventory/:id',
   REPORTS: '/reports',
@@ -112,4 +113,8 @@ export function promotionDetailPath(id: string) {
 
 export function inventoryDetailPath(id: string) {
   return `/inventory/${id}`
+}
+
+export function returnReceiptPreviewPath(id: string) {
+  return `/returns/${id}/receipt-preview`
 }

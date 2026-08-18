@@ -75,3 +75,35 @@ export interface BorrowingByBarcodeResult {
   borrowDate: string
   dueDate: string
 }
+
+// --- Batch Return (WO Return Flow Redesign) ---
+
+/** A single book selected for return within a batch */
+export interface BatchReturnBookItem {
+  /** BorrowDetail.id */
+  borrowDetailId: string
+  /** Condition when returned */
+  condition: ReturnCondition
+}
+
+/** Input for batch return — one or more books from the same transaction */
+export interface BatchReturnInput {
+  /** ID of the Borrow record */
+  borrowingId: string
+  /** Books to return in this batch */
+  books: BatchReturnBookItem[]
+}
+
+/** Result of a successful batch return — full updated Borrow with all details */
+export interface BatchReturnResult {
+  borrowing: BorrowingDTO
+  returnedCount: number
+  stillBorrowedCount: number
+  /** Books returned in THIS batch — for event-scoped receipt rendering */
+  returnedBooks: Array<{
+    borrowDetailId: string
+    bookTitle: string
+    inventoryNumber: string
+    condition: string
+  }>
+}

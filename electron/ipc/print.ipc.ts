@@ -24,4 +24,9 @@ export function registerPrintHandlers(printService: PrintService): void {
   ipcMain.handle('printing:borrowCardPdf', async (_event, borrowingId: string, options?: { activeOnly?: boolean }) =>
     printService.saveBorrowCardPdf(borrowingId, options)
   )
+  ipcMain.handle(
+    'printing:returnReceiptPreview',
+    async (_event, borrowingId: string, detailIds?: string[]) =>
+      printService.getReturnReceiptPreviewHtml(borrowingId, detailIds)
+  )
 }

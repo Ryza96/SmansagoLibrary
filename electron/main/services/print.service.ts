@@ -330,6 +330,47 @@ export class PrintService {
     await this.printHtml(html)
   }
 
+  /**
+   * Return receipt preview HTML — scoped to specific returned detail IDs.
+   * When detailIds is provided, only those items are shown (event-scoped receipt).
+   * When detailIds is omitted, shows ALL returned items (legacy behavior).
+   */
+  async getReturnReceiptPreviewHtml(borrowingId: string, detailIds?: string[]): Promise<string> {
+    const [borrowing, settings] = await Promise.all([
+      this.borrowRepository.findById(borrowingId),
+      this.settingService.get()
+    ])
+    if (!borrowing) {
+      throw new AppError(404, 'Not Found', 'Data peminjaman tidak ditemukan.')
+    }
+
+    const idSet = detailIds && detailIds.length > 0 ? new Set(detailIds) : null
+    const returnedItems = borrowing.details.filter((detail: any) => {
+      if (detail.returnedAt === null) return false
+      if (idSet && !idSet.has(detail.id)) return false
+      return true
+    })
+
+    const data: ReturnReceiptData = {
+      libraryName: settings.libraryName,
+      borrowingNumber: borrowing.borrowNumber,
+      memberName: borrowing.member?.fullName ?? borrowing.memberName ?? '',
+      memberNumber: borrowing.member?.memberNumber ?? borrowing.memberNumber ?? '',
+      returnDate: returnedItems.length > 0 && returnedItems[0].returnedAt
+        ? returnedItems[0].returnedAt.toISOString()
+        : new Date().toISOString(),
+      items: returnedItems.map((detail: any) => ({
+        barcode: detail.bookCopy?.barcode ?? '',
+        inventoryNumber: detail.bookCopy?.inventoryNumber ?? '',
+        bookTitle: detail.bookCopy?.book?.title ?? '',
+        condition: detail.conditionBack ?? undefined
+      })),
+      totalItems: returnedItems.length
+    }
+
+    return this.generateReceiptHtml(data, 'PENGEMBALIAN')
+  }
+
   private generateReceiptHtml(data: any, title: string): string {
     const itemsHtml = data.items
       .map(

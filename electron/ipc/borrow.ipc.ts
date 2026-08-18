@@ -3,7 +3,7 @@ import type { BorrowService } from '../../src/main/services/borrow.service'
 import type { ReturnService } from '../../src/main/services/return.service'
 import type { BorrowDetailRepository } from '../../src/main/repositories/borrow-detail.repository'
 import type { BorrowRepository } from '../../src/main/repositories/borrow.repository'
-import type { CreateBorrowingInput, ReturnBookInput } from '../../src/shared/dto/borrowing'
+import type { BatchReturnInput, CreateBorrowingInput, ReturnBookInput } from '../../src/shared/dto/borrowing'
 
 export function registerBorrowHandlers(
   borrowService: BorrowService,
@@ -35,5 +35,13 @@ export function registerBorrowHandlers(
 
   ipcMain.handle('returns:returnBook', async (_event, input: ReturnBookInput) =>
     returnService.returnBook(input)
+  )
+
+  ipcMain.handle('returns:findByBorrowNumber', async (_event, borrowNumber: string) =>
+    returnService.findByBorrowNumber(borrowNumber)
+  )
+
+  ipcMain.handle('returns:batchReturn', async (_event, input: BatchReturnInput) =>
+    returnService.batchReturn(input)
   )
 }
