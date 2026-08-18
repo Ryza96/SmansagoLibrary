@@ -1,6 +1,6 @@
 {
   "name": "aplibrary",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "author": "Ryza Arshavin",
   "description": "Aplikasi Perpustakaan Desktop - BAM",
   "main": "./out/main/index.js",
