@@ -1,5 +1,5 @@
 import { BrowserWindow, app, dialog } from 'electron'
-import { readFile, writeFile } from 'fs/promises'
+import { readFile, writeFile, unlink } from 'fs/promises'
 import { join } from 'path'
 import { AppError } from '../errorHandler'
 import { BorrowRepository } from '../../../src/main/repositories/borrow.repository'
@@ -81,6 +81,14 @@ export class PrintService {
     private settingService: SettingService,
     private assetRoot: string = ''
   ) {}
+
+  // Electron's webContents.print() fires callback with success=false when the
+  // user cancels the print dialog. The failureReason is "Print job canceled"
+  // (Electron docs, v26+). This is a normal user action, not a real failure.
+  // Exact match — NOT .includes("cancel") — to avoid swallowing real errors.
+  private static isPrintCancelled(failureReason?: string | null): boolean {
+    return failureReason === 'Print job canceled'
+  }
 
   // WO-LABEL — isi ulang data label dari Settings (libraryName/schoolName) dan
   // logo (data URI) persis pola buildBorrowCardHtml: resolveAssetPath adalah
@@ -240,36 +248,48 @@ export class PrintService {
     return { saved: true, filePath: result.filePath }
   }
 
-  private renderPdf(html: string): Promise<Buffer> {
-    return new Promise((resolve, reject) => {
-      const printWindow = new BrowserWindow({
-        width: 800,
-        height: 600,
-        show: false,
-        webPreferences: {
-          contextIsolation: true,
-          nodeIntegration: false
-        }
-      })
+  private async renderPdf(html: string): Promise<Buffer> {
+    // Same temp-file pattern as printHtml to avoid data: URL length limit.
+    const tmpFile = join(
+      app.getPath('temp'),
+      `aplibrary-pdf-${Date.now()}-${Math.random().toString(36).slice(2, 10)}.html`
+    )
+    await writeFile(tmpFile, html, 'utf-8')
+    const fileUrl = `file:///${tmpFile.replace(/\\/g, '/')}`
 
-      printWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`)
+    try {
+      return await new Promise<Buffer>((resolve, reject) => {
+        const printWindow = new BrowserWindow({
+          width: 800,
+          height: 600,
+          show: false,
+          webPreferences: {
+            contextIsolation: true,
+            nodeIntegration: false
+          }
+        })
 
-      printWindow.webContents.on('did-finish-load', async () => {
-        try {
-          const pdf = await printWindow.webContents.printToPDF({ printBackground: true, preferCSSPageSize: true })
-          resolve(pdf)
-        } catch (error) {
-          reject(error)
-        } finally {
+        printWindow.loadURL(fileUrl)
+
+        printWindow.webContents.on('did-finish-load', async () => {
+          try {
+            const pdf = await printWindow.webContents.printToPDF({ printBackground: true, preferCSSPageSize: true })
+            resolve(pdf)
+          } catch (error) {
+            reject(error)
+          } finally {
+            if (!printWindow.isDestroyed()) printWindow.close()
+          }
+        })
+
+        printWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription) => {
           if (!printWindow.isDestroyed()) printWindow.close()
-        }
+          reject(new Error(`Gagal memuat halaman PDF: ${errorDescription}`))
+        })
       })
-
-      printWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription) => {
-        if (!printWindow.isDestroyed()) printWindow.close()
-        reject(new Error(`Gagal memuat halaman PDF: ${errorDescription}`))
-      })
-    })
+    } finally {
+      try { await unlink(tmpFile) } catch { /* best-effort cleanup */ }
+    }
   }
 
   async printBorrowReceipt(borrowingId: string): Promise<void> {
@@ -439,105 +459,121 @@ export class PrintService {
   //    close) TIDAK bisa resolve/reject dua kali (guard `settled`).
   //  - Logging [Print] tahap per-tahap untuk diagnosis (mulai / loadURL /
   //    print invoked / callback / timeout / cleanup).
-  private printHtml(html: string, printOptions?: PrintHtmlOptions): Promise<void> {
-    return new Promise((resolve, reject) => {
-      let settled = false
-      let timer: NodeJS.Timeout | null = null
+  private async printHtml(html: string, printOptions?: PrintHtmlOptions): Promise<void> {
+    // --- FIX: write HTML to temp file to avoid Chromium data: URL length limit ---
+    // Chromium kMaxURLChars = 2,097,152 chars. data:text/html URLs for large
+    // label print jobs (Code39, 100+ labels) exceeded this limit causing
+    // ERR_INVALID_URL. file:// URLs have no such limit.
+    const tmpFile = join(
+      app.getPath('temp'),
+      `aplibrary-print-${Date.now()}-${Math.random().toString(36).slice(2, 10)}.html`
+    )
+    await writeFile(tmpFile, html, 'utf-8')
+    const fileUrl = `file:///${tmpFile.replace(/\\/g, '/')}`
 
-      const printWindow = new BrowserWindow({
-        width: 800,
-        height: 600,
-        show: false,
-        webPreferences: {
-          contextIsolation: true,
-          nodeIntegration: false
-        }
-      })
+    try {
+      await new Promise<void>((resolve, reject) => {
+        let settled = false
+        let timer: NodeJS.Timeout | null = null
 
-      const timeoutMs = printOptions?.timeoutMs ?? PRINT_HTML_TIMEOUT_MS
-      console.log(`[Print] printHtml start (timeout=${timeoutMs}ms)`)
-
-      // Settlement tunggal + cleanup terpusat. Setelah settled, semua jalur
-      // (event, callback print, timer) menjadi no-op — mencegah double
-      // resolve/reject dan menjamin window ditutup TEPAT SATU KALI.
-      const finish = (action: () => void): void => {
-        if (settled) return
-        settled = true
-        if (timer) {
-          clearTimeout(timer)
-          timer = null
-        }
-        if (!printWindow.isDestroyed()) {
-          // Lepas handler event agar teardown window tidak memicu event
-          // did-finish-load / did-fail-load tambahan setelah settlement.
-          printWindow.webContents.removeAllListeners('did-finish-load')
-          printWindow.webContents.removeAllListeners('did-fail-load')
-          try {
-            printWindow.close()
-          } catch (error) {
-            console.warn('[Print] cleanup: gagal menutup window print:', error)
+        const printWindow = new BrowserWindow({
+          width: 800,
+          height: 600,
+          show: false,
+          webPreferences: {
+            contextIsolation: true,
+            nodeIntegration: false
           }
-        }
-        console.log('[Print] cleanup: window print ditutup')
-        action()
-      }
-      const succeed = (): void => finish(resolve)
-      const fail = (error: Error): void => finish(() => reject(error))
-
-      timer = setTimeout(() => {
-        console.log(
-          `[Print] timeout ${timeoutMs}ms tercapai — proses cetak tidak selesai, dibatalkan`
-        )
-        fail(
-          new Error(
-            `Cetak tidak selesai dalam ${timeoutMs} ms — dialog cetak mungkin tersembunyi atau proses native tidak merespons. Silakan coba lagi.`
-          )
-        )
-      }, timeoutMs)
-
-      printWindow.webContents.on('did-finish-load', async () => {
-        if (settled) return
-        try {
-          console.log('[Print] loadURL selesai')
-          const options = await this.resolvePrintOptions(printWindow, printOptions)
-          if (settled || printWindow.isDestroyed()) return
-          console.log(
-            `[Print] print invoked (silent=${options.silent}, deviceName=${options.deviceName ?? 'default'})`
-          )
-          printWindow.webContents.print(options, (success, failureReason) => {
-            if (success) {
-              console.log('[Print] print callback success')
-              succeed()
-            } else {
-              console.log(`[Print] print callback gagal: ${failureReason ?? 'unknown'}`)
-              fail(new Error(failureReason ?? 'Gagal mencetak'))
-            }
-          })
-        } catch (error) {
-          console.warn('[Print] gagal menyiapkan opsi cetak:', error)
-          fail(error instanceof Error ? error : new Error(String(error)))
-        }
-      })
-
-      printWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription) => {
-        console.warn(`[Print] did-fail-load (code=${errorCode}): ${errorDescription}`)
-        fail(new Error(`Gagal memuat halaman cetak: ${errorDescription}`))
-      })
-
-      // loadURL di-await + rejection ditangani. did-fail-load dipertahankan
-      // sebagai sumber detail; guard `settled` mencegah double-reject dari dua
-      // jalur yang keduanya bisa aktif.
-      void printWindow
-        .loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`)
-        .catch((error) => {
-          console.warn('[Print] loadURL gagal:', error)
-          fail(
-            error instanceof Error
-              ? error
-              : new Error(`Gagal memuat halaman cetak: ${String(error)}`)
-          )
         })
-    })
+
+        const timeoutMs = printOptions?.timeoutMs ?? PRINT_HTML_TIMEOUT_MS
+        console.log(`[Print] printHtml start (timeout=${timeoutMs}ms, via temp file)`)
+
+        // Settlement tunggal + cleanup terpusat. Setelah settled, semua jalur
+        // (event, callback print, timer) menjadi no-op — mencegah double
+        // resolve/reject dan menjamin window ditutup TEPAT SATU KALI.
+        const finish = (action: () => void): void => {
+          if (settled) return
+          settled = true
+          if (timer) {
+            clearTimeout(timer)
+            timer = null
+          }
+          if (!printWindow.isDestroyed()) {
+            // Lepas handler event agar teardown window tidak memicu event
+            // did-finish-load / did-fail-load tambahan setelah settlement.
+            printWindow.webContents.removeAllListeners('did-finish-load')
+            printWindow.webContents.removeAllListeners('did-fail-load')
+            try {
+              printWindow.close()
+            } catch (error) {
+              console.warn('[Print] cleanup: gagal menutup window print:', error)
+            }
+          }
+          console.log('[Print] cleanup: window print ditutup')
+          action()
+        }
+        const succeed = (): void => finish(resolve)
+        const fail = (error: Error): void => finish(() => reject(error))
+
+        timer = setTimeout(() => {
+          console.log(
+            `[Print] timeout ${timeoutMs}ms tercapai — proses cetak tidak selesai, dibatalkan`
+          )
+          fail(
+            new Error(
+              `Cetak tidak selesai dalam ${timeoutMs} ms — dialog cetak mungkin tersembunyi atau proses native tidak merespons. Silakan coba lagi.`
+            )
+          )
+        }, timeoutMs)
+
+        printWindow.webContents.on('did-finish-load', async () => {
+          if (settled) return
+          try {
+            console.log('[Print] loadURL selesai')
+            const options = await this.resolvePrintOptions(printWindow, printOptions)
+            if (settled || printWindow.isDestroyed()) return
+            console.log(
+              `[Print] print invoked (silent=${options.silent}, deviceName=${options.deviceName ?? 'default'})`
+            )
+            printWindow.webContents.print(options, (success, failureReason) => {
+              if (success) {
+                console.log('[Print] print callback success')
+                succeed()
+              } else if (PrintService.isPrintCancelled(failureReason)) {
+                console.log('[Print] user cancelled print dialog — treated as normal')
+                succeed()
+              } else {
+                console.log(`[Print] print callback gagal: ${failureReason ?? 'unknown'}`)
+                fail(new Error(failureReason ?? 'Gagal mencetak'))
+              }
+            })
+          } catch (error) {
+            console.warn('[Print] gagal menyiapkan opsi cetak:', error)
+            fail(error instanceof Error ? error : new Error(String(error)))
+          }
+        })
+
+        printWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription) => {
+          console.warn(`[Print] did-fail-load (code=${errorCode}): ${errorDescription}`)
+          fail(new Error(`Gagal memuat halaman cetak: ${errorDescription}`))
+        })
+
+        // loadURL via file:// — unlimited length (no data: URL kMaxURLChars limit).
+        void printWindow
+          .loadURL(fileUrl)
+          .catch((error) => {
+            console.warn('[Print] loadURL gagal:', error)
+            fail(
+              error instanceof Error
+                ? error
+                : new Error(`Gagal memuat halaman cetak: ${String(error)}`)
+            )
+          })
+      })
+    } finally {
+      try { await unlink(tmpFile) } catch { /* best-effort cleanup */ }
+    }
   }
 
   private async resolvePrintOptions(

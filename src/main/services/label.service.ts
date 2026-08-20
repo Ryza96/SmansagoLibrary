@@ -207,6 +207,19 @@ ${
     page-break-after: auto;
     break-after: auto;
   }
+  .label-page::before {
+    content: '';
+    position: absolute;
+    left: ${marginLeftMm}mm;
+    top: ${marginTopMm}mm;
+    right: ${marginRightMm}mm;
+    bottom: ${marginBottomMm}mm;
+    border: 0.28mm dashed ${CUT_GUIDE_COLOR};
+    pointer-events: none;
+    z-index: 5;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
   .label-page::after {
     content: '';
     position: absolute;
@@ -243,7 +256,7 @@ ${
     width: ${LABEL_WIDTH_MM}mm;
     height: ${LABEL_HEIGHT_MM}mm;
     ${labelBorder}
-    padding: 2mm 3mm;
+    padding: 1.5mm 3mm;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -256,7 +269,7 @@ ${
     display: flex;
     align-items: center;
     gap: 2mm;
-    padding-bottom: 1.2mm;
+    padding-bottom: 0.8mm;
     border-bottom: 0.3mm solid #12235a;
   }
   .label-logo {
@@ -320,13 +333,13 @@ ${
     color: #12235a;
     font-family: Consolas, 'Courier New', monospace;
     letter-spacing: 1px;
-    margin-top: 0.8mm;
+    margin-top: 0.3mm;
   }
   .label-book-divider {
     width: 100%;
     height: 0.3mm;
     background: #cbd5e1;
-    margin: 0.9mm 0;
+    margin: 0.4mm 0;
   }
   .label-book {
     flex: 1;
@@ -334,7 +347,7 @@ ${
     width: 100%;
     display: flex;
     align-items: center;
-    gap: 1.5mm;
+    gap: 1mm;
   }
   .label-book-icon {
     flex: 0 0 auto;
@@ -365,7 +378,7 @@ ${
     font-size: 8.5px;
     font-style: italic;
     color: #475569;
-    margin-top: 0.4mm;
+    margin-top: 0.2mm;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -379,7 +392,7 @@ ${
     gap: 1mm;
     background: #12235a;
     border-radius: 2mm;
-    padding: 0.8mm 1.5mm;
+    padding: 0.5mm 1.5mm;
     color: #ffffff;
     font-size: 8.5px;
     font-weight: 600;
