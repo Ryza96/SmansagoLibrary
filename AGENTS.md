@@ -1582,3 +1582,20 @@ pm run build PASS (main 1,819.55 kB ï¿½ preload 9.02 kB ï¿½ renderer 1,044
 - **`new PrismaClient()` bootstrap independen dari singleton app** (base/prisma `getPrisma()`); baca `process.env.DATABASE_URL` saat konstruksi, jadi urutan di `index.ts` (set DATABASE_URL Fix #2 → bootstrap → initDatabase) wajib dipertahankan; `finally` disconnect.
 - **`spawnSync('npx.cmd', ...)` di Node 22 Windows tanpa `shell: true` → `EINVAL`** (empty output, status null); untuk menjalankan CLI Prisma dari smoke gunakan `shell: process.platform === 'win32'`. Manual shell tidak menunjukkan masalah ini.
 - **Posisi bootstrap**: setelah data root & DATABASE_URL (Fix #2), sebelum `initDatabase()` & reconciliation (yang membaca `InventorySequence` yang baru dibuat).
+
+---
+
+## BARCODE INPUT LOCK AUDIT — READ-ONLY INVESTIGATION (COMPLETE — menunggu keputusan implementasi)
+
+### Ringkasan
+- Investigasi READ-ONLY (tanpa perubahan kode) terhadap defek: input Barcode tidak bisa diketik selama ~10 detik setelah error "Buku tidak tersedia" di halaman Peminjaman Buku.
+- **Root cause: `alert()` = synchronous blocking dialog** di Electron (`dialog.showMessageBoxSync`), yang membekukan seluruh renderer JavaScript execution (input, events, React render) selama dialog terbuka. "10 detik" = waktu user membaca + menutup dialog, BUKAN timeout di kode.
+- **3 masalah terkait:** (1) `alert()` blocking (UX), (2) tidak ada `try/catch` pada IPC `findByBarcode` — edge case IPC throw → input terkunci permanen (HIGH severity), (3) tidak ada loading state/disabled guard — double-scan bisa menghasilkan sequential alert dialogs.
+- **Tidak ada 10-second timeout/debounce/cooldown/mutex** di seluruh jalur barcode (dibuktikan grep codebase). IPC latency < 10ms (SQLite `findUnique` indexed).
+- **Rekomendasi fix:** (1) Ganti `alert()` → `notify.warning()`/`notify.error()` (NS-1, non-blocking), (2) Tambah `try/catch/finally` + `setBarcode('')`/`focus()` di `finally`, (3) Tambah loading guard (`scanning` state + `disabled` di input). Scope: `src/pages/BorrowingsPage.tsx` saja (4 lokasi `alert()`).
+- **Laporan:** `BARCODE_INPUT_LOCK_AUDIT.md`. Status: **DONE — menunggu keputusan implementasi** (READ-ONLY, tidak commit/push).
+
+### Pelajaran (retain)
+- **`alert()` di Electron = `dialog.showMessageBoxSync()`** — synchronous blocking yang membekukan renderer. Penggantian ke toast (NS-1) atau non-blocking dialog menghilangkan seluruh "lock" UX.
+- **IPC call tanpa try/catch = risk permanent lock** — jika `findByBarcode` throw, cleanup code (`setBarcode('')`/`focus()`) tidak pernah dieksekusi → input terkunci permanen sampai reload. Fix: `finally` block.
+- **Barcode scanner input path harus di-audit untuk try/catch/finally** — setiap async path di renderer yang cleanup code-nya setelah `await` wajib diproteksi `try/finally` agar input selalu reset.
