@@ -23,6 +23,7 @@ export class ResetDatabaseService {
   }
 
   async performResetTx(tx: Prisma.TransactionClient): Promise<void> {
+    await tx.fine.deleteMany()
     await tx.borrowDetail.deleteMany()
     await tx.borrow.deleteMany()
     await tx.assetEvent.deleteMany()
