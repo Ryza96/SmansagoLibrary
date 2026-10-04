@@ -18,6 +18,7 @@ export const bookAPI = {
   books: {
     findMany: () => invokeClean('books:findMany'),
     findById: (id: string) => invokeClean('books:findById', id),
+    findByIsbn: (isbn: string, excludeBookId?: string) => invokeClean('books:findByIsbn', isbn, excludeBookId),
     create: (input: CreateBookDTO) => invokeClean('books:create', input),
     update: (id: string, input: UpdateBookDTO) => invokeClean('books:update', id, input),
     delete: (id: string) => invokeClean('books:delete', id),

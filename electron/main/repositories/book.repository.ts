@@ -86,6 +86,16 @@ export class BookRepository {
     return count > 0
   }
 
+  async findByIsbn(isbn: string, excludeId?: string): Promise<{ id: string; title: string } | null> {
+    return prisma.book.findFirst({
+      where: {
+        isbn,
+        ...(excludeId ? { id: { not: excludeId } } : {})
+      },
+      select: { id: true, title: true }
+    })
+  }
+
   async existsByAuthorId(authorId: string): Promise<boolean> {
     const count = await prisma.book.count({ where: { authorId } })
     return count > 0

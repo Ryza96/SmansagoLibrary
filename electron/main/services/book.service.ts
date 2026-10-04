@@ -78,6 +78,12 @@ export class BookService {
     }
   }
 
+  async findByIsbn(isbn: string, excludeBookId?: string): Promise<{ id: string; title: string } | null> {
+    const trimmed = isbn.trim()
+    if (!trimmed) return null
+    return this.repository.findByIsbn(trimmed, excludeBookId)
+  }
+
   async createBook(input: CreateBookDTO): Promise<BookDetailDTO> {
     if (input.isbn) {
       const exists = await this.repository.existsByIsbn(input.isbn)

@@ -17,6 +17,7 @@ export default function BookFormPage() {
   const [publishers, setPublishers] = useState<SelectOption[]>([])
   const [categories, setCategories] = useState<SelectOption[]>([])
   const [loading, setLoading] = useState(true)
+  const [submitError, setSubmitError] = useState('')
 
   async function loadOptions() {
     const [authorList, publisherList, categoryList] = await Promise.all([
@@ -44,12 +45,17 @@ export default function BookFormPage() {
   }, [id, isEdit])
 
   async function handleSubmit(data: CreateBookDTO | UpdateBookDTO) {
-    if (isEdit && id) {
-      await api.books.update(id, data)
-    } else {
-      await api.books.create(data as CreateBookDTO)
+    setSubmitError('')
+    try {
+      if (isEdit && id) {
+        await api.books.update(id, data)
+      } else {
+        await api.books.create(data as CreateBookDTO)
+      }
+      navigate(-1)
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : 'Gagal menyimpan buku.')
     }
-    navigate(-1)
   }
 
   async function handleAddAuthor(name: string) {
@@ -94,6 +100,7 @@ export default function BookFormPage() {
         onSubmit={handleSubmit}
         onCancel={() => navigate(-1)}
         isEdit={isEdit}
+        submitError={submitError}
         onAddAuthor={handleAddAuthor}
         onAddPublisher={handleAddPublisher}
         onAddCategory={handleAddCategory}

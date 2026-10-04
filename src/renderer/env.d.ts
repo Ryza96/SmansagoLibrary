@@ -32,6 +32,7 @@ interface ElectronAPI {
   books: {
     findMany: () => Promise<import('../types/dtos/book').BookListItemDTO[]>
     findById: (id: string) => Promise<import('../types/dtos/book').BookDetailDTO | null>
+    findByIsbn: (isbn: string, excludeBookId?: string) => Promise<{ id: string; title: string } | null>
     create: (input: import('../types/dtos/book').CreateBookDTO) => Promise<import('../types/dtos/book').BookDetailDTO>
     update: (id: string, input: import('../types/dtos/book').UpdateBookDTO) => Promise<import('../types/dtos/book').BookDetailDTO | null>
     delete: (id: string) => Promise<boolean>

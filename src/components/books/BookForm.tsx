@@ -1,6 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { BookDetailDTO, CreateBookDTO, UpdateBookDTO, SelectOption } from '../../types/dtos/book'
 import { LABELS } from '../../utils/labels'
+import { bookDetailPath } from '../../utils/navigation'
 import SearchableSelect from '../ui/SearchableSelect'
 import InlineAddModal from '../ui/InlineAddModal'
 
@@ -12,6 +14,7 @@ interface BookFormProps {
   onSubmit: (data: CreateBookDTO | UpdateBookDTO) => Promise<void>
   onCancel: () => void
   isEdit: boolean
+  submitError?: string
   onAddAuthor?: (name: string) => Promise<void>
   onAddPublisher?: (name: string) => Promise<void>
   onAddCategory?: (name: string) => Promise<void>
@@ -19,7 +22,7 @@ interface BookFormProps {
 
 export default function BookForm({
   initialData, authors, publishers, categories,
-  onSubmit, onCancel, isEdit,
+  onSubmit, onCancel, isEdit, submitError,
   onAddAuthor, onAddPublisher, onAddCategory
 }: BookFormProps) {
   const [title, setTitle] = useState(initialData?.title ?? '')
@@ -49,6 +52,43 @@ export default function BookForm({
   const [showAddCategory, setShowAddCategory] = useState(false)
   const [authorInitialName, setAuthorInitialName] = useState('')
   const [publisherInitialName, setPublisherInitialName] = useState('')
+
+  const [isbnStatus, setIsbnStatus] = useState<'idle' | 'checking' | 'ok' | 'duplicate' | 'error'>('idle')
+  const [foundBook, setFoundBook] = useState<{ id: string; title: string } | null>(null)
+  const [noIsbn, setNoIsbn] = useState(false)
+  const titleRef = useRef<HTMLInputElement>(null)
+
+  const fieldsEnabled = isbnStatus === 'duplicate' ? false : (isEdit ? true : (noIsbn || isbnStatus === 'ok'))
+  const saveDisabled =
+    isbnStatus === 'duplicate' ||
+    isbnStatus === 'checking' ||
+    (!isEdit && !noIsbn && isbnStatus !== 'ok')
+
+  async function checkIsbn() {
+    const value = isbn.trim()
+    if (!value) return
+    setIsbnStatus('checking')
+    setFoundBook(null)
+    try {
+      const found = await window.electronAPI.books.findByIsbn(value, isEdit ? initialData?.id : undefined)
+      if (found) {
+        setFoundBook(found)
+        setIsbnStatus('duplicate')
+      } else {
+        setIsbnStatus('ok')
+        setTimeout(() => titleRef.current?.focus(), 0)
+      }
+    } catch {
+      setIsbnStatus('error')
+    }
+  }
+
+  function handleIsbnChange(value: string) {
+    setIsbn(value)
+    setIsbnStatus('idle')
+    setFoundBook(null)
+    if (noIsbn && value.trim()) setNoIsbn(false)
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -145,10 +185,46 @@ export default function BookForm({
           <div className="flex-1 min-w-0 space-y-6">
             <Section title={LABELS.BOOK_SECTION.MAIN_INFO}>
               <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">{LABELS.FIELD.ISBN}</label>
+                <input
+                  type="text"
+                  value={isbn}
+                  onChange={(e) => handleIsbnChange(e.target.value)}
+                  onBlur={checkIsbn}
+                  placeholder="Contoh: 978-602-1234-56-7"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                {!isEdit && !noIsbn && isbnStatus !== 'ok' && (
+                  <p className="text-slate-400 text-xs mt-1">Isi ISBN terlebih dahulu</p>
+                )}
+                {isbnStatus === 'checking' && <p className="text-slate-400 text-xs mt-1">Memeriksa ISBN...</p>}
+                {isbnStatus === 'error' && <p className="text-red-500 text-xs mt-1">Gagal memeriksa ISBN.</p>}
+                {isbnStatus === 'duplicate' && foundBook && (
+                  <p className="text-amber-600 text-xs mt-1">
+                    ISBN sudah digunakan oleh{' '}
+                    <Link to={bookDetailPath(foundBook.id)} className="underline font-medium">
+                      {foundBook.title}
+                    </Link>
+                  </p>
+                )}
+                {!isEdit && !noIsbn && isbnStatus !== 'ok' && (
+                  <button
+                    type="button"
+                    onClick={() => { setNoIsbn(true); setIsbn(''); setIsbnStatus('ok'); setFoundBook(null); setTimeout(() => titleRef.current?.focus(), 0) }}
+                    className="mt-2 text-xs text-blue-600 hover:text-blue-800 underline"
+                  >
+                    Buku ini tidak punya ISBN
+                  </button>
+                )}
+              </div>
+
+              <fieldset disabled={!fieldsEnabled} className="border-0 p-0 m-0 min-w-0 space-y-4">
+              <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">
                   {LABELS.FIELD.TITLE} <span className="text-red-500">*</span>
                 </label>
                 <input
+                  ref={titleRef}
                   type="text"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
@@ -159,16 +235,6 @@ export default function BookForm({
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">{LABELS.FIELD.ISBN}</label>
-                  <input
-                    type="text"
-                    value={isbn}
-                    onChange={(e) => setIsbn(e.target.value)}
-                    placeholder="Contoh: 978-602-1234-56-7"
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">
                     {LABELS.FIELD.YEAR} <span className="text-red-500">*</span>
@@ -235,8 +301,10 @@ export default function BookForm({
                   </div>
                 </div>
               </div>
+              </fieldset>
             </Section>
 
+            <fieldset disabled={!fieldsEnabled} className="border-0 p-0 m-0 min-w-0">
             <Section title={LABELS.BOOK_SECTION.BIBLIOGRAPHY}>
               <div className="grid grid-cols-3 gap-4">
                 <div>
@@ -293,9 +361,10 @@ export default function BookForm({
                 </div>
               </div>
             </Section>
+            </fieldset>
           </div>
 
-          <div className="w-80 flex-shrink-0 space-y-6">
+          <fieldset disabled={!fieldsEnabled} className="border-0 p-0 m-0 w-80 flex-shrink-0 space-y-6">
             <Card title={LABELS.BOOK_SECTION.COVER}>
               {coverLoading ? (
                 <div className="border-2 border-dashed border-slate-200 rounded-lg p-6 text-center">
@@ -371,8 +440,12 @@ export default function BookForm({
                 {LABELS.COPIES_INFO}
               </p>
             </Card>
-          </div>
+          </fieldset>
         </div>
+
+        {submitError && (
+          <p className="mt-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{submitError}</p>
+        )}
 
         <div className="flex items-center justify-end gap-3 mt-8 pt-6 border-t border-slate-200">
           <button
@@ -391,7 +464,8 @@ export default function BookForm({
           </button>
           <button
             type="submit"
-            className="px-5 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+            disabled={saveDisabled}
+            className="px-5 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {LABELS.BOOK.SAVE}
           </button>
