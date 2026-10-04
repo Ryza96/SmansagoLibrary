@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { X } from 'lucide-react'
 
 interface InlineAddModalProps {
@@ -6,12 +6,18 @@ interface InlineAddModalProps {
   fieldLabel: string
   onSubmit: (value: string) => Promise<void>
   onClose: () => void
+  initialValue?: string
 }
 
-export default function InlineAddModal({ title, fieldLabel, onSubmit, onClose }: InlineAddModalProps) {
-  const [value, setValue] = useState('')
+export default function InlineAddModal({ title, fieldLabel, onSubmit, onClose, initialValue }: InlineAddModalProps) {
+  const [value, setValue] = useState(initialValue ?? '')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+
+  useEffect(() => {
+    setValue(initialValue ?? '')
+    setError('')
+  }, [initialValue])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()

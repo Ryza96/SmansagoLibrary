@@ -5,7 +5,8 @@ interface SearchableSelectProps {
   options: { id: string; name: string }[]
   value: string | string[]
   onChange: (value: string | string[]) => void
-  onAdd?: () => void
+  onAdd?: (initialName?: string) => void
+  addLabel?: string
   placeholder?: string
   label?: string
   required?: boolean
@@ -20,6 +21,7 @@ export default function SearchableSelect({
   value,
   onChange,
   onAdd,
+  addLabel,
   placeholder,
   label,
   required,
@@ -149,6 +151,21 @@ export default function SearchableSelect({
           {filtered.length === 0 && !onAdd && (
             <p className="text-slate-400 text-sm text-center py-4">Tidak ada data.</p>
           )}
+          {(filtered.length === 0 && onAdd && search.trim()) && (
+            <div className="text-center py-4 space-y-2">
+              <p className="text-slate-400 text-sm">Tidak ada data.</p>
+              <button
+                type="button"
+                onClick={() => { const name = search.trim(); setSearch(''); setIsOpen(false); onAdd(name) }}
+                className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+              >
+                {addLabel ?? 'Tambah'} "{search.trim()}"
+              </button>
+            </div>
+          )}
+          {filtered.length === 0 && onAdd && !search.trim() && (
+            <p className="text-slate-400 text-sm text-center py-4">Tidak ada data.</p>
+          )}
           {filtered.map((o) => (
             <label
               key={o.id}
@@ -167,11 +184,11 @@ export default function SearchableSelect({
           {onAdd && (
             <button
               type="button"
-              onClick={(e) => { e.stopPropagation(); setSearch(''); setIsOpen(false); onAdd() }}
+              onClick={(e) => { e.stopPropagation(); const name = search.trim(); setSearch(''); setIsOpen(false); onAdd(name) }}
               className="flex items-center gap-2 w-full px-3 py-2 text-blue-600 hover:bg-blue-50 text-sm font-medium border-t border-slate-100"
             >
               <Plus size={16} />
-              Tambah Baru
+              {addLabel ?? 'Tambah Baru'}
             </button>
           )}
         </div>

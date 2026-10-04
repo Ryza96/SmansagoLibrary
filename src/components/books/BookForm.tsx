@@ -47,6 +47,8 @@ export default function BookForm({
   const [showAddAuthor, setShowAddAuthor] = useState(false)
   const [showAddPublisher, setShowAddPublisher] = useState(false)
   const [showAddCategory, setShowAddCategory] = useState(false)
+  const [authorInitialName, setAuthorInitialName] = useState('')
+  const [publisherInitialName, setPublisherInitialName] = useState('')
 
   useEffect(() => {
     let cancelled = false
@@ -187,7 +189,8 @@ export default function BookForm({
                 options={authors}
                 value={selectedAuthorIds}
                 onChange={(val) => setSelectedAuthorIds(val as string[])}
-                onAdd={onAddAuthor ? () => setShowAddAuthor(true) : undefined}
+                onAdd={onAddAuthor ? (name) => { setAuthorInitialName(name ?? ''); setShowAddAuthor(true) } : undefined}
+                addLabel="Tambahkan Penulis"
                 placeholder="Cari dan pilih penulis..."
                 required
                 multiple
@@ -199,7 +202,8 @@ export default function BookForm({
                   options={publishers}
                   value={publisherId}
                   onChange={(val) => setPublisherId(val as string)}
-                  onAdd={onAddPublisher ? () => setShowAddPublisher(true) : undefined}
+                  onAdd={onAddPublisher ? (name) => { setPublisherInitialName(name ?? ''); setShowAddPublisher(true) } : undefined}
+                  addLabel="Tambahkan Penerbit"
                   placeholder={LABELS.PLACEHOLDER.SELECT_PUBLISHER}
                   required
                 />
@@ -400,6 +404,7 @@ export default function BookForm({
           fieldLabel={`Nama ${LABELS.MASTER.AUTHOR}`}
           onSubmit={onAddAuthor}
           onClose={() => setShowAddAuthor(false)}
+          initialValue={authorInitialName}
         />
       )}
       {showAddPublisher && onAddPublisher && (
@@ -408,6 +413,7 @@ export default function BookForm({
           fieldLabel={`Nama ${LABELS.MASTER.PUBLISHER}`}
           onSubmit={onAddPublisher}
           onClose={() => setShowAddPublisher(false)}
+          initialValue={publisherInitialName}
         />
       )}
       {showAddCategory && onAddCategory && (
