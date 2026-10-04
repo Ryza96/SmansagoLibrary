@@ -4,8 +4,7 @@ import { Undo2, Search, BookOpen, User, ChevronRight, CheckCircle, Printer } fro
 import { useNotification } from '../notification/NotificationContext'
 import { receiptPreviewPath, returnReceiptPreviewPath } from '../utils/navigation'
 import type { BorrowingDTO, ReturnCondition } from '../types/dtos/borrowing'
-
-const CONDITIONS = ['BAIK', 'RUSAK', 'HILANG'] as const
+import { RETURN_CONDITION, RETURN_CONDITION_VALUES, RETURN_CONDITION_LABELS } from '../shared/config/return-condition'
 type EntryMode = 'barcode' | 'borrowNumber'
 
 interface ReturnResult {
@@ -431,9 +430,9 @@ export default function ReturnsPage() {
                         disabled={returning}
                         className="text-xs px-2 py-1.5 border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-50"
                       >
-                        {CONDITIONS.map((c) => (
+                        {RETURN_CONDITION_VALUES.map((c) => (
                           <option key={c} value={c}>
-                            {c}
+                            {RETURN_CONDITION_LABELS[c] ?? c}
                           </option>
                         ))}
                       </select>
@@ -537,13 +536,13 @@ export default function ReturnsPage() {
                       <span className="text-xs text-slate-500">{book.inventoryNumber}</span>
                     </div>
                     <span className={`text-xs font-medium px-2 py-0.5 rounded ${
-                      book.condition === 'BAIK'
+                      book.condition === RETURN_CONDITION.BAIK
                         ? 'text-green-600 bg-green-50'
-                        : book.condition === 'RUSAK'
+                        : book.condition === RETURN_CONDITION.RUSAK_RINGAN || book.condition === 'RUSAK'
                           ? 'text-amber-600 bg-amber-50'
                           : 'text-red-600 bg-red-50'
                     }`}>
-                      {book.condition}
+                      {RETURN_CONDITION_LABELS[book.condition] ?? book.condition}
                     </span>
                   </div>
                 ))}

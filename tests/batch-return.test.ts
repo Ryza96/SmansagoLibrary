@@ -240,7 +240,7 @@ describe('ReturnService.batchReturn', () => {
   })
 
   // KETIDAKSEMPURNAAN YANG DIKETAHUI, bukan perilaku yang diinginkan
-  it('5. KNOWN ISSUE: condition RUSAK sets status to AVAILABLE and BookCopy.condition is not updated', async () => {
+  it('5. KNOWN ISSUE: condition RUSAK_RINGAN sets status to AVAILABLE and BookCopy.condition is not updated', async () => {
     const { student, copy1 } = await createBaseData()
     const borrow = await createBorrowWithBooks(student.id, [copy1.id], new Date(Date.now() + 7 * 24 * 60 * 60 * 1000))
 
@@ -248,7 +248,7 @@ describe('ReturnService.batchReturn', () => {
 
     await service.batchReturn({
       borrowingId: borrow.id,
-      books: [{ borrowDetailId: detail1!.id, condition: 'RUSAK' }],
+      books: [{ borrowDetailId: detail1!.id, condition: 'RUSAK_RINGAN' }],
     })
 
     const updatedCopy = await prisma.bookCopy.findUnique({ where: { id: copy1.id } })
@@ -259,7 +259,7 @@ describe('ReturnService.batchReturn', () => {
     expect(updatedCopy?.condition).toBe('GOOD')
 
     const updatedDetail = await prisma.borrowDetail.findFirst({ where: { bookCopyId: copy1.id } })
-    expect(updatedDetail?.conditionBack).toBe('RUSAK')
+    expect(updatedDetail?.conditionBack).toBe('RUSAK_RINGAN')
   })
 
   it('6. should document behavior when returning an already-returned item', async () => {
@@ -309,20 +309,29 @@ describe('ReturnService.batchReturn', () => {
       })
     ).rejects.toThrow('Beberapa buku tidak ditemukan dalam transaksi ini.')
 
-    // Array books kosong — TIDAK ada validasi eksplisit
-    const emptyResult = await service.batchReturn({
-      borrowingId: borrow.id,
-      books: [],
-    })
-    expect(emptyResult.returnedCount).toBe(0)
+    // Array books kosong — DITOLAK (validasi baru)
+    await expect(
+      service.batchReturn({
+        borrowingId: borrow.id,
+        books: [],
+      })
+    ).rejects.toThrow('Pilih minimal satu buku untuk dikembalikan.')
 
-    // Condition di luar daftar — TIDAK ada validasi, diperlakukan sebagai AVAILABLE
-    const invalidCondResult = await service.batchReturn({
-      borrowingId: borrow.id,
-      books: [{ borrowDetailId: detail1!.id, condition: 'INVALID' as any }],
-    })
+    // Condition di luar daftar — DITOLAK (validasi baru)
+    await expect(
+      service.batchReturn({
+        borrowingId: borrow.id,
+        books: [{ borrowDetailId: detail1!.id, condition: 'INVALID' as any }],
+      })
+    ).rejects.toThrow('Kondisi pengembalian tidak valid.')
+
+    // State database tidak berubah setelah penolakan
+    const updatedBorrowAfterReject = await prisma.borrow.findUnique({ where: { id: borrow.id } })
+    expect(updatedBorrowAfterReject?.returnDate).toBeNull()
+    const updatedDetailAfterReject = await prisma.borrowDetail.findUnique({ where: { id: detail1!.id } })
+    expect(updatedDetailAfterReject?.returnedAt).toBeNull()
     const updatedCopy = await prisma.bookCopy.findUnique({ where: { id: copy1.id } })
-    expect(updatedCopy?.status).toBe('AVAILABLE')
+    expect(updatedCopy?.status).toBe('BORROWED')
   })
 
   it('8. should succeed for overdue return and document that no fine is created', async () => {
@@ -348,5 +357,45 @@ describe('ReturnService.batchReturn', () => {
     const setting = await prisma.setting.findFirst()
     // lateFee default = 1000, tapi tidak ada tabel Fine yang menyimpan denda
     expect(setting).toBeNull() // Setting belum di-create di test ini
+  })
+
+  it('9. should accept condition RUSAK_BERAT: stored in conditionBack, copy stays AVAILABLE', async () => {
+    const { student, copy1 } = await createBaseData()
+    const borrow = await createBorrowWithBooks(student.id, [copy1.id], new Date(Date.now() + 7 * 24 * 60 * 60 * 1000))
+
+    const detail1 = await prisma.borrowDetail.findFirst({ where: { bookCopyId: copy1.id } })
+
+    const result = await service.batchReturn({
+      borrowingId: borrow.id,
+      books: [{ borrowDetailId: detail1!.id, condition: 'RUSAK_BERAT' }],
+    })
+
+    expect(result.returnedCount).toBe(1)
+
+    const updatedDetail = await prisma.borrowDetail.findUnique({ where: { id: detail1!.id } })
+    expect(updatedDetail?.conditionBack).toBe('RUSAK_BERAT')
+    expect(updatedDetail?.returnedAt).not.toBeNull()
+
+    const updatedCopy = await prisma.bookCopy.findUnique({ where: { id: copy1.id } })
+    // SEMENTARA: akan menjadi REMOVED di tahap denda
+    expect(updatedCopy?.status).toBe('AVAILABLE')
+  })
+
+  it('10. should reject legacy condition value RUSAK', async () => {
+    const { student, copy1 } = await createBaseData()
+    const borrow = await createBorrowWithBooks(student.id, [copy1.id], new Date(Date.now() + 7 * 24 * 60 * 60 * 1000))
+
+    const detail1 = await prisma.borrowDetail.findFirst({ where: { bookCopyId: copy1.id } })
+
+    await expect(
+      service.batchReturn({
+        borrowingId: borrow.id,
+        books: [{ borrowDetailId: detail1!.id, condition: 'RUSAK' as any }],
+      })
+    ).rejects.toThrow('Kondisi pengembalian tidak valid.')
+
+    // State tidak berubah
+    const updatedDetail = await prisma.borrowDetail.findUnique({ where: { id: detail1!.id } })
+    expect(updatedDetail?.returnedAt).toBeNull()
   })
 })

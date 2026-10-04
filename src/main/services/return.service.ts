@@ -2,6 +2,7 @@ import { BorrowRepository } from '../repositories/borrow.repository'
 import { BorrowDetailRepository } from '../repositories/borrow-detail.repository'
 import { BookCopyRepository } from '../repositories/book-copy.repository'
 import { BOOK_COPY_STATUS, canTransitionStatus } from '../../shared/config/book-copy-status'
+import { RETURN_CONDITION, isReturnCondition } from '../../shared/config/return-condition'
 import { runTransaction } from '../repositories/base/transaction'
 import { getPrisma } from '../repositories/base/prisma'
 import type {
@@ -161,6 +162,15 @@ export class ReturnService {
    * Throws on any validation failure (no partial writes).
    */
   async batchReturn(input: BatchReturnInput): Promise<BatchReturnResult> {
+    // 0. Validasi input (sebelum transaksi)
+    if (input.books.length === 0) {
+      throw new AppError(400, 'Validation Error', 'Pilih minimal satu buku untuk dikembalikan.')
+    }
+    const invalidCondition = input.books.find((b) => !isReturnCondition(b.condition))
+    if (invalidCondition) {
+      throw new AppError(400, 'Validation Error', 'Kondisi pengembalian tidak valid.')
+    }
+
     return runTransaction(getPrisma(), async (tx) => {
       // 1. Load borrowing with all details + relations
       const borrowing = await tx.borrow.findUnique({
@@ -226,7 +236,7 @@ export class ReturnService {
 
         // Update BookCopy status — IT-1 transition logic
         const targetStatus =
-          condition === 'HILANG' ? BOOK_COPY_STATUS.LOST : BOOK_COPY_STATUS.AVAILABLE
+          condition === RETURN_CONDITION.HILANG ? BOOK_COPY_STATUS.LOST : BOOK_COPY_STATUS.AVAILABLE
 
         const currentCopy = copies.find((c) => c.id === detail.bookCopyId)
         if (currentCopy && canTransitionStatus(currentCopy.status, targetStatus)) {

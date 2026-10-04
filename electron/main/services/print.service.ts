@@ -7,6 +7,7 @@ import { SettingService } from './setting.service'
 import { generateLabelsHtml } from '../../../src/main/services/label.service'
 import { BORROW_CARD_LAYOUT, buildBorrowCardData, generateBorrowCardHtml } from '../../../src/main/services/borrow-card.service'
 import { resolveAssetPath } from '../../../src/main/infrastructure/asset/asset-resolver'
+import { RETURN_CONDITION_LABELS } from '../../../src/shared/config/return-condition'
 import type { BorrowReceiptData, ReturnReceiptData, BookLabelData, PrinterInfoDTO } from '../../../src/shared/dto/print'
 
 // WO-2 — nama file PDF Kartu Peminjaman (FINAL PREVIEW DESIGN DECISION F5).
@@ -341,7 +342,7 @@ export class PrintService {
         barcode: detail.bookCopy?.barcode ?? '',
         inventoryNumber: detail.bookCopy?.inventoryNumber ?? '',
         bookTitle: detail.bookCopy?.book?.title ?? '',
-        condition: detail.conditionBack ?? undefined
+        condition: detail.conditionBack ? (RETURN_CONDITION_LABELS[detail.conditionBack] ?? detail.conditionBack) : undefined
       })),
       totalItems: returnedItems.length
     }
@@ -383,7 +384,7 @@ export class PrintService {
         barcode: detail.bookCopy?.barcode ?? '',
         inventoryNumber: detail.bookCopy?.inventoryNumber ?? '',
         bookTitle: detail.bookCopy?.book?.title ?? '',
-        condition: detail.conditionBack ?? undefined
+        condition: detail.conditionBack ? (RETURN_CONDITION_LABELS[detail.conditionBack] ?? detail.conditionBack) : undefined
       })),
       totalItems: returnedItems.length
     }

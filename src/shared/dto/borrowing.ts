@@ -1,3 +1,5 @@
+import type { ReturnConditionCode } from '../config/return-condition'
+
 export interface BorrowingItemDetailDTO {
   id: string
   bookCopyId: string
@@ -54,7 +56,15 @@ export interface ReturnDTO {
   createdAt: string
 }
 
-export type ReturnCondition = 'BAIK' | 'RUSAK' | 'HILANG'
+/**
+ * Kondisi pengembalian. SSOT nilai ada di `src/shared/config/return-condition.ts`
+ * (BAIK | RUSAK_RINGAN | RUSAK_BERAT | HILANG).
+ *
+ * LEGACY: kolom `BorrowDetail.conditionBack` masih bisa berisi 'RUSAK' (snapshot
+ * pengembalian sebelum migrasi kosakata), sehingga tipe nilai TERSIMPAN/terbaca
+ * tetap string; tipe ini hanya dipakai untuk INPUT yang tervalidasi.
+ */
+export type ReturnCondition = ReturnConditionCode
 
 export interface ReturnBookInput {
   bookCopyId: string
