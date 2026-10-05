@@ -25,6 +25,7 @@ import type { AppDatabaseInfoDTO } from '../shared/dto/app-info'
 import { BARCODE_FORMATS, normalizeBarcodeFormat } from '../shared/config/barcode-format'
 import { validateFineSettings } from '../shared/utils/fine-settings'
 import { formatFileSize } from '../utils/bookImport'
+import RecoveryCodeDisplay from './auth/RecoveryCodeDisplay'
 
 type TabKey = 'identity' | 'data' | 'security' | 'appInfo' | 'about'
 
@@ -72,6 +73,11 @@ export default function SettingsPage() {
   const [resetting, setResetting] = useState(false)
   const [printers, setPrinters] = useState<PrinterInfoDTO[]>([])
   const [printersLoading, setPrintersLoading] = useState(true)
+  const [recoveryOpen, setRecoveryOpen] = useState(false)
+  const [recoveryCurrentPassword, setRecoveryCurrentPassword] = useState('')
+  const [recoveryNewCode, setRecoveryNewCode] = useState<string | null>(null)
+  const [recoveryError, setRecoveryError] = useState<string | null>(null)
+  const [recoveryBusy, setRecoveryBusy] = useState(false)
 
   function loadPrinters() {
     api.settings.listPrinters()
@@ -274,6 +280,50 @@ export default function SettingsPage() {
           {tab === 'about' && renderAbout()}
         </div>
       </div>
+      {recoveryOpen && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-6">
+          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md">
+            {recoveryNewCode ? (
+              <RecoveryCodeDisplay recoveryCode={recoveryNewCode} onContinue={() => setRecoveryOpen(false)} />
+            ) : (
+              <>
+                <h3 className="text-lg font-semibold text-slate-800 mb-2">{LABELS.SETTINGS.SECURITY_RECOVERY}</h3>
+                <p className="text-sm text-slate-500 mb-4">{LABELS.SETTINGS.SECURITY_RECOVERY_DESC}</p>
+                <input
+                  type="password"
+                  value={recoveryCurrentPassword}
+                  onChange={(e) => setRecoveryCurrentPassword(e.target.value)}
+                  placeholder={LABELS.AUTH.CURRENT_PASSWORD}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm mb-3"
+                />
+                {recoveryError && <p className="text-red-500 text-xs mb-3">{recoveryError}</p>}
+                <div className="flex justify-end gap-3">
+                  <button onClick={() => setRecoveryOpen(false)} className="px-4 py-2 text-sm border border-slate-300 rounded-lg">{LABELS.SETTINGS.RESET_CONFIRM_CANCEL}</button>
+                  <button
+                    onClick={async () => {
+                      if (!recoveryCurrentPassword.trim() || recoveryBusy) return
+                      setRecoveryBusy(true)
+                      setRecoveryError(null)
+                      try {
+                        const r = await window.electronAPI.auth.issueRecoveryCode(recoveryCurrentPassword)
+                        setRecoveryNewCode(r.recoveryCode)
+                      } catch (err: unknown) {
+                        setRecoveryError(err instanceof Error ? err.message : LABELS.AUTH.SUBMIT_ERROR_DEFAULT)
+                      } finally {
+                        setRecoveryBusy(false)
+                      }
+                    }}
+                    disabled={recoveryBusy || !recoveryCurrentPassword.trim()}
+                    className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg disabled:opacity-50"
+                  >
+                    {LABELS.SETTINGS.SECURITY_RECOVERY_CREATE}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 
@@ -509,6 +559,13 @@ export default function SettingsPage() {
             desc={LABELS.SETTINGS.SECURITY_PASSWORD_DESC}
             actionLabel={LABELS.SETTINGS.SECURITY_PASSWORD}
             onAction={() => navigate(ROUTES.CHANGE_PASSWORD)}
+          />
+          <ActionCard
+            icon={ShieldCheck}
+            title={LABELS.SETTINGS.SECURITY_RECOVERY}
+            desc={LABELS.SETTINGS.SECURITY_RECOVERY_DESC}
+            actionLabel={LABELS.SETTINGS.SECURITY_RECOVERY}
+            onAction={() => { setRecoveryCurrentPassword(''); setRecoveryNewCode(null); setRecoveryError(null); setRecoveryOpen(true) }}
           />
         </div>
       </Card>

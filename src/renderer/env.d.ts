@@ -28,6 +28,8 @@ interface ElectronAPI {
     login: (input: import('../../src/shared/dto/auth').LoginAdminDTO) => Promise<import('../../src/shared/dto/auth').AuthResultDTO>,
     logout: () => Promise<import('../../src/shared/dto/auth').AuthOkDTO>,
     changePassword: (input: import('../../src/shared/dto/auth').ChangePasswordDTO) => Promise<import('../../src/shared/dto/auth').AuthOkDTO>,
+    issueRecoveryCode: (currentPassword: string) => Promise<{ recoveryCode: string }>,
+    resetWithRecoveryCode: (input: { code: string; newPassword: string }) => Promise<{ recoveryCode: string }>,
   }
   books: {
     findMany: () => Promise<import('../types/dtos/book').BookListItemDTO[]>

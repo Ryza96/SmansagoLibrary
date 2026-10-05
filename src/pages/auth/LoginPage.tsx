@@ -4,6 +4,7 @@ import { LABELS } from '../../utils/labels'
 import { useAuthGate } from '../../auth/AuthGate'
 import { validateLoginForm, type LoginFormErrors } from '../../auth/login-validation'
 import { authErrorMessageOf } from '../../auth/auth-error'
+import ForgotPasswordPage from './ForgotPasswordPage'
 
 export default function LoginPage() {
   const { refreshStatus } = useAuthGate()
@@ -12,6 +13,7 @@ export default function LoginPage() {
   const [errors, setErrors] = useState<LoginFormErrors>({})
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [showForgot, setShowForgot] = useState(false)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -30,6 +32,10 @@ export default function LoginPage() {
       setSubmitError(authErrorMessageOf(err, LABELS.AUTH.SUBMIT_ERROR_DEFAULT))
       setSubmitting(false)
     }
+  }
+
+  if (showForgot) {
+    return <ForgotPasswordPage onBack={() => setShowForgot(false)} />
   }
 
   const inputClass = (hasError: boolean) =>
@@ -112,6 +118,12 @@ export default function LoginPage() {
             {submitting ? LABELS.AUTH.LOGIN_PROCESSING : LABELS.AUTH.LOGIN_BUTTON}
           </button>
         </form>
+
+        <div className="mt-4 text-center">
+          <button type="button" onClick={() => setShowForgot(true)} className="text-sm text-blue-600 underline">
+            {LABELS.AUTH.FORGOT_LINK}
+          </button>
+        </div>
 
         <div className="mt-6 flex items-center justify-center gap-1.5 border-t border-slate-100 pt-4 text-xs text-slate-400">
           <ShieldCheck size={14} />

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { LABELS } from '../../utils/labels'
 import { validateSetupForm, type SetupFormErrors } from '../../auth/setup-validation'
 import { useAuthGate } from '../../auth/AuthGate'
+import RecoveryCodeDisplay from './RecoveryCodeDisplay'
 
 export default function SetupPage() {
   const { refreshStatus } = useAuthGate()
@@ -11,6 +12,7 @@ export default function SetupPage() {
   const [errors, setErrors] = useState<SetupFormErrors>({})
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [recoveryCode, setRecoveryCode] = useState<string | null>(null)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -21,7 +23,12 @@ export default function SetupPage() {
     setSubmitError(null)
     setSubmitting(true)
     try {
-      await window.electronAPI.auth.setup({ username: username.trim(), password })
+      const result = await window.electronAPI.auth.setup({ username: username.trim(), password })
+      if (result?.recoveryCode) {
+        sessionStorage.setItem('recoveryCodePending', '1')
+        setRecoveryCode(result.recoveryCode)
+        return
+      }
       await refreshStatus()
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : LABELS.AUTH.SUBMIT_ERROR_DEFAULT
@@ -34,6 +41,22 @@ export default function SetupPage() {
     `w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
       hasError ? 'border-red-400' : 'border-slate-300'
     }`
+
+  if (recoveryCode) {
+    return (
+      <div className="min-h-screen bg-slate-100 flex items-center justify-center p-6">
+        <div className="w-full max-w-md bg-white rounded-xl shadow-sm border border-slate-200 p-8">
+          <RecoveryCodeDisplay
+            recoveryCode={recoveryCode}
+            onContinue={async () => {
+              sessionStorage.removeItem('recoveryCodePending')
+              await refreshStatus()
+            }}
+          />
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-slate-100 flex items-center justify-center p-6">

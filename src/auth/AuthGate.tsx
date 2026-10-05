@@ -47,10 +47,13 @@ export default function AuthGate() {
 
   useEffect(() => {
     if (!status) return
+    const recoveryPending = sessionStorage.getItem('recoveryCodePending') === '1'
     if (status.needsSetup) {
       if (location.pathname !== '/setup') navigate('/setup', { replace: true })
     } else if (!status.authenticated) {
       if (location.pathname !== '/login') navigate('/login', { replace: true })
+    } else if (recoveryPending && location.pathname === '/setup') {
+      // Tahan di layar setup sampai kode pemulihan dikonfirmasi.
     } else if (location.pathname === '/setup' || location.pathname === '/login') {
       navigate('/', { replace: true })
     }
@@ -78,10 +81,12 @@ export default function AuthGate() {
     )
   }
 
+  const recoveryPending = sessionStorage.getItem('recoveryCodePending') === '1'
   const redirecting =
     (status.needsSetup && location.pathname !== '/setup') ||
     (!status.needsSetup && !status.authenticated && location.pathname !== '/login') ||
     (status.authenticated &&
+      !(recoveryPending && location.pathname === '/setup') &&
       (location.pathname === '/setup' || location.pathname === '/login'))
 
   if (redirecting) {

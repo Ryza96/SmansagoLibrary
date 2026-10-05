@@ -9,6 +9,9 @@ export const authAPI = {
     setup: (input: SetupAdminDTO) => ipcRenderer.invoke('auth:setup', input),
     login: (input: LoginAdminDTO) => ipcRenderer.invoke('auth:login', input),
     logout: () => ipcRenderer.invoke('auth:logout'),
-    changePassword: (input: ChangePasswordDTO) => ipcRenderer.invoke('auth:changePassword', input)
+    changePassword: (input: ChangePasswordDTO) => ipcRenderer.invoke('auth:changePassword', input),
+    issueRecoveryCode: (currentPassword: string) => ipcRenderer.invoke('auth:issueRecoveryCode', currentPassword),
+    resetWithRecoveryCode: (input: { code: string; newPassword: string }) =>
+      ipcRenderer.invoke('auth:resetWithRecoveryCode', input)
   }
 }

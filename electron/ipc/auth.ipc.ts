@@ -12,4 +12,14 @@ export function registerAuthHandlers(service: AuthService): void {
   ipcMain.handle('auth:login', async (_event, input: LoginAdminDTO) => service.login(input))
   ipcMain.handle('auth:logout', async () => service.logout())
   ipcMain.handle('auth:changePassword', async (_event, input: ChangePasswordDTO) => service.changePassword(input))
+  ipcMain.handle('auth:issueRecoveryCode', async (_event, currentPassword: string) => {
+    if (typeof currentPassword !== 'string') throw new Error('Password tidak valid.')
+    return service.issueRecoveryCode(currentPassword)
+  })
+  ipcMain.handle('auth:resetWithRecoveryCode', async (_event, input: { code: string; newPassword: string }) => {
+    if (typeof input?.code !== 'string' || typeof input?.newPassword !== 'string') {
+      throw new Error('Input tidak valid.')
+    }
+    return service.resetPasswordWithRecoveryCode(input)
+  })
 }
