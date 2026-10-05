@@ -2,6 +2,8 @@ import { AdminRepository } from '../repositories/admin.repository'
 import { PasswordHasher } from './password-hasher'
 import { SessionManager, type Session } from './session-manager'
 import { validatePassword } from './password-policy'
+import { RecoveryAttemptLimiter } from './recovery-attempt-limiter'
+import { generateRecoveryCode, normalizeRecoveryCode } from '../../shared/utils/recovery-code'
 import type {
   AuthOkDTO,
   AuthResultDTO,
@@ -18,7 +20,8 @@ export class AuthService {
   constructor(
     private adminRepository: AdminRepository,
     private passwordHasher: PasswordHasher,
-    private sessionManager: SessionManager
+    private sessionManager: SessionManager,
+    private recoveryLimiter: RecoveryAttemptLimiter = new RecoveryAttemptLimiter()
   ) {}
 
   // RFC §4.1 auth:status — needsSetup = tabel Admin kosong; authenticated =
@@ -60,14 +63,18 @@ export class AuthService {
       throw new AppError(400, 'Conflict', policyError)
     }
     const passwordHash = await this.passwordHasher.hash(input.password)
+    const recoveryCode = generateRecoveryCode()
+    const recoveryCodeHash = await this.passwordHasher.hash(normalizeRecoveryCode(recoveryCode))
     const admin = await this.adminRepository.create({
       username,
       passwordHash,
-      passwordChangedAt: new Date()
+      passwordChangedAt: new Date(),
+      recoveryCodeHash,
+      recoveryCodeCreatedAt: new Date()
     })
     await this.sessionManager.open(admin)
     await this.adminRepository.updateLastLogin(admin.id)
-    return { authenticated: true, username: admin.username }
+    return { authenticated: true, username: admin.username, recoveryCode }
   }
 
   // RFC §8 Login — pesan 401 seragam (anti user-enumeration & timing, §11.2).
@@ -119,5 +126,60 @@ export class AuthService {
     const newHash = await this.passwordHasher.hash(input.newPassword)
     await this.adminRepository.updatePassword(admin.id, newHash, new Date())
     return { ok: true }
+  }
+
+  // Issue recovery code baru (menggantikan code lama). Butuh password saat ini.
+  async issueRecoveryCode(currentPassword: string): Promise<{ recoveryCode: string }> {
+    const session = await this.ensureLoadedSession()
+    if (!session) {
+      throw new AppError(401, 'Unauthorized', 'Sesi tidak aktif')
+    }
+    const admin = await this.adminRepository.findById(session.adminId)
+    if (!admin) {
+      throw new AppError(401, 'Unauthorized', 'Sesi tidak aktif')
+    }
+    const valid = await this.passwordHasher.verify(admin.passwordHash, currentPassword)
+    if (!valid) {
+      throw new AppError(400, 'Conflict', 'Password saat ini tidak sesuai')
+    }
+    const code = generateRecoveryCode()
+    const hash = await this.passwordHasher.hash(normalizeRecoveryCode(code))
+    await this.adminRepository.updateRecoveryCode(admin.id, hash, new Date())
+    return { recoveryCode: code }
+  }
+
+  // Reset password memakai recovery code. Code asli TIDAK pernah disimpan/log.
+  async resetPasswordWithRecoveryCode(input: { code: string; newPassword: string }): Promise<{ recoveryCode: string }> {
+    if (this.recoveryLimiter.isLocked()) {
+      throw new AppError(
+        429,
+        'Too Many Requests',
+        `Terlalu banyak percobaan. Coba lagi dalam ${this.recoveryLimiter.remainingLockMinutes()} menit.`
+      )
+    }
+    const normalized = normalizeRecoveryCode(input.code)
+    const admin = await this.adminRepository.findSingle()
+    if (!admin || !admin.recoveryCodeHash) {
+      this.recoveryLimiter.recordFailure()
+      throw new AppError(400, 'Bad Request', 'Kode pemulihan tidak valid.')
+    }
+    const ok = await this.passwordHasher.verify(admin.recoveryCodeHash, normalized)
+    if (!ok) {
+      this.recoveryLimiter.recordFailure()
+      throw new AppError(400, 'Bad Request', 'Kode pemulihan tidak valid.')
+    }
+    const policyError = validatePassword(input.newPassword)
+    if (policyError) {
+      // Code valid, tapi password tidak sesuai kebijakan — JANGAN catat kegagalan limiter.
+      throw new AppError(400, 'Conflict', policyError)
+    }
+    const newHash = await this.passwordHasher.hash(input.newPassword)
+    await this.adminRepository.updatePassword(admin.id, newHash, new Date())
+    await this.sessionManager.revokeAllSessions(admin.id)
+    const newCode = generateRecoveryCode()
+    const newHashCode = await this.passwordHasher.hash(normalizeRecoveryCode(newCode))
+    await this.adminRepository.updateRecoveryCode(admin.id, newHashCode, new Date())
+    this.recoveryLimiter.reset()
+    return { recoveryCode: newCode }
   }
 }

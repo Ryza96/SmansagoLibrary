@@ -85,4 +85,13 @@ export class SessionManager {
   isAuthenticated(): boolean {
     return this.session !== null
   }
+
+  // Cabut SEMUA sesi satu admin (mis. reset password via recovery code).
+  // Mirror in-memory dikosongkan bila session aktif milik admin itu.
+  async revokeAllSessions(adminId: string): Promise<void> {
+    if (this.session && this.session.adminId === adminId) {
+      this.session = null
+    }
+    await this.repo.deleteByAdminId(adminId)
+  }
 }

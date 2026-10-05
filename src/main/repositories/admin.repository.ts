@@ -5,6 +5,8 @@ export interface CreateAdminData {
   username: string
   passwordHash: string
   passwordChangedAt: Date
+  recoveryCodeHash?: string
+  recoveryCodeCreatedAt?: Date
 }
 
 export class AdminRepository extends BaseRepository {
@@ -40,6 +42,10 @@ export class AdminRepository extends BaseRepository {
 
   async updatePassword(id: string, passwordHash: string, passwordChangedAt: Date): Promise<Admin> {
     return this.prisma.admin.update({ where: { id }, data: { passwordHash, passwordChangedAt } })
+  }
+
+  async updateRecoveryCode(id: string, recoveryCodeHash: string, recoveryCodeCreatedAt: Date): Promise<Admin> {
+    return this.prisma.admin.update({ where: { id }, data: { recoveryCodeHash, recoveryCodeCreatedAt } })
   }
 
   async updateLastLogin(id: string): Promise<Admin> {

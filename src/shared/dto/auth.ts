@@ -29,6 +29,7 @@ export interface ChangePasswordDTO {
 export interface AuthResultDTO {
   authenticated: true
   username: string
+  recoveryCode?: string
 }
 
 export interface AuthOkDTO {
