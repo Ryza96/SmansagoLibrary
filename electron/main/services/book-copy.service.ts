@@ -54,8 +54,8 @@ export class BookCopyService {
       throw new AppError(404, 'Not Found', 'Buku tidak ditemukan.')
     }
 
-    if (input.quantity < 1 || input.quantity > 100) {
-      throw new AppError(400, 'Validation Error', 'Jumlah eksemplar harus antara 1 dan 100.')
+    if (input.quantity < 1 || input.quantity > 1000 || !Number.isInteger(input.quantity)) {
+      throw new AppError(400, 'Validation Error', 'Jumlah eksemplar harus bilangan bulat antara 1 dan 1000.')
     }
 
     if (!input.shelfLocation || !input.shelfLocation.trim()) {
@@ -69,13 +69,24 @@ export class BookCopyService {
 
     if (input.acquisitionCost !== undefined && input.acquisitionCost !== null) {
       if (!Number.isInteger(input.acquisitionCost) || input.acquisitionCost < 0) {
-        throw new AppError(400, 'Validation Error', 'Harga perolehan harus berupa bilangan bulat positif.')
+        throw new AppError(400, 'Validation Error', 'Harga perolehan harus berupa bilangan bulat tidak negatif.')
       }
     }
 
     if (input.acquisitionSource !== undefined && input.acquisitionSource !== null) {
       if (!VALID_ACQUISITION_SOURCES.includes(input.acquisitionSource)) {
         throw new AppError(400, 'Validation Error', 'Sumber perolehan tidak valid.')
+      }
+    }
+
+    if (input.acquisitionDate) {
+      const parsed = new Date(input.acquisitionDate)
+      const today = new Date()
+      if (isNaN(parsed.getTime())) {
+        throw new AppError(400, 'Validation Error', 'Tanggal perolehan tidak valid.')
+      }
+      if (parsed.getTime() > today.getTime()) {
+        throw new AppError(400, 'Validation Error', 'Tanggal perolehan tidak boleh di masa depan.')
       }
     }
 

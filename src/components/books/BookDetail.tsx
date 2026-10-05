@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Plus, Trash2, AlertTriangle, Printer } from 'lucide-react'
 import { BookDetailDTO, BookCopyDTO, CreateBookCopiesDTO } from '../../types/dtos/book'
@@ -27,7 +27,8 @@ function conditionLabel(condition: string): string {
 export default function BookDetail({ book, copies, onAddCopies, onDecommissionCopy }: BookDetailProps) {
   const navigate = useNavigate()
   const [showAddDialog, setShowAddDialog] = useState(false)
-  const [quantity, setQuantity] = useState(1)
+  const [quantity, setQuantity] = useState('')
+  const [qtyError, setQtyError] = useState('')
   const [shelfLocation, setShelfLocation] = useState('')
   const [condition, setCondition] = useState('GOOD')
   const [acquisitionDate, setAcquisitionDate] = useState('')
@@ -38,6 +39,7 @@ export default function BookDetail({ book, copies, onAddCopies, onDecommissionCo
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [coverUri, setCoverUri] = useState<string | null>(null)
+  const quantityRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -54,16 +56,72 @@ export default function BookDetail({ book, copies, onAddCopies, onDecommissionCo
     }
   }, [book.id])
 
+  function resetState() {
+    setQuantity('')
+    setQtyError('')
+    setShelfLocation('')
+    setCondition('GOOD')
+    setAcquisitionDate('')
+    setAcquisitionSource('')
+    setAcquisitionSourceDetail('')
+    setAcquisitionCost('')
+    setAcquisitionNotes('')
+    setError('')
+  }
+
+  function openAddDialog() {
+    resetState()
+    setShowAddDialog(true)
+    window.electronAPI.settings
+      .get()
+      .then((s) => {
+        if (s?.defaultShelfLocation) setShelfLocation(s.defaultShelfLocation)
+      })
+      .catch(() => {})
+    setTimeout(() => quantityRef.current?.focus(), 0)
+  }
+
+  useEffect(() => {
+    if (!showAddDialog) return
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        e.stopPropagation()
+        setShowAddDialog(false)
+        resetState()
+      }
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [showAddDialog])
+
+  function handleCostChange(value: string) {
+    const digits = value.replace(/\D/g, '')
+    setAcquisitionCost(digits)
+  }
+
+  function formatThousands(digits: string): string {
+    return digits.replace(/\B(?=(\d{3})+(?!\d))/g, '.')
+  }
+
   async function handleAdd() {
+    setQtyError('')
+    if (!/^\d+$/.test(quantity.trim()) || Number(quantity) < 1 || Number(quantity) > 1000) {
+      setQtyError('Isi jumlah eksemplar (1 sampai 1000).')
+      return
+    }
     if (!shelfLocation.trim()) {
       setError('Lokasi rak wajib diisi.')
+      return
+    }
+    if (acquisitionDate && acquisitionDate > todayISO()) {
+      setError('Tanggal perolehan tidak boleh di masa depan.')
       return
     }
     setError('')
     setSubmitting(true)
     try {
       await onAddCopies({
-        quantity,
+        quantity: Number(quantity),
         shelfLocation: shelfLocation.trim(),
         condition,
         acquisitionDate: acquisitionDate || undefined,
@@ -74,17 +132,17 @@ export default function BookDetail({ book, copies, onAddCopies, onDecommissionCo
         acquisitionNotes: acquisitionNotes.trim() || undefined
       })
       setShowAddDialog(false)
-      setQuantity(1)
-      setShelfLocation('')
-      setCondition('GOOD')
-      setAcquisitionDate('')
-      setAcquisitionSource('')
-      setAcquisitionSourceDetail('')
-      setAcquisitionCost('')
-      setAcquisitionNotes('')
+      resetState()
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Gagal menambah eksemplar.')
     } finally {
       setSubmitting(false)
     }
+  }
+
+  function todayISO(): string {
+    const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
   }
 
   async function handleDecommission(copy: BookCopyDTO) {
@@ -188,7 +246,7 @@ export default function BookDetail({ book, copies, onAddCopies, onDecommissionCo
             {LABELS.COPY.PRINT_LABELS}
           </button>
           <button
-            onClick={() => setShowAddDialog(true)}
+            onClick={openAddDialog}
             className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
           >
             <Plus size={16} />
@@ -242,40 +300,46 @@ export default function BookDetail({ book, copies, onAddCopies, onDecommissionCo
 
       {showAddDialog && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md">
+          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-xl max-h-[90vh] flex flex-col">
             <h3 className="text-lg font-semibold text-slate-800 mb-4">{LABELS.COPY.ADD_TITLE}</h3>
-            <div className="space-y-4">
+            <div className="space-y-4 overflow-y-auto flex-1 min-h-0 pr-1">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">
+                <label htmlFor="add-copies-quantity" className="block text-sm font-medium text-slate-700 mb-1">
                   {LABELS.COPY.QUANTITY} <span className="text-red-500">*</span>
                 </label>
                 <input
+                  ref={quantityRef}
+                  id="add-copies-quantity"
                   type="number"
                   value={quantity}
-                  onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                  onChange={(e) => { setQuantity(e.target.value); setQtyError('') }}
+                  placeholder="0"
                   min={1}
-                  max={100}
+                  max={1000}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
+                <p className="text-xs text-slate-400 mt-1">Maksimal 1000 sekali tambah</p>
+                {qtyError && <p role="alert" className="text-red-500 text-xs mt-1">{qtyError}</p>}
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">
+                <label htmlFor="add-copies-shelf" className="block text-sm font-medium text-slate-700 mb-1">
                   {LABELS.COPY.SHELF_LOCATION} <span className="text-red-500">*</span>
                 </label>
                 <input
+                  id="add-copies-shelf"
                   type="text"
                   value={shelfLocation}
                   onChange={(e) => setShelfLocation(e.target.value)}
                   placeholder="Contoh: Rak A - 01"
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
-                {error && <p className="text-red-500 text-xs mt-1">{error}</p>}
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">
+                <label htmlFor="add-copies-condition" className="block text-sm font-medium text-slate-700 mb-1">
                   {LABELS.COPY.CONDITION_INITIAL}
                 </label>
                 <select
+                  id="add-copies-condition"
                   value={condition}
                   onChange={(e) => setCondition(e.target.value)}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -291,21 +355,24 @@ export default function BookDetail({ book, copies, onAddCopies, onDecommissionCo
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">
+                      <label htmlFor="add-copies-acq-date" className="block text-sm font-medium text-slate-700 mb-1">
                         {LABELS.FIELD.ACQUISITION_DATE}
                       </label>
                       <input
+                        id="add-copies-acq-date"
                         type="date"
                         value={acquisitionDate}
+                        max={todayISO()}
                         onChange={(e) => setAcquisitionDate(e.target.value)}
                         className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">
+                      <label htmlFor="add-copies-acq-source" className="block text-sm font-medium text-slate-700 mb-1">
                         {LABELS.FIELD.ACQUISITION_SOURCE}
                       </label>
                       <select
+                        id="add-copies-acq-source"
                         value={acquisitionSource}
                         onChange={(e) => setAcquisitionSource(e.target.value)}
                         className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
@@ -321,10 +388,11 @@ export default function BookDetail({ book, copies, onAddCopies, onDecommissionCo
                   </div>
                   {acquisitionSource === 'LAINNYA' && (
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">
+                      <label htmlFor="add-copies-acq-source-detail" className="block text-sm font-medium text-slate-700 mb-1">
                         {LABELS.FIELD.ACQUISITION_SOURCE_DETAIL}
                       </label>
                       <input
+                        id="add-copies-acq-source-detail"
                         type="text"
                         value={acquisitionSourceDetail}
                         onChange={(e) => setAcquisitionSourceDetail(e.target.value)}
@@ -334,25 +402,27 @@ export default function BookDetail({ book, copies, onAddCopies, onDecommissionCo
                     </div>
                   )}
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                    <label htmlFor="add-copies-acq-cost" className="block text-sm font-medium text-slate-700 mb-1">
                       {LABELS.FIELD.ACQUISITION_COST}
                     </label>
                     <div className="relative">
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">Rp</span>
                       <input
-                        type="number"
-                        min={0}
-                        value={acquisitionCost}
-                        onChange={(e) => setAcquisitionCost(e.target.value)}
+                        id="add-copies-acq-cost"
+                        type="text"
+                        inputMode="numeric"
+                        value={formatThousands(acquisitionCost)}
+                        onChange={(e) => handleCostChange(e.target.value)}
                         className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
                     </div>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                    <label htmlFor="add-copies-acq-notes" className="block text-sm font-medium text-slate-700 mb-1">
                       {LABELS.FIELD.ACQUISITION_NOTES}
                     </label>
                     <textarea
+                      id="add-copies-acq-notes"
                       rows={2}
                       value={acquisitionNotes}
                       onChange={(e) => setAcquisitionNotes(e.target.value)}
@@ -367,9 +437,13 @@ export default function BookDetail({ book, copies, onAddCopies, onDecommissionCo
                 <p className="text-xs text-slate-400">{LABELS.COPY.INV_AUTO}</p>
               </div>
             </div>
+            {error && (
+              <p role="alert" className="mt-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>
+            )}
             <div className="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-slate-200">
               <button
-                onClick={() => { setShowAddDialog(false); setError(''); }}
+                type="button"
+                onClick={() => { setShowAddDialog(false); resetState() }}
                 className="px-4 py-2 border border-slate-300 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors"
               >
                 {LABELS.BOOK.CANCEL}
