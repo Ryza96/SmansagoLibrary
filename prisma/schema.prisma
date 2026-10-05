@@ -362,6 +362,7 @@ model Setting {
   defaultBorrowDays    Int      @default(7)
   maxBorrowBooks       Int      @default(5)
   lateFee              Int      @default(1000)
+  defaultBookValue     Int      @default(25000)
   allowRenewal         Boolean  @default(true)
   // Inventory
   inventoryPrefix      String   @default("INV")

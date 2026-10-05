@@ -139,7 +139,7 @@ export class SettingService {
     const allowedFields = [
       'libraryName', 'schoolName', 'address', 'phone', 'email', 'website', 'logoPath',
       'principalName', 'principalNip', 'librarianName', 'librarianNip',
-      'defaultBorrowDays', 'maxBorrowBooks', 'lateFee', 'allowRenewal',
+      'defaultBorrowDays', 'maxBorrowBooks', 'lateFee', 'allowRenewal', 'defaultBookValue',
       'inventoryPrefix', 'defaultShelfLocation', 'barcodeFormat',
       'reportPaperSize', 'reportDateFormat', 'reportSigner',
       'borrowCardPrinter'

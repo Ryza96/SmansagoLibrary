@@ -300,6 +300,7 @@ interface ElectronAPI {
       defaultBorrowDays: number
       maxBorrowBooks: number
       lateFee: number
+      defaultBookValue: number
       allowRenewal: boolean
       inventoryPrefix: string
       defaultShelfLocation: string
@@ -327,6 +328,7 @@ interface ElectronAPI {
       defaultBorrowDays: number
       maxBorrowBooks: number
       lateFee: number
+      defaultBookValue: number
       allowRenewal: boolean
       inventoryPrefix: string
       defaultShelfLocation: string

@@ -23,6 +23,7 @@ import { useNotification } from '../notification/NotificationContext'
 import type { PrinterInfoDTO } from '../shared/dto/print'
 import type { AppDatabaseInfoDTO } from '../shared/dto/app-info'
 import { BARCODE_FORMATS, normalizeBarcodeFormat } from '../shared/config/barcode-format'
+import { validateFineSettings } from '../shared/utils/fine-settings'
 import { formatFileSize } from '../utils/bookImport'
 
 type TabKey = 'identity' | 'data' | 'security' | 'appInfo' | 'about'
@@ -34,6 +35,8 @@ interface IdentityForm {
   borrowCardPrinter: string
   barcodeFormat: string
   inventoryPrefix: string
+  lateFee: string
+  defaultBookValue: string
 }
 
 interface LogoPreview {
@@ -59,6 +62,7 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [fineErrors, setFineErrors] = useState<{ lateFee?: string; defaultBookValue?: string }>({})
   const [tab, setTab] = useState<TabKey>('identity')
   const [appInfo, setAppInfo] = useState<{ version: string; name: string } | null>(null)
   const [dbInfo, setDbInfo] = useState<AppDatabaseInfoDTO | null>(null)
@@ -88,6 +92,8 @@ export default function SettingsPage() {
           borrowCardPrinter: data.borrowCardPrinter ?? '',
           barcodeFormat: normalizeBarcodeFormat(data.barcodeFormat),
           inventoryPrefix: data.inventoryPrefix ?? 'INV',
+          lateFee: String(data.lateFee ?? 1000),
+          defaultBookValue: String((data as any).defaultBookValue ?? 25000),
         })
       })
       .catch((err: unknown) => {
@@ -134,10 +140,24 @@ export default function SettingsPage() {
       return
     }
 
+    const lateFeeNum = Number(form.lateFee)
+    const defaultBookValueNum = Number(form.defaultBookValue)
+    const fineValidation = validateFineSettings({ lateFee: lateFeeNum, defaultBookValue: defaultBookValueNum })
+    setFineErrors(fineValidation.errors)
+    if (!fineValidation.ok) {
+      notify.error(LABELS.SETTINGS.FINE_VALIDATION_GENERIC)
+      return
+    }
+
     setSaving(true)
     setError(null)
     try {
-      const payload: Record<string, unknown> = { ...form, inventoryPrefix: inventoryPrefixRaw }
+      const payload: Record<string, unknown> = {
+        ...form,
+        inventoryPrefix: inventoryPrefixRaw,
+        lateFee: lateFeeNum,
+        defaultBookValue: defaultBookValueNum,
+      }
       if (logoPreview?.filePath) {
         payload.logoUpload = logoPreview.filePath
       }
@@ -149,6 +169,8 @@ export default function SettingsPage() {
         borrowCardPrinter: result.borrowCardPrinter ?? '',
         barcodeFormat: normalizeBarcodeFormat(result.barcodeFormat),
         inventoryPrefix: result.inventoryPrefix ?? 'INV',
+        lateFee: String(result.lateFee ?? lateFeeNum),
+        defaultBookValue: String((result as any).defaultBookValue ?? defaultBookValueNum),
       })
       setLogoPreview(null)
       notify.success(LABELS.SETTINGS.SAVED)
@@ -398,6 +420,30 @@ export default function SettingsPage() {
               </div>
             </Field>
           </div>
+          <Field label={LABELS.SETTINGS.FIELD_LATE_FEE}>
+            <p className="text-xs text-slate-400 mb-1">{LABELS.SETTINGS.FINE_HINT}</p>
+            <input
+              type="number"
+              min={0}
+              max={1000000}
+              value={f.lateFee}
+              onChange={(e) => set('lateFee', e.target.value)}
+              className="w-full max-w-[220px] px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            {fineErrors.lateFee && <p role="alert" className="text-red-500 text-xs mt-1">{fineErrors.lateFee}</p>}
+          </Field>
+          <Field label={LABELS.SETTINGS.FIELD_DEFAULT_BOOK_VALUE}>
+            <p className="text-xs text-slate-400 mb-1">{LABELS.SETTINGS.FINE_HINT}</p>
+            <input
+              type="number"
+              min={1}
+              max={100000000}
+              value={f.defaultBookValue}
+              onChange={(e) => set('defaultBookValue', e.target.value)}
+              className="w-full max-w-[220px] px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            {fineErrors.defaultBookValue && <p role="alert" className="text-red-500 text-xs mt-1">{fineErrors.defaultBookValue}</p>}
+          </Field>
         </div>
         <div className="flex items-center gap-3 mt-6 pt-5 border-t border-slate-100">
           <button

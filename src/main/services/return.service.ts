@@ -14,10 +14,9 @@ import type {
   ReturnBookInput
 } from '../../shared/dto/borrowing'
 import { AppError } from '../../../electron/main/errorHandler'
-import { FINE_STATUS, FINE_TYPE, DEFAULT_LATE_FEE_PER_DAY } from '../../shared/config/fine'
+import { FINE_STATUS, FINE_TYPE, DEFAULT_LATE_FEE_PER_DAY, DEFAULT_BOOK_VALUE } from '../../shared/config/fine'
 import {
   calculateLateFine,
-  resolveBookValue,
   lateFineDedupeKey,
   detailFineDedupeKey
 } from './fine-calculator'
@@ -228,6 +227,10 @@ export class ReturnService {
         )
       }
 
+      const setting = await tx.setting.findFirst()
+      const ratePerDay = setting?.lateFee ?? DEFAULT_LATE_FEE_PER_DAY
+      const defaultBookValue = setting?.defaultBookValue ?? DEFAULT_BOOK_VALUE
+
       const now = new Date()
       const conditionMap = new Map(input.books.map((b) => [b.borrowDetailId, b.condition]))
       const finesCreated: Array<{ type: string; amount: number }> = []
@@ -260,7 +263,10 @@ export class ReturnService {
 
         // Denda per-buku (HEAVY_DAMAGE / LOST) — masing-masing memakai dedupeKey-nya sendiri
         if (condition === RETURN_CONDITION.RUSAK_BERAT || condition === RETURN_CONDITION.HILANG) {
-          const amount = resolveBookValue(currentCopy?.acquisitionCost)
+          const amount =
+            currentCopy?.acquisitionCost && currentCopy.acquisitionCost > 0
+              ? currentCopy.acquisitionCost
+              : defaultBookValue
           const type = condition === RETURN_CONDITION.RUSAK_BERAT ? FINE_TYPE.HEAVY_DAMAGE : FINE_TYPE.LOST
           await tx.fine.create({
             data: {
@@ -288,10 +294,8 @@ export class ReturnService {
         })
 
         // Denda LATE — SATU per transaksi, dibuat hanya saat pengembalian terakhir
-        const setting = await tx.setting.findFirst()
-        const ratePerDay = setting?.lateFee ?? DEFAULT_LATE_FEE_PER_DAY
         const late = calculateLateFine({ dueDate: borrowing.dueDate, returnedAt: now, ratePerDay })
-        if (late) {
+        if (late && ratePerDay > 0) {
           await tx.fine.create({
             data: {
               borrowId: input.borrowingId,
