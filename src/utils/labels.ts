@@ -926,6 +926,11 @@ export const LABELS = {
     RETRY: 'Coba Lagi',
     SUBMIT_ERROR_DEFAULT: 'Terjadi kesalahan. Coba lagi.',
   },
+  RETURN_FINES_BOX: {
+    TITLE: 'Denda dari pengembalian ini',
+    TOTAL: 'Total denda yang harus dibayar',
+    VIEW_FINES: 'Lihat halaman Denda',
+  },
   FINES: {
     TITLE: 'Denda',
     TOTAL_UNPAID: 'Total belum dibayar',

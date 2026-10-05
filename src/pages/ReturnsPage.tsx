@@ -2,7 +2,10 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Undo2, Search, BookOpen, User, ChevronRight, CheckCircle, Printer } from 'lucide-react'
 import { useNotification } from '../notification/NotificationContext'
-import { receiptPreviewPath, returnReceiptPreviewPath } from '../utils/navigation'
+import { receiptPreviewPath, returnReceiptPreviewPath, ROUTES } from '../utils/navigation'
+import { summarizeReturnFines } from '../shared/utils/return-fines-summary'
+import { formatRupiah } from '../shared/utils/format-rupiah'
+import { LABELS } from '../utils/labels'
 import type { BorrowingDTO, ReturnCondition } from '../types/dtos/borrowing'
 import { RETURN_CONDITION, RETURN_CONDITION_VALUES, RETURN_CONDITION_LABELS } from '../shared/config/return-condition'
 type EntryMode = 'barcode' | 'borrowNumber'
@@ -15,6 +18,7 @@ interface ReturnResult {
   memberName: string
   returnedBookIds: string[]
   returnedBooks: { bookTitle: string; inventoryNumber: string; condition: string }[]
+  fines?: Array<{ type: string; amount: number }>
 }
 
 function formatLocalDate(iso: string): string {
@@ -211,7 +215,8 @@ export default function ReturnsPage() {
           bookTitle: b.bookTitle,
           inventoryNumber: b.inventoryNumber,
           condition: b.condition
-        }))
+        })),
+        fines: result.fines
       })
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Gagal mengembalikan buku.'
@@ -548,6 +553,34 @@ export default function ReturnsPage() {
                 ))}
               </div>
             </div>
+
+            {/* Fines summary for this return */}
+            {(() => {
+              const summary = summarizeReturnFines(returnResult.fines)
+              if (summary.items.length === 0) return null
+              return (
+                <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                  <h3 className="text-sm font-semibold text-amber-800 mb-2">{LABELS.RETURN_FINES_BOX.TITLE}</h3>
+                  <div className="space-y-1">
+                    {summary.items.map((item, i) => (
+                      <div key={i} className="flex justify-between text-sm text-amber-900">
+                        <span>{item.label}</span>
+                        <span>{formatRupiah(item.amount)}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-2 pt-2 border-t border-amber-200 text-sm font-bold text-amber-900">
+                    {LABELS.RETURN_FINES_BOX.TOTAL}: {formatRupiah(summary.total)}
+                  </div>
+                  <button
+                    onClick={() => navigate(ROUTES.FINES)}
+                    className="mt-3 px-4 py-2 text-sm text-amber-800 border border-amber-300 rounded-lg hover:bg-amber-100 transition-colors"
+                  >
+                    {LABELS.RETURN_FINES_BOX.VIEW_FINES}
+                  </button>
+                </div>
+              )
+            })()}
 
             {/* Action buttons */}
             <div className="flex flex-wrap gap-3">
