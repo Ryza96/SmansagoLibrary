@@ -19,3 +19,15 @@ export type FineStatusCode = (typeof FINE_STATUS)[keyof typeof FINE_STATUS]
 
 export const DEFAULT_LATE_FEE_PER_DAY = 1000
 export const DEFAULT_BOOK_VALUE = 25000
+
+export const FINE_TYPE_LABELS: Record<string, string> = {
+  LATE: 'Terlambat',
+  HEAVY_DAMAGE: 'Rusak Berat',
+  LOST: 'Hilang'
+}
+
+export const FINE_STATUS_LABELS: Record<string, string> = {
+  UNPAID: 'Belum dibayar',
+  PAID: 'Lunas',
+  WAIVED: 'Dibebaskan'
+}

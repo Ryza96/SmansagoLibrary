@@ -24,6 +24,15 @@ export interface ReturnReceiptData {
   returnDate: string
   items: ReceiptItemData[]
   totalItems: number
+  fines?: Array<{
+    type: string
+    label: string
+    amount: number
+    status: string
+    lateDays?: number
+    ratePerDay?: number
+  }>
+  totalUnpaid?: number
 }
 
 export interface BookLabelItemData {

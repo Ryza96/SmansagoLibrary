@@ -3,6 +3,8 @@ import { readFile, writeFile, unlink } from 'fs/promises'
 import { join } from 'path'
 import { AppError } from '../errorHandler'
 import { BorrowRepository } from '../../../src/main/repositories/borrow.repository'
+import { FineRepository } from '../../../src/main/repositories/fine.repository'
+import { summarizeReceiptFines } from '../../../src/shared/utils/receipt-fines'
 import { SettingService } from './setting.service'
 import { generateLabelsHtml } from '../../../src/main/services/label.service'
 import { BORROW_CARD_LAYOUT, buildBorrowCardData, generateBorrowCardHtml } from '../../../src/main/services/borrow-card.service'
@@ -80,7 +82,8 @@ export class PrintService {
   constructor(
     private borrowRepository: BorrowRepository,
     private settingService: SettingService,
-    private assetRoot: string = ''
+    private assetRoot: string = '',
+    private fineRepository: FineRepository = new FineRepository()
   ) {}
 
   // Electron's webContents.print() fires callback with success=false when the
@@ -388,6 +391,11 @@ export class PrintService {
       })),
       totalItems: returnedItems.length
     }
+
+    const fines = await this.fineRepository.findByBorrowId(borrowingId)
+    const summary = summarizeReceiptFines(fines, idSet ?? undefined)
+    data.fines = summary.items
+    data.totalUnpaid = summary.totalUnpaid
 
     return this.generateReceiptHtml(data, 'PENGEMBALIAN')
   }
