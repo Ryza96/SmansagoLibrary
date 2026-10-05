@@ -109,6 +109,8 @@ export interface BatchReturnResult {
   borrowing: BorrowingDTO
   returnedCount: number
   stillBorrowedCount: number
+  /** Denda yang dibuat pada panggilan ini (untuk ditampilkan UI nanti) */
+  fines?: Array<{ type: string; amount: number }>
   /** Books returned in THIS batch — for event-scoped receipt rendering */
   returnedBooks: Array<{
     borrowDetailId: string

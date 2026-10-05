@@ -8,6 +8,7 @@ import { BookCopyRepository } from '../src/main/repositories/book-copy.repositor
 const prisma = getPrisma()
 
 async function cleanup() {
+  await prisma.fine.deleteMany()
   await prisma.borrowDetail.deleteMany()
   await prisma.borrow.deleteMany()
   await prisma.memberEnrollment.deleteMany()
@@ -352,11 +353,15 @@ describe('ReturnService.batchReturn', () => {
     const updatedBorrow = await prisma.borrow.findUnique({ where: { id: borrow.id } })
     expect(updatedBorrow?.returnDate).not.toBeNull()
 
-    // Dokumentasi: saat ini TIDAK ada denda yang dibuat
-    // Setting.lateFee ada di schema tapi tidak dikonsumsi oleh return flow
+    // 5 hari terlambat dengan tarif default 1000 → satu Fine LATE 5000
     const setting = await prisma.setting.findFirst()
-    // lateFee default = 1000, tapi tidak ada tabel Fine yang menyimpan denda
-    expect(setting).toBeNull() // Setting belum di-create di test ini
+    expect(setting).toBeNull() // tarif default 1000 dipakai
+    const fines = await prisma.fine.findMany({ where: { borrowId: borrow.id } })
+    expect(fines.length).toBe(1)
+    expect(fines[0].type).toBe('LATE')
+    expect(fines[0].amount).toBe(5000)
+    expect(fines[0].lateDays).toBe(5)
+    expect(fines[0].ratePerDay).toBe(1000)
   })
 
   it('9. should accept condition RUSAK_BERAT: stored in conditionBack, copy stays AVAILABLE', async () => {
@@ -377,8 +382,11 @@ describe('ReturnService.batchReturn', () => {
     expect(updatedDetail?.returnedAt).not.toBeNull()
 
     const updatedCopy = await prisma.bookCopy.findUnique({ where: { id: copy1.id } })
-    // SEMENTARA: akan menjadi REMOVED di tahap denda
-    expect(updatedCopy?.status).toBe('AVAILABLE')
+    expect(updatedCopy?.status).toBe('REMOVED')
+
+    const fines = await prisma.fine.findMany({ where: { borrowId: borrow.id } })
+    expect(fines.length).toBe(1)
+    expect(fines[0].type).toBe('HEAVY_DAMAGE')
   })
 
   it('10. should reject legacy condition value RUSAK', async () => {

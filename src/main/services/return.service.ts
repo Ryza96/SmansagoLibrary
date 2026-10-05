@@ -14,6 +14,13 @@ import type {
   ReturnBookInput
 } from '../../shared/dto/borrowing'
 import { AppError } from '../../../electron/main/errorHandler'
+import { FINE_STATUS, FINE_TYPE, DEFAULT_LATE_FEE_PER_DAY } from '../../shared/config/fine'
+import {
+  calculateLateFine,
+  resolveBookValue,
+  lateFineDedupeKey,
+  detailFineDedupeKey
+} from './fine-calculator'
 
 function toItemDTO(item: {
   id: string
@@ -223,6 +230,7 @@ export class ReturnService {
 
       const now = new Date()
       const conditionMap = new Map(input.books.map((b) => [b.borrowDetailId, b.condition]))
+      const finesCreated: Array<{ type: string; amount: number }> = []
 
       // 5. Process each book (within same tx)
       for (const detail of matchingDetails) {
@@ -236,7 +244,11 @@ export class ReturnService {
 
         // Update BookCopy status — IT-1 transition logic
         const targetStatus =
-          condition === RETURN_CONDITION.HILANG ? BOOK_COPY_STATUS.LOST : BOOK_COPY_STATUS.AVAILABLE
+          condition === RETURN_CONDITION.HILANG
+            ? BOOK_COPY_STATUS.LOST
+            : condition === RETURN_CONDITION.RUSAK_BERAT
+              ? BOOK_COPY_STATUS.REMOVED
+              : BOOK_COPY_STATUS.AVAILABLE
 
         const currentCopy = copies.find((c) => c.id === detail.bookCopyId)
         if (currentCopy && canTransitionStatus(currentCopy.status, targetStatus)) {
@@ -244,6 +256,23 @@ export class ReturnService {
             where: { id: detail.bookCopyId, status: currentCopy.status },
             data: { status: targetStatus }
           })
+        }
+
+        // Denda per-buku (HEAVY_DAMAGE / LOST) — masing-masing memakai dedupeKey-nya sendiri
+        if (condition === RETURN_CONDITION.RUSAK_BERAT || condition === RETURN_CONDITION.HILANG) {
+          const amount = resolveBookValue(currentCopy?.acquisitionCost)
+          const type = condition === RETURN_CONDITION.RUSAK_BERAT ? FINE_TYPE.HEAVY_DAMAGE : FINE_TYPE.LOST
+          await tx.fine.create({
+            data: {
+              borrowId: input.borrowingId,
+              borrowDetailId: detail.id,
+              type,
+              amount,
+              status: FINE_STATUS.UNPAID,
+              dedupeKey: detailFineDedupeKey(detail.id)
+            }
+          })
+          finesCreated.push({ type, amount })
         }
       }
 
@@ -257,6 +286,25 @@ export class ReturnService {
           where: { id: input.borrowingId },
           data: { returnDate: now }
         })
+
+        // Denda LATE — SATU per transaksi, dibuat hanya saat pengembalian terakhir
+        const setting = await tx.setting.findFirst()
+        const ratePerDay = setting?.lateFee ?? DEFAULT_LATE_FEE_PER_DAY
+        const late = calculateLateFine({ dueDate: borrowing.dueDate, returnedAt: now, ratePerDay })
+        if (late) {
+          await tx.fine.create({
+            data: {
+              borrowId: input.borrowingId,
+              type: FINE_TYPE.LATE,
+              amount: late.amount,
+              lateDays: late.lateDays,
+              ratePerDay,
+              status: FINE_STATUS.UNPAID,
+              dedupeKey: lateFineDedupeKey(input.borrowingId)
+            }
+          })
+          finesCreated.push({ type: FINE_TYPE.LATE, amount: late.amount })
+        }
       }
 
       // 7. Re-fetch full borrowing for receipt (post-return state)
@@ -278,6 +326,7 @@ export class ReturnService {
         borrowing: toDTO(updatedBorrowing!),
         returnedCount: matchingDetails.length,
         stillBorrowedCount: allDetails.filter((d) => d.returnedAt === null).length,
+        fines: finesCreated,
         returnedBooks: input.books.map((b) => {
           const detail = matchingDetails.find((d) => d.id === b.borrowDetailId)!
           return {
