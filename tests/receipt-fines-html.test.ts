@@ -45,6 +45,39 @@ describe('renderFinesBlockHtml', () => {
     expect(html).toContain('&lt;script&gt;')
   })
 
+  it('PENGEMBALIAN dengan borrowDate valid memuat tanggal & tanpa Invalid Date', async () => {
+    const { PrintService } = await import('../electron/main/services/print.service')
+    const svc = new PrintService(null as any, null as any, '')
+    const html = (svc as any).generateReceiptHtml(
+      { libraryName: 'P', borrowingNumber: 'PJ/1', memberName: 'M', memberNumber: 'S', returnDate: new Date('2026-10-01').toISOString(), borrowDate: new Date('2026-09-25').toISOString(), items: [], totalItems: 0 },
+      'PENGEMBALIAN'
+    )
+    expect(html).toContain(new Date('2026-09-25').toLocaleDateString('id-ID'))
+    expect(html).not.toContain('Invalid Date')
+  })
+
+  it('PENGEMBALIAN tanpa borrowDate memuat "-" & tanpa Invalid Date', async () => {
+    const { PrintService } = await import('../electron/main/services/print.service')
+    const svc = new PrintService(null as any, null as any, '')
+    const html = (svc as any).generateReceiptHtml(
+      { libraryName: 'P', borrowingNumber: 'PJ/1', memberName: 'M', memberNumber: 'S', returnDate: new Date('2026-10-01').toISOString(), items: [], totalItems: 0 },
+      'PENGEMBALIAN'
+    )
+    expect(html).toContain('-')
+    expect(html).not.toContain('Invalid Date')
+  })
+
+  it('PEMINJAMAN tidak berubah perilaku Tanggal Pinjam', async () => {
+    const { PrintService } = await import('../electron/main/services/print.service')
+    const svc = new PrintService(null as any, null as any, '')
+    const html = (svc as any).generateReceiptHtml(
+      { libraryName: 'P', borrowingNumber: 'PJ/1', memberName: 'M', memberNumber: 'S', borrowDate: new Date('2026-09-25').toISOString(), dueDate: new Date('2026-10-02').toISOString(), items: [], totalItems: 0 },
+      'PEMINJAMAN'
+    )
+    expect(html).toContain(new Date('2026-09-25').toLocaleDateString('id-ID'))
+    expect(html).not.toContain('Invalid Date')
+  })
+
   it('PENGEMBALIAN memuat blok denda, PEMINJAMAN tidak', async () => {
     const { PrintService } = await import('../electron/main/services/print.service')
     const svc = new PrintService(null as any, null as any, '')

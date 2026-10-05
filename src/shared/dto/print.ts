@@ -22,6 +22,7 @@ export interface ReturnReceiptData {
   memberName: string
   memberNumber: string
   returnDate: string
+  borrowDate?: string
   items: ReceiptItemData[]
   totalItems: number
   fines?: Array<{

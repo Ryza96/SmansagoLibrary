@@ -342,6 +342,7 @@ export class PrintService {
       memberName: borrowing.member?.fullName ?? borrowing.memberName ?? '',
       memberNumber: borrowing.member?.memberNumber ?? borrowing.memberNumber ?? '',
       returnDate: new Date().toISOString(),
+      borrowDate: borrowing.borrowDate ? borrowing.borrowDate.toISOString() : undefined,
       items: returnedItems.map((detail: any) => ({
         barcode: detail.bookCopy?.barcode ?? '',
         inventoryNumber: detail.bookCopy?.inventoryNumber ?? '',
@@ -384,6 +385,7 @@ export class PrintService {
       returnDate: returnedItems.length > 0 && returnedItems[0].returnedAt
         ? returnedItems[0].returnedAt.toISOString()
         : new Date().toISOString(),
+      borrowDate: borrowing.borrowDate ? borrowing.borrowDate.toISOString() : undefined,
       items: returnedItems.map((detail: any) => ({
         barcode: detail.bookCopy?.barcode ?? '',
         inventoryNumber: detail.bookCopy?.inventoryNumber ?? '',
@@ -432,9 +434,9 @@ export class PrintService {
         <tr><td style="padding:2px 0;color:#6b7280">No. Peminjaman</td><td style="padding:2px 0">: ${data.borrowingNumber}</td></tr>
         <tr><td style="padding:2px 0;color:#6b7280">Nama Anggota</td><td style="padding:2px 0">: ${data.memberName}</td></tr>
         <tr><td style="padding:2px 0;color:#6b7280">No. Anggota</td><td style="padding:2px 0">: ${data.memberNumber}</td></tr>
-        <tr><td style="padding:2px 0;color:#6b7280">Tanggal Pinjam</td><td style="padding:2px 0">: ${new Date(data.borrowDate).toLocaleDateString('id-ID')}</td></tr>
-        ${data.dueDate ? `<tr><td style="padding:2px 0;color:#6b7280">Tenggat Waktu</td><td style="padding:2px 0">: ${new Date(data.dueDate).toLocaleDateString('id-ID')}</td></tr>` : ''}
-        ${data.returnDate ? `<tr><td style="padding:2px 0;color:#6b7280">Tanggal Kembali</td><td style="padding:2px 0">: ${new Date(data.returnDate).toLocaleDateString('id-ID')}</td></tr>` : ''}
+        <tr><td style="padding:2px 0;color:#6b7280">Tanggal Pinjam</td><td style="padding:2px 0">: ${data.borrowDate && !isNaN(new Date(data.borrowDate).getTime()) ? new Date(data.borrowDate).toLocaleDateString('id-ID') : '-'}</td></tr>
+        ${data.dueDate && !isNaN(new Date(data.dueDate).getTime()) ? `<tr><td style="padding:2px 0;color:#6b7280">Tenggat Waktu</td><td style="padding:2px 0">: ${new Date(data.dueDate).toLocaleDateString('id-ID')}</td></tr>` : ''}
+        ${data.returnDate && !isNaN(new Date(data.returnDate).getTime()) ? `<tr><td style="padding:2px 0;color:#6b7280">Tanggal Kembali</td><td style="padding:2px 0">: ${new Date(data.returnDate).toLocaleDateString('id-ID')}</td></tr>` : ''}
       </table>
     </div>
     <table style="width:100%;border-collapse:collapse;font-size:12px">
