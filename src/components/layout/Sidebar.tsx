@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
+import { LABELS } from '../../utils/labels'
 import {
   LayoutDashboard,
   BookOpen,
@@ -27,7 +28,8 @@ const menuItems = [
 
 const transactionSubItems = [
   { to: '/borrowings', label: 'Peminjaman' },
-  { to: '/returns', label: 'Pengembalian' }
+  { to: '/returns', label: 'Pengembalian' },
+  { to: '/fines', label: LABELS.FINES.TITLE }
 ]
 
 const memberSubItems = [
@@ -53,7 +55,8 @@ export default function Sidebar() {
 
   const isTransactionActive =
     location.pathname.startsWith('/borrowings') ||
-    location.pathname.startsWith('/returns')
+    location.pathname.startsWith('/returns') ||
+    location.pathname.startsWith('/fines')
   const isMemberActive = location.pathname.startsWith('/members')
 
   return (

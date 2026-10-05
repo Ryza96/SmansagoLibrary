@@ -19,6 +19,7 @@ export const ROUTES = {
   BORROWINGS: '/borrowings',
   BORROW_CARD_PRINT: '/borrowings/print-card',
   RETURNS: '/returns',
+  FINES: '/fines',
   RETURN_RECEIPT_PREVIEW: '/returns/:id/receipt-preview',
   INVENTORY: '/inventory',
   INVENTORY_DETAIL: '/inventory/:id',
