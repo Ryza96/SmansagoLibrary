@@ -5,6 +5,7 @@ import { AppError } from '../errorHandler'
 import { BorrowRepository } from '../../../src/main/repositories/borrow.repository'
 import { FineRepository } from '../../../src/main/repositories/fine.repository'
 import { summarizeReceiptFines } from '../../../src/shared/utils/receipt-fines'
+import { renderFinesBlockHtml } from '../../../src/shared/utils/receipt-fines-html'
 import { SettingService } from './setting.service'
 import { generateLabelsHtml } from '../../../src/main/services/label.service'
 import { BORROW_CARD_LAYOUT, buildBorrowCardData, generateBorrowCardHtml } from '../../../src/main/services/borrow-card.service'
@@ -449,6 +450,7 @@ export class PrintService {
       <tbody>${itemsHtml}</tbody>
     </table>
     <div style="margin-top:12px;font-size:13px;color:#6b7280">Total Buku: ${data.totalItems}</div>
+    ${title === 'PENGEMBALIAN' ? renderFinesBlockHtml(data.fines, data.totalUnpaid) : ''}
     <div style="margin-top:32px;text-align:center;font-size:11px;color:#9ca3af;border-top:1px solid #e5e7eb;padding-top:12px">${data.libraryName} - Dokumen ini dicetak secara otomatis</div>
   </div>
 </body></html>`
