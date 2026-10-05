@@ -18,6 +18,7 @@ import { inventoryAPI } from './inventory.preload'
 import { assetEventAPI } from './asset-event.preload'
 import { settingAPI } from './setting.preload'
 import { bookImportAPI } from './book-import.preload'
+import { fineAPI } from './fine.preload'
 import { dashboardAPI } from './dashboard.preload'
 import { reportAPI } from './report.preload'
 import { backupUIAPI } from './backup-ui.preload'
@@ -46,7 +47,8 @@ const electronAPI = {
   ...dashboardAPI,
   ...reportAPI,
   ...backupUIAPI,
-  ...authAPI
+  ...authAPI,
+  ...fineAPI
 }
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI)

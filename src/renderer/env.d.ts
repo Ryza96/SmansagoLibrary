@@ -153,6 +153,13 @@ interface ElectronAPI {
     findByBorrowNumber: (borrowNumber: string) => Promise<import('../types/dtos/borrowing').BorrowingDTO>
     batchReturn: (input: import('../types/dtos/borrowing').BatchReturnInput) => Promise<import('../types/dtos/borrowing').BatchReturnResult>
   }
+  // Catatan: fines.markPaid/waive mengembalikan DTO dengan borrowNumber/memberName/memberNumber/bookTitle kosong —
+  // UI WAJIB memuat ulang daftar (fines.list) setelah aksi ini.
+  fines: {
+    list: (filter?: import('../../src/shared/dto/fine').FineListFilter) => Promise<import('../../src/shared/dto/fine').FineListItemDTO[]>
+    markPaid: (id: string) => Promise<import('../../src/shared/dto/fine').FineListItemDTO>
+    waive: (id: string, reason: string) => Promise<import('../../src/shared/dto/fine').FineListItemDTO>
+  }
   print: {
     getLabelPreviewHtml: (input: import('../../src/shared/dto/print').BookLabelData) => Promise<string>
     borrowReceipt: (borrowingId: string) => Promise<void>

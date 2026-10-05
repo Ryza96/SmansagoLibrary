@@ -1,6 +1,7 @@
 import { BrowserWindow } from 'electron'
 import type { BookService } from '../main/services/book.service'
 import type { AuthorService } from '../main/services/author.service'
+import type { FineService } from '../../src/main/services/fine.service'
 import type { PublisherService } from '../main/services/publisher.service'
 import type { CategoryService } from '../main/services/category.service'
 import type { BookCopyService as LegacyBookCopyService } from '../main/services/book-copy.service'
@@ -39,6 +40,7 @@ import { registerMemberHandlers } from './member.ipc'
 import { registerTeacherHandlers } from './teacher.ipc'
 import { registerBorrowHandlers } from './borrow.ipc'
 import { registerAuthorHandlers } from './author.ipc'
+import { registerFineHandlers } from './fine.ipc'
 import { registerPublisherHandlers } from './publisher.ipc'
 import { registerCategoryHandlers } from './category.ipc'
 import { registerPrintHandlers } from './print.ipc'
@@ -59,6 +61,7 @@ export function registerAllHandlers(
   services: {
     bookService: BookService
     authorService: AuthorService
+    fineService: FineService
     publisherService: PublisherService
     categoryService: CategoryService
     bookCopyService: LegacyBookCopyService
@@ -102,6 +105,7 @@ export function registerAllHandlers(
   registerTeacherHandlers(services.teacherImportService)
   registerBorrowHandlers(services.borrowService, services.newReturnService, services.borrowDetailRepository, services.borrowRepository)
   registerAuthorHandlers(services.authorService)
+  registerFineHandlers(services.fineService)
   registerPublisherHandlers(services.publisherService)
   registerCategoryHandlers(services.categoryService)
   registerPrintHandlers(services.printService)

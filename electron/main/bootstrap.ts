@@ -27,6 +27,7 @@ import { BorrowDetailRepository } from '../../src/main/repositories/borrow-detai
 import { BookCopyService as NewBookCopyService } from '../../src/main/services/book-copy.service'
 import { BookCopyRepository as NewBookCopyRepository } from '../../src/main/repositories/book-copy.repository'
 import { ReturnService as NewReturnService } from '../../src/main/services/return.service'
+import { FineService } from '../../src/main/services/fine.service'
 import { InventoryService } from './services/inventory.service'
 import { AssetEventService } from './services/asset-event.service'
 import { SettingService } from './services/setting.service'
@@ -118,6 +119,7 @@ export interface Container {
   promotionExecuteService: PromotionExecuteService
   newBookCopyService: NewBookCopyService
   newReturnService: NewReturnService
+  fineService: FineService
   borrowDetailRepository: BorrowDetailRepository
   borrowRepository: BorrowRepository
   inventoryService: InventoryService
@@ -167,6 +169,7 @@ export function createContainer(paths: AppPaths, restoreWiring?: RestoreWiring):
   const borrowDetailRepository = new BorrowDetailRepository()
   const newBookCopyService = new NewBookCopyService(newBookCopyRepository)
   const newReturnService = new NewReturnService(borrowRepository, borrowDetailRepository, newBookCopyRepository)
+  const fineService = new FineService()
 
   const inventoryService = new InventoryService(newBookCopyRepository)
 
@@ -317,6 +320,7 @@ export function createContainer(paths: AppPaths, restoreWiring?: RestoreWiring):
     promotionExecuteService,
     newBookCopyService,
     newReturnService,
+    fineService,
     borrowDetailRepository,
     borrowRepository,
     inventoryService,
