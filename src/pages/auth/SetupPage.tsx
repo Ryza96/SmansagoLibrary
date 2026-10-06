@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { LABELS } from '../../utils/labels'
 import { validateSetupForm, type SetupFormErrors } from '../../auth/setup-validation'
 import { useAuthGate } from '../../auth/AuthGate'
@@ -13,6 +13,17 @@ export default function SetupPage() {
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [recoveryCode, setRecoveryCode] = useState<string | null>(null)
+
+  useEffect(() => {
+    // Anti-macet: flag pending bertahan setelah reload, tapi kode tidak disimpan.
+    // Bila flag ada namun state kosong (mis. Ctrl+R di layar kode), bersihkan lalu
+    // refresh agar AuthGate keluar ke aplikasi (admin sudah ada; kode baru bisa dibuat di Pengaturan).
+    if (sessionStorage.getItem('recoveryCodePending') === '1' && !recoveryCode) {
+      sessionStorage.removeItem('recoveryCodePending')
+      refreshStatus()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()

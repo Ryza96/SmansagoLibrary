@@ -25,6 +25,7 @@ import type { AppDatabaseInfoDTO } from '../shared/dto/app-info'
 import { BARCODE_FORMATS, normalizeBarcodeFormat } from '../shared/config/barcode-format'
 import { validateFineSettings } from '../shared/utils/fine-settings'
 import { formatFileSize } from '../utils/bookImport'
+import { authErrorMessageOf } from '../auth/auth-error'
 import RecoveryCodeDisplay from './auth/RecoveryCodeDisplay'
 
 type TabKey = 'identity' | 'data' | 'security' | 'appInfo' | 'about'
@@ -284,7 +285,15 @@ export default function SettingsPage() {
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-6">
           <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md">
             {recoveryNewCode ? (
-              <RecoveryCodeDisplay recoveryCode={recoveryNewCode} onContinue={() => setRecoveryOpen(false)} />
+              <RecoveryCodeDisplay
+                recoveryCode={recoveryNewCode}
+                onContinue={() => {
+                  setRecoveryOpen(false)
+                  setRecoveryNewCode(null)
+                  setRecoveryCurrentPassword('')
+                  setRecoveryError(null)
+                }}
+              />
             ) : (
               <>
                 <h3 className="text-lg font-semibold text-slate-800 mb-2">{LABELS.SETTINGS.SECURITY_RECOVERY}</h3>
@@ -298,7 +307,7 @@ export default function SettingsPage() {
                 />
                 {recoveryError && <p className="text-red-500 text-xs mb-3">{recoveryError}</p>}
                 <div className="flex justify-end gap-3">
-                  <button onClick={() => setRecoveryOpen(false)} className="px-4 py-2 text-sm border border-slate-300 rounded-lg">{LABELS.SETTINGS.RESET_CONFIRM_CANCEL}</button>
+                  <button onClick={() => { setRecoveryOpen(false); setRecoveryNewCode(null); setRecoveryCurrentPassword(''); setRecoveryError(null) }} className="px-4 py-2 text-sm border border-slate-300 rounded-lg">{LABELS.SETTINGS.RESET_CONFIRM_CANCEL}</button>
                   <button
                     onClick={async () => {
                       if (!recoveryCurrentPassword.trim() || recoveryBusy) return
@@ -308,7 +317,7 @@ export default function SettingsPage() {
                         const r = await window.electronAPI.auth.issueRecoveryCode(recoveryCurrentPassword)
                         setRecoveryNewCode(r.recoveryCode)
                       } catch (err: unknown) {
-                        setRecoveryError(err instanceof Error ? err.message : LABELS.AUTH.SUBMIT_ERROR_DEFAULT)
+                        setRecoveryError(authErrorMessageOf(err, LABELS.AUTH.SUBMIT_ERROR_DEFAULT))
                       } finally {
                         setRecoveryBusy(false)
                       }
