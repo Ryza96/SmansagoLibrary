@@ -57,6 +57,7 @@ import { BookRepository as NewBookRepository } from '../../src/main/repositories
 import { DashboardService } from '../../src/main/services/dashboard.service'
 import { DashboardRepository } from '../../src/main/repositories/dashboard.repository'
 import { ReportService } from '../../src/main/services/report.service'
+import { ReportPrintService } from '../../src/main/services/report-print.service'
 import { ReportRepository } from '../../src/main/repositories/report.repository'
 import { AppPaths } from '../../src/main/infrastructure/paths'
 import { ProviderRegistry, RestoreHandlerRegistry } from '../../src/main/domain/provider/provider-registry'
@@ -133,6 +134,7 @@ export interface Container {
   bookImportService: BookImportService
   dashboardService: DashboardService
   reportService: ReportService
+  reportPrintService: ReportPrintService
   providerRegistry: ProviderRegistry
   restoreHandlerRegistry: RestoreHandlerRegistry
   databaseProvider: DatabaseProvider
@@ -232,7 +234,9 @@ export function createContainer(paths: AppPaths, restoreWiring?: RestoreWiring):
   const bookImportService = new BookImportService(new NewBookRepository(), new NewBookCopyRepository(), autoCreateService)
 
   const dashboardService = new DashboardService(new DashboardRepository())
-  const reportService = new ReportService(new ReportRepository())
+  const reportRepository = new ReportRepository()
+  const reportService = new ReportService(reportRepository)
+  const reportPrintService = new ReportPrintService(reportRepository, settingService)
 
   const databaseProvider = new DatabaseProvider({ stagingDir: paths.tempDir })
   const assetBackupProvider = new AssetBackupProvider({ assetDir: assetBookCoversDir, stagingDir: paths.tempDir })
@@ -343,6 +347,7 @@ export function createContainer(paths: AppPaths, restoreWiring?: RestoreWiring):
     bookImportService,
     dashboardService,
     reportService,
+    reportPrintService,
     providerRegistry,
     restoreHandlerRegistry,
     databaseProvider,

@@ -26,19 +26,22 @@ import { MEMBER_TYPES } from '../../shared/config/member-type'
 // renderer TIDAK menurunkan angka. Laporan Promosi memakai PromotionRunService
 // existing (P-3/P-4) — tidak diduplikasi di sini.
 
-function startOfDay(d: Date): Date {
+// Derivasi murni di bawah diekspor (additive, isi tidak berubah) agar
+// ReportPrintService memakai rumus yang SAMA PERSIS dengan laporan layar —
+// satu sumber rumus untuk status/lateDays/durationDays, tanpa menyalin.
+export function startOfDay(d: Date): Date {
   const x = new Date(d)
   x.setHours(0, 0, 0, 0)
   return x
 }
 
-function endOfDay(d: Date): Date {
+export function endOfDay(d: Date): Date {
   const x = new Date(d)
   x.setHours(23, 59, 59, 999)
   return x
 }
 
-function parseRange(from?: string, to?: string): { from: Date; to: Date } {
+export function parseRange(from?: string, to?: string): { from: Date; to: Date } {
   const now = new Date()
   return {
     from: startOfDay(from ? new Date(from) : now),
@@ -46,17 +49,17 @@ function parseRange(from?: string, to?: string): { from: Date; to: Date } {
   }
 }
 
-function iso(d: Date): string {
+export function iso(d: Date): string {
   return d.toISOString()
 }
 
-function diffDays(later: Date, earlier: Date): number {
+export function diffDays(later: Date, earlier: Date): number {
   const ms = startOfDay(later).getTime() - startOfDay(earlier).getTime()
   return Math.floor(ms / 86_400_000)
 }
 
 // Status turunan (bukan kolom): ACTIVE/COMPLETED/OVERDUE dari returnDate + dueDate.
-function deriveBorrowStatus(returnDate: Date | null, dueDate: Date, now: number): BorrowReportStatus {
+export function deriveBorrowStatus(returnDate: Date | null, dueDate: Date, now: number): BorrowReportStatus {
   if (returnDate) return 'COMPLETED'
   return dueDate.getTime() < now ? 'OVERDUE' : 'ACTIVE'
 }
@@ -70,7 +73,7 @@ function toReportPagination(p: { page: number; limit: number; total: number; tot
 // yang DIBUAT dari dua query terpisah. Pagination gabungan menghitung posisi
 // skip/take di DAFTAR GABUNGAN lalu memecahnya ke tiap kategori — setiap halaman
 // berisi limit baris (kecuali halaman terakhir). Murni → diuji smoke.
-function computeOverdueSlice(
+export function computeOverdueSlice(
   page: number,
   limit: number,
   activeTotal: number,

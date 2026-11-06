@@ -4,6 +4,8 @@ import { Prisma } from '@prisma/client'
 import { ACADEMIC_STATUS } from '../../shared/config/academic-status'
 import { BOOK_COPY_STATUS } from '../../shared/config/book-copy-status'
 import { BookCopyCondition } from '../../../electron/main/shared/book-copy-condition'
+import { AppError } from '../../../electron/main/errorHandler'
+import { REPORT_PRINT_MAX_ROWS } from '../../shared/config/report-print'
 
 // Report Module (R-1) — query AGREGAT khusus laporan, terpisah dari repository
 // domain. Repository domain existing TIDAK diubah. Wajib memakai getPrisma()
@@ -259,7 +261,31 @@ function buildMemberReportWhere(query: MemberReportQuery): Prisma.MemberWhereInp
   return where
 }
 
+// Batas baris ekspor Laporan Cetak A4 (TAHAP 1). Dilewati TANPA pemotongan:
+/// melebihi batas → AppError berbahasa Indonesia yang meminta filter
+// dipersempit. `maxRows` dapat di-override hanya untuk TEST (seed 5000
+// baris nyata tidak diperlukan untuk membuktikan penolakan).
+export function assertReportPrintRowLimit(rowCount: number, maxRows: number = REPORT_PRINT_MAX_ROWS): void {
+  if (rowCount > maxRows) {
+    throw new AppError(
+      400,
+      'Validation Error',
+      `Jumlah baris laporan adalah ${rowCount} baris, melebihi batas ekspor ${maxRows} baris. Persempit filter (periode, status, atau pencarian) lalu coba lagi.`
+    )
+  }
+}
+
+export interface ReportRepositoryOptions {
+  reportPrintMaxRows?: number
+}
+
 export class ReportRepository extends BaseRepository {
+  private readonly reportPrintMaxRows: number
+
+  constructor(options: ReportRepositoryOptions = {}) {
+    super()
+    this.reportPrintMaxRows = options.reportPrintMaxRows ?? REPORT_PRINT_MAX_ROWS
+  }
   // -------------------------------------------------------------------------
   // Laporan Peminjaman
   // -------------------------------------------------------------------------
@@ -511,24 +537,9 @@ export class ReportRepository extends BaseRepository {
   // Laporan Koleksi Buku
   // -------------------------------------------------------------------------
 
-  async findBookReportRows(query: BookReportQuery) {
-    const { skip, take } = getPaginationParams({ page: query.page, limit: query.limit })
-
-    const where = buildBookReportWhere(query)
-
-    const [data, total] = await Promise.all([
-      this.prisma.book.findMany({
-        where,
-        skip,
-        take,
-        orderBy: { title: 'asc' },
-        include: bookReportInclude
-      }),
-      this.prisma.book.count({ where })
-    ])
-
-    // R-6: breakdown status/condition per-judul via groupBy pada halaman ini
-    // (bukan fetch-all — anti-pola B1). available+borrowed+lost = copyCount.
+  // R-6: breakdown status/condition per-judul (dipakai findBookReportRows
+  // layar DAN findAllCollectionsForExport cetak agar keduanya identik).
+  private async withBookCounts(data: BookReportRow[]): Promise<BookReportRowWithCounts[]> {
     const ids = data.map((b) => b.id)
     const [statusGroups, damagedGroups] = ids.length
       ? await Promise.all([
@@ -558,7 +569,7 @@ export class ReportRepository extends BaseRepository {
     const damagedMap = new Map<string, number>()
     for (const g of damagedGroups) damagedMap.set(g.bookId, g._count._all)
 
-    const rows: BookReportRowWithCounts[] = data.map((b) => {
+    return data.map((b) => {
       const byStatus = statusMap.get(b.id) ?? new Map<string, number>()
       return {
         ...b,
@@ -568,6 +579,25 @@ export class ReportRepository extends BaseRepository {
         damagedCount: damagedMap.get(b.id) ?? 0
       }
     })
+  }
+
+  async findBookReportRows(query: BookReportQuery) {
+    const { skip, take } = getPaginationParams({ page: query.page, limit: query.limit })
+
+    const where = buildBookReportWhere(query)
+
+    const [data, total] = await Promise.all([
+      this.prisma.book.findMany({
+        where,
+        skip,
+        take,
+        orderBy: { title: 'asc' },
+        include: bookReportInclude
+      }),
+      this.prisma.book.count({ where })
+    ])
+
+    const rows = await this.withBookCounts(data)
 
     return toPaginatedResult<BookReportRowWithCounts>(rows, total, { page: query.page, limit: query.limit })
   }
@@ -597,6 +627,88 @@ export class ReportRepository extends BaseRepository {
       byStatus: byStatus.map((g) => ({ status: g.status, count: g._count._all })),
       byCondition: byCondition.map((g) => ({ condition: g.condition, count: g._count._all }))
     }
+  }
+
+  // -------------------------------------------------------------------------
+  // Ekspor "semua baris" untuk Laporan Cetak A4 (TAHAP 1, additive).
+  // Setiap method memakai where-builder dan orderBy yang SAMA dengan tampilan
+  // layar, TANPA getPaginationParams (tanpa clamp 100), dan menghitung jumlah
+  // BARIS tabel lebih dulu — melebihi REPORT_PRINT_MAX_ROWS → AppError
+  // (tidak dipotong diam-diam).
+  // -------------------------------------------------------------------------
+
+  // Laporan Peminjaman — 1 baris cetak = 1 BorrowDetail (bukan 1 transaksi),
+  // sehingga count-nya dihitung pada BorrowDetail dengan filter borrow yang sama.
+  async findAllBorrowingsForExport(query: BorrowReportQuery) {
+    const where = buildBorrowReportWhere(query)
+    const totalRows = await this.prisma.borrowDetail.count({ where: { borrow: where } })
+    assertReportPrintRowLimit(totalRows, this.reportPrintMaxRows)
+    const data = await this.prisma.borrow.findMany({
+      where,
+      orderBy: { borrowDate: 'asc' },
+      include: borrowReportInclude
+    })
+    return { data, totalRows }
+  }
+
+  // Laporan Pengembalian — 1 baris = 1 BorrowDetail yang sudah dikembalikan.
+  async findAllReturnsForExport(query: ReturnReportQuery) {
+    const where = buildReturnReportWhere(query)
+    const totalRows = await this.prisma.borrowDetail.count({ where })
+    assertReportPrintRowLimit(totalRows, this.reportPrintMaxRows)
+    const data = await this.prisma.borrowDetail.findMany({
+      where,
+      orderBy: { returnedAt: 'asc' },
+      include: {
+        borrow: { include: { member: true } },
+        bookCopy: { include: { book: true } }
+      }
+    })
+    return { data, totalRows }
+  }
+
+  // Laporan Keterlambatan — gabungan ACTIVE (tanpa filter periode, aturan R-4)
+  // + RETURNED (filter periode via raw SQL late join). Urutan gabungan sama
+  // dengan layar: [active ..., returned ...].
+  async findAllOverduesForExport(query: { asOf: Date; from: Date; to: Date; search?: string }) {
+    const [activeTotal, returnedTotal] = await Promise.all([
+      this.countActiveOverdueDetails({ asOf: query.asOf, search: query.search }),
+      this.countReturnedLateBetween(query.from, query.to, query.search)
+    ])
+    const totalRows = activeTotal + returnedTotal
+    assertReportPrintRowLimit(totalRows, this.reportPrintMaxRows)
+    const [active, returned] = await Promise.all([
+      this.findActiveOverdueDetails({ asOf: query.asOf, search: query.search, skip: 0, take: activeTotal }),
+      this.findReturnedLateBetween({ from: query.from, to: query.to, search: query.search, skip: 0, take: returnedTotal })
+    ])
+    return { active: active.data, returned: returned.data, totalRows }
+  }
+
+  // Laporan Anggota — 1 baris = 1 anggota (tanpa filter periode).
+  async findAllMembersForExport(query: MemberReportQuery) {
+    const where = buildMemberReportWhere(query)
+    const totalRows = await this.prisma.member.count({ where })
+    assertReportPrintRowLimit(totalRows, this.reportPrintMaxRows)
+    const data = await this.prisma.member.findMany({
+      where,
+      orderBy: { memberNumber: 'asc' },
+      include: memberReportInclude
+    })
+    return { data, totalRows }
+  }
+
+  // Laporan Koleksi Buku — 1 baris = 1 judul (tanpa filter periode).
+  async findAllCollectionsForExport(query: BookReportQuery) {
+    const where = buildBookReportWhere(query)
+    const totalRows = await this.prisma.book.count({ where })
+    assertReportPrintRowLimit(totalRows, this.reportPrintMaxRows)
+    const books = await this.prisma.book.findMany({
+      where,
+      orderBy: { title: 'asc' },
+      include: bookReportInclude
+    })
+    const data = await this.withBookCounts(books)
+    return { data, totalRows }
   }
 }
 
