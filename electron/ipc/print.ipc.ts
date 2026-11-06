@@ -29,4 +29,13 @@ export function registerPrintHandlers(printService: PrintService): void {
     async (_event, borrowingId: string, detailIds?: string[]) =>
       printService.getReturnReceiptPreviewHtml(borrowingId, detailIds)
   )
+  ipcMain.handle('printing:collectiveCardPreview', async (_event, borrowingId: string) =>
+    printService.getCollectiveCardPreviewHtml(borrowingId)
+  )
+  ipcMain.handle('printing:collectiveCard', async (_event, borrowingId: string) =>
+    printService.printCollectiveCard(borrowingId)
+  )
+  ipcMain.handle('printing:collectiveCardPdf', async (_event, borrowingId: string) =>
+    printService.saveCollectiveCardPdf(borrowingId)
+  )
 }

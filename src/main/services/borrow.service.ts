@@ -7,7 +7,7 @@ import type { BorrowingDTO, BorrowingItemDetailDTO, CreateBorrowingInput } from 
 import { getMemberType } from '../../shared/config/member-type'
 import { AppError } from '../../../electron/main/errorHandler'
 
-function generateBorrowNumber(lastNumber: string | null): string {
+export function generateBorrowNumber(lastNumber: string | null): string {
   const now = new Date()
   const yyyy = now.getFullYear().toString()
   const mm = (now.getMonth() + 1).toString().padStart(2, '0')
@@ -58,6 +58,10 @@ function toDTO(borrowing: {
   className: string | null
   createdAt: Date
   updatedAt: Date
+  borrowType?: string
+  purpose?: string | null
+  collectiveClassId?: string | null
+  collectiveClassName?: string | null
   member: { fullName: string; memberNumber: string } | null
   details: Array<{
     id: string
@@ -82,7 +86,11 @@ function toDTO(borrowing: {
     totalItems: borrowing.details.length,
     items: borrowing.details.map(toItemDTO),
     createdAt: borrowing.createdAt.toISOString(),
-    updatedAt: borrowing.updatedAt.toISOString()
+    updatedAt: borrowing.updatedAt.toISOString(),
+    borrowType: borrowing.borrowType ?? 'INDIVIDUAL',
+    purpose: borrowing.purpose ?? null,
+    collectiveClassId: borrowing.collectiveClassId ?? null,
+    collectiveClassName: borrowing.collectiveClassName ?? null
   }
 }
 
@@ -107,7 +115,8 @@ export class BorrowService {
         borrowDate: b.borrowDate.toISOString(),
         dueDate: b.dueDate.toISOString(),
         status: b.returnDate ? 'COMPLETED' as const : 'ACTIVE' as const,
-        totalItems: b._count?.details ?? 0
+        totalItems: b._count?.details ?? 0,
+        borrowType: b.borrowType ?? 'INDIVIDUAL'
       }))
     }
   }

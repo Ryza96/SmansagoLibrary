@@ -18,6 +18,7 @@ export const ROUTES = {
   MEMBER_ENROLLMENT_HISTORY: '/members/:id/enrollments',
   BORROWINGS: '/borrowings',
   BORROW_CARD_PRINT: '/borrowings/print-card',
+  COLLECTIVE_CARD_PREVIEW: '/borrowings/:id/collective-card-preview',
   RETURNS: '/returns',
   FINES: '/fines',
   RETURN_RECEIPT_PREVIEW: '/returns/:id/receipt-preview',
@@ -70,6 +71,10 @@ export function bookLabelPreviewPath(id: string) {
 
 export function receiptPreviewPath(id: string) {
   return `/borrowings/${id}/receipt-preview`
+}
+
+export function collectiveCardPreviewPath(id: string) {
+  return `/borrowings/${id}/collective-card-preview`
 }
 
 export function memberDetailPath(id: string) {

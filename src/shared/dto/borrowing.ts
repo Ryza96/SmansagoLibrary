@@ -27,6 +27,11 @@ export interface BorrowingDTO {
   items: BorrowingItemDetailDTO[]
   createdAt: string
   updatedAt: string
+  /** Fase 1 kolektif (opsional agar kontrak lama non-breaking): INDIVIDUAL | COLLECTIVE. */
+  borrowType?: string
+  purpose?: string | null
+  collectiveClassId?: string | null
+  collectiveClassName?: string | null
 }
 
 export interface BorrowingListItemDTO {
@@ -38,6 +43,7 @@ export interface BorrowingListItemDTO {
   dueDate: string
   status: string
   totalItems: number
+  borrowType?: string
 }
 
 export interface CreateBorrowingInput {

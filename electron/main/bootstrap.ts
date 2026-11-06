@@ -22,6 +22,7 @@ import { TeacherDuplicateChecker } from '../../src/main/services/teacher-duplica
 import { TeacherImportService } from '../../src/main/services/teacher-import.service'
 import { MemberRepository as NewMemberRepository } from '../../src/main/repositories/member.repository'
 import { BorrowService } from '../../src/main/services/borrow.service'
+import { CollectiveBorrowService } from '../../src/main/services/collective-borrow.service'
 import { BorrowRepository } from '../../src/main/repositories/borrow.repository'
 import { BorrowDetailRepository } from '../../src/main/repositories/borrow-detail.repository'
 import { BookCopyService as NewBookCopyService } from '../../src/main/services/book-copy.service'
@@ -109,6 +110,7 @@ export interface Container {
   teacherDuplicateChecker: TeacherDuplicateChecker
   teacherImportService: TeacherImportService
   borrowService: BorrowService
+  collectiveBorrowService: CollectiveBorrowService
   printService: PrintService
   academicYearService: AcademicYearService
   curriculumService: CurriculumService
@@ -199,6 +201,14 @@ export function createContainer(paths: AppPaths, restoreWiring?: RestoreWiring):
     promotionRunService
   )
   const borrowService = new BorrowService(borrowRepository, borrowDetailRepository, newMemberRepository, newBookCopyRepository, enrollmentService)
+  const collectiveBorrowService = new CollectiveBorrowService(
+    borrowRepository,
+    borrowDetailRepository,
+    newMemberRepository,
+    newBookCopyRepository,
+    new NewBookRepository(),
+    classRepository
+  )
 
   const memberDuplicateChecker = new MemberDuplicateChecker(newMemberRepository)
   const memberClassResolver = new MemberClassResolver(classRepository)
@@ -310,6 +320,7 @@ export function createContainer(paths: AppPaths, restoreWiring?: RestoreWiring):
     teacherDuplicateChecker,
     teacherImportService,
     borrowService,
+    collectiveBorrowService,
     printService,
     academicYearService,
     curriculumService,

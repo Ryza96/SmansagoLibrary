@@ -91,6 +91,24 @@ export class BookCopyRepository extends BaseRepository {
     })
   }
 
+  // Kolektif Fase 1 — pilih eksemplar AVAILABLE untuk satu judul,
+  // urut inventoryNumber (deterministik). Dipakai mode "judul + jumlah".
+  async findAvailableCopiesByBookId(
+    bookId: string,
+    limit: number
+  ): Promise<Array<BookCopy & { book: { title: string } | null }>> {
+    return this.prisma.bookCopy.findMany({
+      where: { bookId, status: 'AVAILABLE' },
+      orderBy: { inventoryNumber: 'asc' },
+      take: limit,
+      include: { book: { select: { title: true } } }
+    }) as Promise<Array<BookCopy & { book: { title: string } | null }>>
+  }
+
+  async countAvailableByBookId(bookId: string): Promise<number> {
+    return this.prisma.bookCopy.count({ where: { bookId, status: 'AVAILABLE' } })
+  }
+
   async findMany(options?: FindOptions) {
     const { skip, take } = getPaginationParams(options?.pagination)
 

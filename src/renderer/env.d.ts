@@ -139,6 +139,7 @@ interface ElectronAPI {
         dueDate: string
         status: 'ACTIVE' | 'COMPLETED'
         totalItems: number
+        borrowType?: string
       }>
       total: number
       page: number
@@ -148,6 +149,15 @@ interface ElectronAPI {
     findById: (id: string) => Promise<import('../types/dtos/borrowing').BorrowingDTO>
     create: (input: import('../types/dtos/borrowing').CreateBorrowingInput) => Promise<import('../types/dtos/borrowing').BorrowingDTO>
     getMemberBorrowingStats: (memberId: string) => Promise<{ activeBookCount: number; nearestDueDate: string | null }>
+    previewCollective: (
+      input: import('../types/dtos/collective-borrowing').PreviewCollectiveBorrowingInput
+    ) => Promise<import('../types/dtos/collective-borrowing').CollectivePreviewDTO>
+    createCollective: (
+      input: import('../types/dtos/collective-borrowing').CreateCollectiveBorrowingInput
+    ) => Promise<import('../types/dtos/borrowing').BorrowingDTO>
+    outstandingCopies: (
+      borrowingId: string
+    ) => Promise<import('../types/dtos/collective-borrowing').OutstandingCopiesResultDTO>
   }
   returns: {
     findByBarcode: (barcode: string) => Promise<import('../types/dtos/borrowing').BorrowingByBarcodeResult>
@@ -171,6 +181,9 @@ interface ElectronAPI {
     borrowCard: (borrowingId: string, options?: { silent?: boolean; activeOnly?: boolean }) => Promise<void>
     borrowCardPdf: (borrowingId: string, options?: { activeOnly?: boolean }) => Promise<{ saved: boolean; filePath?: string }>
     returnReceiptPreview: (borrowingId: string, detailIds?: string[]) => Promise<string>
+    collectiveCardPreview: (borrowingId: string) => Promise<string>
+    collectiveCard: (borrowingId: string) => Promise<void>
+    collectiveCardPdf: (borrowingId: string) => Promise<{ saved: boolean; filePath?: string }>
   }
   academicYears: {
     findMany: (search?: string, page?: number, limit?: number) => Promise<{

@@ -10,6 +10,7 @@ import type { MemberService } from '../../src/main/services/member.service'
 import type { MemberImportService } from '../../src/main/services/member-import.service'
 import type { TeacherImportService } from '../../src/main/services/teacher-import.service'
 import type { BorrowService } from '../../src/main/services/borrow.service'
+import type { CollectiveBorrowService } from '../../src/main/services/collective-borrow.service'
 import type { ReturnService as NewReturnService } from '../../src/main/services/return.service'
 import type { PrintService } from '../main/services/print.service'
 import type { BorrowDetailRepository } from '../../src/main/repositories/borrow-detail.repository'
@@ -38,7 +39,7 @@ import { registerBookHandlers } from './book.ipc'
 import { registerBookCopyHandlers } from './book-copy.ipc'
 import { registerMemberHandlers } from './member.ipc'
 import { registerTeacherHandlers } from './teacher.ipc'
-import { registerBorrowHandlers } from './borrow.ipc'
+import { registerBorrowHandlers, registerCollectiveBorrowHandlers } from './borrow.ipc'
 import { registerAuthorHandlers } from './author.ipc'
 import { registerFineHandlers } from './fine.ipc'
 import { registerPublisherHandlers } from './publisher.ipc'
@@ -69,6 +70,7 @@ export function registerAllHandlers(
     memberImportService: MemberImportService
     teacherImportService: TeacherImportService
     borrowService: BorrowService
+    collectiveBorrowService: CollectiveBorrowService
     printService: PrintService
     academicYearService: AcademicYearService
     curriculumService: CurriculumService
@@ -104,6 +106,7 @@ export function registerAllHandlers(
   registerMemberHandlers(services.memberService, services.memberImportService)
   registerTeacherHandlers(services.teacherImportService)
   registerBorrowHandlers(services.borrowService, services.newReturnService, services.borrowDetailRepository, services.borrowRepository)
+  registerCollectiveBorrowHandlers(services.collectiveBorrowService)
   registerAuthorHandlers(services.authorService)
   registerFineHandlers(services.fineService)
   registerPublisherHandlers(services.publisherService)

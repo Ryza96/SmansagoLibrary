@@ -9,6 +9,11 @@ import { renderFinesBlockHtml } from '../../../src/shared/utils/receipt-fines-ht
 import { SettingService } from './setting.service'
 import { generateLabelsHtml } from '../../../src/main/services/label.service'
 import { BORROW_CARD_LAYOUT, buildBorrowCardData, generateBorrowCardHtml } from '../../../src/main/services/borrow-card.service'
+import {
+  buildCollectiveCardData,
+  generateCollectiveCardHtml
+} from '../../../src/main/services/collective-borrow-card.service'
+import { COLLECTIVE_CARD_TERMS } from '../../../src/shared/config/collective-card'
 import { resolveAssetPath } from '../../../src/main/infrastructure/asset/asset-resolver'
 import { RETURN_CONDITION_LABELS } from '../../../src/shared/config/return-condition'
 import type { BorrowReceiptData, ReturnReceiptData, BookLabelData, PrinterInfoDTO } from '../../../src/shared/dto/print'
@@ -26,6 +31,21 @@ export function buildBorrowCardPdfFilename(borrowing: { borrowNumber: string; me
   const number = sanitize(borrowing.borrowNumber) || 'PEMINJAMAN'
   const member = sanitize(borrowing.memberName).slice(0, 40) || 'Anggota'
   return `Kartu Peminjaman - ${number} - ${member}.pdf`
+}
+
+// Kartu Kolektif A4 — nama file PDF (pola buildBorrowCardPdfFilename).
+// Format: "Kartu Kolektif - <borrowNumber> - <Nama Guru>.pdf".
+// Murni (tanpa Electron) agar dapat diuji.
+export function buildCollectiveCardPdfFilename(borrowing: { borrowNumber: string; memberName: string }): string {
+  const sanitize = (value: string): string =>
+    value
+      .replace(/[<>:"/\\|?*\u0000-\u001f]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+
+  const number = sanitize(borrowing.borrowNumber) || 'PEMINJAMAN'
+  const member = sanitize(borrowing.memberName).slice(0, 40) || 'Guru'
+  return `Kartu Kolektif - ${number} - ${member}.pdf`
 }
 
 const IMAGE_MIME: Record<string, string> = {
@@ -241,6 +261,68 @@ export class PrintService {
 
     const result = await dialog.showSaveDialog({
       title: 'Simpan Kartu Peminjaman PDF',
+      defaultPath: join(app.getPath('documents'), filename),
+      filters: [{ name: 'PDF', extensions: ['pdf'] }]
+    })
+
+    if (result.canceled || !result.filePath) {
+      return { saved: false }
+    }
+
+    await writeFile(result.filePath, pdf)
+    return { saved: true, filePath: result.filePath }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Kartu Peminjaman Kolektif A4 — Preview / Cetak / Simpan PDF.
+  // Orkestrasi saja (pola buildBorrowCardHtml): data + template dari
+  // collective-borrow-card.service.ts (stack baru). Kartu individu tidak tersentuh.
+  // Cetak memakai dialog sistem TANPA pageSize/deviceName (printer default OS,
+  // CSS @page A4 sebagai panduan) — setting printer kartu TIDAK dipakai.
+  // ---------------------------------------------------------------------------
+
+  async buildCollectiveCardHtml(borrowingId: string): Promise<string> {
+    const [borrowing, settings] = await Promise.all([
+      this.borrowRepository.findById(borrowingId),
+      this.settingService.get()
+    ])
+    if (!borrowing) {
+      throw new AppError(404, 'Not Found', 'Data peminjaman tidak ditemukan.')
+    }
+    const resolvedLogoPath = resolveAssetPath(settings.logoPath, this.assetRoot)
+    const data = await buildCollectiveCardData(
+      borrowing,
+      { ...settings, logoPath: resolvedLogoPath ?? '' },
+      {
+        readFileAsDataUri: this.readFileAsDataUri.bind(this)
+      }
+    )
+    return generateCollectiveCardHtml(data, { termsText: COLLECTIVE_CARD_TERMS })
+  }
+
+  async getCollectiveCardPreviewHtml(borrowingId: string): Promise<string> {
+    return this.buildCollectiveCardHtml(borrowingId)
+  }
+
+  async printCollectiveCard(borrowingId: string): Promise<void> {
+    const html = await this.buildCollectiveCardHtml(borrowingId)
+    await this.printHtml(html)
+  }
+
+  async saveCollectiveCardPdf(borrowingId: string): Promise<{ saved: boolean; filePath?: string }> {
+    const [borrowing, html] = await Promise.all([
+      this.borrowRepository.findById(borrowingId),
+      this.buildCollectiveCardHtml(borrowingId)
+    ])
+    if (!borrowing) {
+      throw new AppError(404, 'Not Found', 'Data peminjaman tidak ditemukan.')
+    }
+
+    const pdf = await this.renderPdf(html)
+    const filename = buildCollectiveCardPdfFilename(borrowing)
+
+    const result = await dialog.showSaveDialog({
+      title: 'Simpan Kartu Kolektif PDF',
       defaultPath: join(app.getPath('documents'), filename),
       filters: [{ name: 'PDF', extensions: ['pdf'] }]
     })

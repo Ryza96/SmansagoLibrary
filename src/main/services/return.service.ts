@@ -56,6 +56,10 @@ function toDTO(borrowing: {
   memberNumber: string
   createdAt: Date
   updatedAt: Date
+  borrowType?: string
+  purpose?: string | null
+  collectiveClassId?: string | null
+  collectiveClassName?: string | null
   member: { fullName: string; memberNumber: string } | null
   details: Array<{
     id: string
@@ -80,7 +84,11 @@ function toDTO(borrowing: {
     totalItems: borrowing.details.length,
     items: borrowing.details.map(toItemDTO),
     createdAt: borrowing.createdAt.toISOString(),
-    updatedAt: borrowing.updatedAt.toISOString()
+    updatedAt: borrowing.updatedAt.toISOString(),
+    borrowType: borrowing.borrowType ?? 'INDIVIDUAL',
+    purpose: borrowing.purpose ?? null,
+    collectiveClassId: borrowing.collectiveClassId ?? null,
+    collectiveClassName: borrowing.collectiveClassName ?? null
   }
 }
 

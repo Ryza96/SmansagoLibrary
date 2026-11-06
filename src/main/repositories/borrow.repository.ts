@@ -195,6 +195,94 @@ export class BorrowRepository extends BaseRepository {
     return borrow?.dueDate ?? null
   }
 
+  // Kolektif Fase 1 — SATU transaksi atomik: Borrow (borrowType COLLECTIVE)
+  // + BorrowDetail + update status BookCopy ke BORROWED.
+  // Guard atomik AVAILABLE → BORROWED DI DALAM transaksi (pola IT-1):
+  // updateMany berpredikat + count check; bila satu eksemplar tidak lagi
+  // AVAILABLE, seluruh transaksi di-rollback (tidak ada tulis parsial).
+  // Sengaja TANPA guard maxBooks member (batas kolektif = per transaksi,
+  // divalidasi di service dengan COLLECTIVE_MAX_COPIES).
+  // Aktivasi guru (INACTIVE → ACTIVE) dilakukan DI DALAM transaksi yang sama
+  // bila activateMemberId diisi — rollback membatalkan aktivasi juga.
+  // (Pola individu di borrow.service.ts:228-230 mengaktifkan SETELAH tx;
+  // kolektif lebih kuat: aktivasi ikut atomik.)
+  async createCollectiveWithItems(
+    borrowData: {
+      borrowNumber: string
+      memberId: string
+      memberName: string
+      memberNumber: string
+      borrowDate: Date
+      dueDate: Date
+      className?: string
+      notes?: string
+      purpose: string
+      collectiveClassId?: string | null
+      collectiveClassName?: string | null
+      activateMemberId?: string | null
+    },
+    itemsData: Array<{ bookCopyId: string; bookTitle: string }>
+  ) {
+    return this.prisma.$transaction(async (tx) => {
+      const created = await tx.borrow.create({
+        data: {
+          borrowNumber: borrowData.borrowNumber,
+          memberId: borrowData.memberId,
+          memberName: borrowData.memberName,
+          memberNumber: borrowData.memberNumber,
+          borrowDate: borrowData.borrowDate,
+          dueDate: borrowData.dueDate,
+          returnDate: null,
+          notes: borrowData.notes ?? null,
+          className: borrowData.className ?? null,
+          borrowType: 'COLLECTIVE',
+          purpose: borrowData.purpose,
+          collectiveClassId: borrowData.collectiveClassId ?? null,
+          collectiveClassName: borrowData.collectiveClassName ?? null,
+          details: {
+            createMany: {
+              data: itemsData.map((item) => ({
+                bookCopyId: item.bookCopyId,
+                bookTitle: item.bookTitle
+              }))
+            }
+          }
+        },
+        include: {
+          details: {
+            include: {
+              bookCopy: {
+                include: { book: true }
+              }
+            }
+          },
+          member: true
+        }
+      })
+
+      const statusGuard = await tx.bookCopy.updateMany({
+        where: {
+          id: { in: itemsData.map((i) => i.bookCopyId) },
+          status: BOOK_COPY_STATUS.AVAILABLE
+        },
+        data: { status: BOOK_COPY_STATUS.BORROWED }
+      })
+
+      if (statusGuard.count !== itemsData.length) {
+        throw new AppError(400, 'Validation Error', 'Salah satu buku sedang tidak tersedia. Transaksi dibatalkan.')
+      }
+
+      if (borrowData.activateMemberId) {
+        await tx.member.update({
+          where: { id: borrowData.activateMemberId },
+          data: { status: 'ACTIVE' }
+        })
+      }
+
+      return created
+    })
+  }
+
   async processReturn(
     detailId: string,
     conditionBack: string,

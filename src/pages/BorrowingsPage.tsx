@@ -1,13 +1,24 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { X, BookmarkCheck } from 'lucide-react'
+import { X, BookmarkCheck, Printer } from 'lucide-react'
 import SearchableSelect from '../components/ui/SearchableSelect'
 import { useNotification } from '../notification/NotificationContext'
 import { getMemberType } from '../shared/config/member-type'
+import {
+  COLLECTIVE_DEFAULT_LOAN_DAYS,
+  COLLECTIVE_MAX_COPIES
+} from '../shared/config/borrow-type'
 import type { CreateBorrowingInput } from '../types/dtos/borrowing'
 import type { MemberDTO } from '../types/dtos/member'
-import { receiptPreviewPath } from '../utils/navigation'
+import { receiptPreviewPath, collectiveCardPreviewPath } from '../utils/navigation'
 import { LABELS } from '../utils/labels'
+
+type BorrowTypeTab = 'INDIVIDUAL' | 'COLLECTIVE'
+
+function defaultCollectiveDueDate(): string {
+  const d = new Date(Date.now() + COLLECTIVE_DEFAULT_LOAN_DAYS * 24 * 60 * 60 * 1000)
+  return d.toISOString().slice(0, 10)
+}
 
 interface BookEntry {
   bookCopyId: string
@@ -40,8 +51,26 @@ export default function BorrowingPage() {
   const [memberStats, setMemberStats] = useState<{ activeBookCount: number; nearestDueDate: string | null } | null>(null)
   const [dueDate, setDueDate] = useState('')
   const [saving, setSaving] = useState(false)
+  const [borrowType, setBorrowType] = useState<BorrowTypeTab>('INDIVIDUAL')
+  const [purpose, setPurpose] = useState('')
+  const [collectiveClassId, setCollectiveClassId] = useState('')
+  const [classOptions, setClassOptions] = useState<{ id: string; name: string }[]>([])
+  const [collectiveResult, setCollectiveResult] = useState<{
+    borrowingId: string
+    borrowingNumber: string
+    memberName: string
+    totalItems: number
+  } | null>(null)
 
+  const collectiveTotal = books.length
   const canSave = selectedMember !== null && books.length > 0 && dueDate !== '' && !saving
+  const canSaveCollective =
+    borrowType === 'COLLECTIVE' &&
+    selectedMember !== null &&
+    purpose.trim() !== '' &&
+    collectiveTotal > 0 &&
+    collectiveTotal <= COLLECTIVE_MAX_COPIES &&
+    !saving
 
   useEffect(() => {
     barcodeRef.current?.focus()
@@ -79,9 +108,37 @@ export default function BorrowingPage() {
       setMemberOptions([])
       return
     }
-    const result = await window.electronAPI.members.findMany(query, 1, 20)
+    const result = await window.electronAPI.members.findMany(query, 1, 20, borrowType === 'COLLECTIVE' ? 'teacher' : undefined)
     setMemberOptions(result.data.map((m: MemberDTO) => ({ id: m.id, name: m.fullName })))
   }, 300)
+
+  useEffect(() => {
+    if (borrowType !== 'COLLECTIVE') return
+    let cancelled = false
+    async function loadMaster() {
+      try {
+        const classes: { id: string; name: string }[] = []
+        let page = 1
+        for (;;) {
+          const result = await window.electronAPI.classes.findMany('', page, 100)
+          for (const c of result.data) {
+            classes.push({ id: c.id, name: `${c.educationLevel} ${c.parallel}` })
+          }
+          if (classes.length >= result.total || page >= result.totalPages) break
+          page += 1
+        }
+        if (!cancelled) {
+          setClassOptions(classes)
+        }
+      } catch {
+        if (!cancelled) notify.error('Gagal memuat data kelas.')
+      }
+    }
+    void loadMaster()
+    return () => {
+      cancelled = true
+    }
+  }, [borrowType, notify])
 
   function handleMemberSelect(id: string | string[]) {
     const memberId = id as string
@@ -172,9 +229,125 @@ export default function BorrowingPage() {
     }
   }
 
+  function handleBorrowTypeChange(next: BorrowTypeTab) {
+    if (next === borrowType) return
+    setBorrowType(next)
+    setBooks([])
+    setCollectiveResult(null)
+    setSelectedMember(null)
+    setMemberStats(null)
+    setMemberOptions([])
+    setBarcode('')
+    if (next === 'COLLECTIVE' && dueDate === '') {
+      setDueDate(defaultCollectiveDueDate())
+    }
+  }
+
+  function buildCollectiveInput() {
+    return {
+      memberId: selectedMember!.id,
+      purpose: purpose.trim(),
+      dueDate: dueDate === '' ? undefined : dueDate,
+      collectiveClassId: collectiveClassId === '' ? null : collectiveClassId,
+      bookCopyIds: books.map((b) => b.bookCopyId)
+    }
+  }
+
+  async function handleSaveCollective() {
+    setSaving(true)
+    try {
+      const result = await window.electronAPI.borrowings.createCollective(buildCollectiveInput())
+      notify.success('Transaksi berhasil disimpan.')
+      setCollectiveResult({
+        borrowingId: result.id,
+        borrowingNumber: result.borrowingNumber,
+        memberName: result.memberName,
+        totalItems: result.totalItems
+      })
+      setBooks([])
+      setSelectedMember(null)
+      setMemberStats(null)
+      setMemberOptions([])
+      setPurpose('')
+      setCollectiveClassId('')
+      setDueDate('')
+      setBarcode('')
+      barcodeRef.current?.focus()
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Terjadi kesalahan saat menyimpan transaksi.'
+      notify.error(message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  function handleNewCollective() {
+    setCollectiveResult(null)
+    setBorrowType('INDIVIDUAL')
+    setDueDate('')
+  }
+
   return (
     <div>
       <h1 className="text-2xl font-bold text-slate-800 mb-6">Peminjaman</h1>
+
+      <div className="flex gap-2 mb-6">
+        <button
+          onClick={() => handleBorrowTypeChange('INDIVIDUAL')}
+          className={`px-4 py-2 text-sm font-medium rounded-lg border transition-colors ${
+            borrowType === 'INDIVIDUAL'
+              ? 'bg-blue-600 text-white border-blue-600'
+              : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'
+          }`}
+        >
+          {LABELS.COLLECTIVE.TYPE_INDIVIDUAL}
+        </button>
+        <button
+          onClick={() => handleBorrowTypeChange('COLLECTIVE')}
+          className={`px-4 py-2 text-sm font-medium rounded-lg border transition-colors ${
+            borrowType === 'COLLECTIVE'
+              ? 'bg-blue-600 text-white border-blue-600'
+              : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'
+          }`}
+        >
+          {LABELS.COLLECTIVE.TYPE_COLLECTIVE}
+        </button>
+      </div>
+
+      {borrowType === 'COLLECTIVE' && collectiveResult && (
+        <div className="bg-green-50 border border-green-200 rounded-lg p-6 mb-6">
+          <h2 className="text-lg font-bold text-green-800 mb-4">{LABELS.COLLECTIVE.SUCCESS_TITLE}</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm mb-6">
+            <div>
+              <span className="text-green-700 block">{LABELS.COLLECTIVE.SUCCESS_NUMBER}</span>
+              <span className="text-green-900 font-medium">{collectiveResult.borrowingNumber}</span>
+            </div>
+            <div>
+              <span className="text-green-700 block">{LABELS.COLLECTIVE.SUCCESS_TEACHER}</span>
+              <span className="text-green-900 font-medium">{collectiveResult.memberName}</span>
+            </div>
+            <div>
+              <span className="text-green-700 block">{LABELS.COLLECTIVE.SUCCESS_COUNT}</span>
+              <span className="text-green-900 font-medium">{collectiveResult.totalItems}</span>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <button
+              onClick={() => navigate(collectiveCardPreviewPath(collectiveResult.borrowingId))}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              <Printer size={16} />
+              {LABELS.COLLECTIVE.PRINT_CARD}
+            </button>
+            <button
+              onClick={handleNewCollective}
+              className="px-4 py-2 bg-green-700 text-white text-sm font-medium rounded-lg hover:bg-green-800 transition-colors"
+            >
+              {LABELS.COLLECTIVE.NEW_TRANSACTION}
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="flex gap-6">
         <div className="flex-1 min-w-0 space-y-6">
@@ -244,8 +417,12 @@ export default function BorrowingPage() {
               value={selectedMember?.id ?? ''}
               onChange={handleMemberSelect}
               onSearch={fetchMembers}
-              placeholder="Cari nama / nomor anggota..."
-              label="Cari Anggota"
+              placeholder={
+                borrowType === 'COLLECTIVE'
+                  ? LABELS.COLLECTIVE.TEACHER_SEARCH_PLACEHOLDER
+                  : 'Cari nama / nomor anggota...'
+              }
+              label={borrowType === 'COLLECTIVE' ? LABELS.COLLECTIVE.TEACHER_PICKER : 'Cari Anggota'}
               selectedOption={selectedMember ? { id: selectedMember.id, name: selectedMember.fullName } : undefined}
             />
             {selectedMember && (
@@ -304,6 +481,41 @@ export default function BorrowingPage() {
             </div>
           )}
 
+          {borrowType === 'COLLECTIVE' && (
+            <>
+              <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-4">
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  {LABELS.COLLECTIVE.PURPOSE} <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={purpose}
+                  onChange={(e) => setPurpose(e.target.value)}
+                  placeholder={LABELS.COLLECTIVE.PURPOSE_PLACEHOLDER}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-4">
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  {LABELS.COLLECTIVE.CLASS_OPTIONAL}
+                </label>
+                <select
+                  value={collectiveClassId}
+                  onChange={(e) => setCollectiveClassId(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">{LABELS.COLLECTIVE.CLASS_ALL}</option>
+                  {classOptions.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </>
+          )}
+
           <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-4">
             <label className="block text-sm font-medium text-slate-700 mb-2">
               Due Date
@@ -323,8 +535,13 @@ export default function BorrowingPage() {
             <div className="space-y-1 text-sm">
               <div className="flex justify-between">
                 <span className="text-slate-500">Jumlah Buku</span>
-                <span className="text-slate-800 font-medium">{books.length}</span>
+                <span className="text-slate-800 font-medium">
+                  {borrowType === 'COLLECTIVE' ? collectiveTotal : books.length}
+                </span>
               </div>
+              {borrowType === 'COLLECTIVE' && (
+                <div className="text-xs text-slate-400">{LABELS.COLLECTIVE.MAX_HINT}</div>
+              )}
               <div className="flex justify-between">
                 <span className="text-slate-500">Nama Anggota</span>
                 <span className="text-slate-800 text-right">{selectedMember?.fullName ?? '-'}</span>
@@ -338,14 +555,25 @@ export default function BorrowingPage() {
             </div>
           </div>
 
-          <button
-            onClick={handleSave}
-            disabled={!canSave}
-            className="flex items-center justify-center gap-2 w-full px-4 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            <BookmarkCheck size={18} />
-            {saving ? 'Menyimpan...' : 'SIMPAN TRANSAKSI'}
-          </button>
+          {borrowType === 'COLLECTIVE' ? (
+            <button
+              onClick={handleSaveCollective}
+              disabled={!canSaveCollective}
+              className="flex items-center justify-center gap-2 w-full px-4 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              <BookmarkCheck size={18} />
+              {saving ? LABELS.COLLECTIVE.SAVING : LABELS.COLLECTIVE.CONFIRM}
+            </button>
+          ) : (
+            <button
+              onClick={handleSave}
+              disabled={!canSave}
+              className="flex items-center justify-center gap-2 w-full px-4 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              <BookmarkCheck size={18} />
+              {saving ? 'Menyimpan...' : 'SIMPAN TRANSAKSI'}
+            </button>
+          )}
         </div>
       </div>
     </div>

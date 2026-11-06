@@ -1,9 +1,14 @@
 import { ipcMain } from 'electron'
 import type { BorrowService } from '../../src/main/services/borrow.service'
+import type { CollectiveBorrowService } from '../../src/main/services/collective-borrow.service'
 import type { ReturnService } from '../../src/main/services/return.service'
 import type { BorrowDetailRepository } from '../../src/main/repositories/borrow-detail.repository'
 import type { BorrowRepository } from '../../src/main/repositories/borrow.repository'
 import type { BatchReturnInput, CreateBorrowingInput, ReturnBookInput } from '../../src/shared/dto/borrowing'
+import type {
+  CreateCollectiveBorrowingInput,
+  PreviewCollectiveBorrowingInput
+} from '../../src/shared/dto/collective-borrow'
 
 export function registerBorrowHandlers(
   borrowService: BorrowService,
@@ -43,5 +48,19 @@ export function registerBorrowHandlers(
 
   ipcMain.handle('returns:batchReturn', async (_event, input: BatchReturnInput) =>
     returnService.batchReturn(input)
+  )
+}
+
+export function registerCollectiveBorrowHandlers(collectiveBorrowService: CollectiveBorrowService): void {
+  ipcMain.handle('borrowings:previewCollective', async (_event, input: PreviewCollectiveBorrowingInput) =>
+    collectiveBorrowService.previewCollective(input)
+  )
+
+  ipcMain.handle('borrowings:createCollective', async (_event, input: CreateCollectiveBorrowingInput) =>
+    collectiveBorrowService.createCollective(input)
+  )
+
+  ipcMain.handle('borrowings:outstandingCopies', async (_event, borrowingId: string) =>
+    collectiveBorrowService.listOutstanding(borrowingId)
   )
 }

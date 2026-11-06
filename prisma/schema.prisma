@@ -54,6 +54,7 @@ model Class {
   curriculum        Curriculum         @relation(fields: [curriculumId], references: [id])
   members           Member[]
   memberEnrollments MemberEnrollment[]
+  collectiveBorrows Borrow[]
 
   @@unique([academicYearId, curriculumId, educationLevel, parallel])
   @@index([academicYearId])
@@ -266,15 +267,24 @@ model Borrow {
   memberName   String
   memberNumber String
   className    String?
+  // Peminjaman kolektif (Fase 1): guru meminjam banyak eksemplar sekaligus.
+  // borrowType: INDIVIDUAL | COLLECTIVE (tanpa enum DB, validasi di service).
+  // Default INDIVIDUAL agar seluruh data lama otomatis menjadi pinjaman individu.
+  borrowType          String  @default("INDIVIDUAL")
+  purpose             String?
+  collectiveClassId   String?
+  collectiveClassName String?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
-  member  Member         @relation(fields: [memberId], references: [id])
+  member         Member         @relation(fields: [memberId], references: [id])
+  collectiveClass Class?        @relation(fields: [collectiveClassId], references: [id], onDelete: SetNull)
   details BorrowDetail[]
   fines   Fine[]
 
   @@index([memberId])
   @@index([borrowNumber])
+  @@index([borrowType])
 }
 
 model BorrowDetail {

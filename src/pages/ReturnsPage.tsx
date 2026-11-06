@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Undo2, Search, BookOpen, User, ChevronRight, CheckCircle, Printer } from 'lucide-react'
 import { useNotification } from '../notification/NotificationContext'
-import { receiptPreviewPath, returnReceiptPreviewPath, ROUTES } from '../utils/navigation'
+import { receiptPreviewPath, returnReceiptPreviewPath, collectiveCardPreviewPath, ROUTES } from '../utils/navigation'
 import { summarizeReturnFines } from '../shared/utils/return-fines-summary'
 import { formatRupiah } from '../shared/utils/format-rupiah'
 import { LABELS } from '../utils/labels'
@@ -353,6 +353,11 @@ export default function ReturnsPage() {
               <div>
                 <span className="text-slate-500 block">Nomor Transaksi</span>
                 <span className="text-slate-800 font-medium">{transaction.borrowingNumber}</span>
+                {transaction.borrowType === 'COLLECTIVE' && (
+                  <span className="ml-2 text-xs font-medium text-purple-700 bg-purple-100 px-2 py-0.5 rounded">
+                    {LABELS.COLLECTIVE.BADGE}
+                  </span>
+                )}
               </div>
               <div>
                 <span className="text-slate-500 block">Anggota</span>
@@ -370,6 +375,23 @@ export default function ReturnsPage() {
                 </span>
               </div>
             </div>
+            {transaction.borrowType === 'COLLECTIVE' && transaction.purpose && (
+              <div className="mt-3 text-sm">
+                <span className="text-slate-500 block">{LABELS.COLLECTIVE.PURPOSE}</span>
+                <span className="text-slate-800">{transaction.purpose}</span>
+              </div>
+            )}
+            {transaction.borrowType === 'COLLECTIVE' && (
+              <div className="mt-3">
+                <button
+                  onClick={() => navigate(collectiveCardPreviewPath(transaction.id))}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  <Printer size={16} />
+                  {LABELS.COLLECTIVE.PRINT_CARD}
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Book List */}

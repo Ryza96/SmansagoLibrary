@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Eye, Inbox } from 'lucide-react'
 import { LABELS } from '../utils/labels'
-import { receiptPreviewPath } from '../utils/navigation'
+import { receiptPreviewPath, collectiveCardPreviewPath } from '../utils/navigation'
 
 interface ActiveBorrowingRow {
   id: string
@@ -12,6 +12,7 @@ interface ActiveBorrowingRow {
   borrowDate: string
   dueDate: string
   totalItems: number
+  borrowType?: string
 }
 
 const PAGE_LIMIT = 100
@@ -100,7 +101,14 @@ export default function BorrowCardPrintPage() {
               {formattedRows.map((row) => (
                 <tr key={row.id} className="border-b border-slate-50 hover:bg-slate-50">
                   <td className="px-4 py-2.5 text-slate-700">{row.borrowDateLabel}</td>
-                  <td className="px-4 py-2.5 text-slate-700 font-medium">{row.borrowingNumber}</td>
+                  <td className="px-4 py-2.5 text-slate-700 font-medium">
+                    {row.borrowingNumber}
+                    {row.borrowType === 'COLLECTIVE' && (
+                      <span className="ml-2 text-xs font-medium text-purple-700 bg-purple-100 px-2 py-0.5 rounded">
+                        {LABELS.COLLECTIVE.BADGE}
+                      </span>
+                    )}
+                  </td>
                   <td className="px-4 py-2.5 text-slate-700">{row.memberName}</td>
                   <td className="px-4 py-2.5 text-slate-500">{row.memberNumber}</td>
                   <td className="px-4 py-2.5 text-center text-slate-700">{row.totalItems}</td>
@@ -108,11 +116,17 @@ export default function BorrowCardPrintPage() {
                   <td className="px-4 py-2.5 text-center">
                     <button
                       type="button"
-                      onClick={() => navigate(receiptPreviewPath(row.id), { state: { activeOnly: true } })}
+                      onClick={() =>
+                        row.borrowType === 'COLLECTIVE'
+                          ? navigate(collectiveCardPreviewPath(row.id))
+                          : navigate(receiptPreviewPath(row.id), { state: { activeOnly: true } })
+                      }
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 transition-colors"
                     >
                       <Eye size={14} />
-                      {LABELS.BORROW_CARD_PRINT.ACTION_PREVIEW}
+                      {row.borrowType === 'COLLECTIVE'
+                        ? LABELS.COLLECTIVE.PRINT_CARD
+                        : LABELS.BORROW_CARD_PRINT.ACTION_PREVIEW}
                     </button>
                   </td>
                 </tr>

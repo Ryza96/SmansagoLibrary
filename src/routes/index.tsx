@@ -12,6 +12,7 @@ import BookDetailPage from '../pages/BookDetailPage'
 import BookFormPage from '../pages/BookFormPage'
 import LabelPreviewPage from '../pages/LabelPreviewPage'
 import BorrowReceiptPreviewPage from '../pages/BorrowReceiptPreviewPage'
+import CollectiveCardPreviewPage from '../pages/CollectiveCardPreviewPage'
 import BookImportPage from '../pages/BookImportPage'
 import BookImportPreviewPage from '../pages/BookImportPreviewPage'
 import MemberListPage from '../pages/MemberListPage'
@@ -91,6 +92,7 @@ export const router = createHashRouter([
       { path: 'borrowings', element: <BorrowingsPage /> },
       { path: 'borrowings/print-card', element: <BorrowCardPrintPage /> },
       { path: 'borrowings/:id/receipt-preview', element: <BorrowReceiptPreviewPage /> },
+      { path: 'borrowings/:id/collective-card-preview', element: <CollectiveCardPreviewPage /> },
       { path: 'returns', element: <ReturnsPage /> },
       { path: 'fines', element: <FinesPage /> },
       { path: 'returns/:id/receipt-preview', element: <ReturnReceiptPreviewPage /> },

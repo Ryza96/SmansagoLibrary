@@ -14,6 +14,12 @@ export const printAPI = {
     borrowCardPdf: (borrowingId: string, options?: { activeOnly?: boolean }) =>
       ipcRenderer.invoke('printing:borrowCardPdf', borrowingId, options) as Promise<{ saved: boolean; filePath?: string }>,
     returnReceiptPreview: (borrowingId: string, detailIds?: string[]) =>
-      ipcRenderer.invoke('printing:returnReceiptPreview', borrowingId, detailIds)
+      ipcRenderer.invoke('printing:returnReceiptPreview', borrowingId, detailIds),
+    collectiveCardPreview: (borrowingId: string) =>
+      ipcRenderer.invoke('printing:collectiveCardPreview', borrowingId),
+    collectiveCard: (borrowingId: string) =>
+      ipcRenderer.invoke('printing:collectiveCard', borrowingId),
+    collectiveCardPdf: (borrowingId: string) =>
+      ipcRenderer.invoke('printing:collectiveCardPdf', borrowingId) as Promise<{ saved: boolean; filePath?: string }>
   }
 }

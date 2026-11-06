@@ -78,6 +78,20 @@ export class BorrowDetailRepository extends BaseRepository {
     })
   }
 
+  // Kolektif Fase 1 — daftar eksemplar yang belum kembali untuk satu Borrow
+  // (pengembalian parsial). Urut inventoryNumber agar stabil di UI.
+  async findOutstandingByBorrowId(borrowId: string) {
+    return this.prisma.borrowDetail.findMany({
+      where: { borrowId, returnedAt: null },
+      orderBy: { createdAt: 'asc' },
+      include: {
+        bookCopy: {
+          include: { book: true }
+        }
+      }
+    })
+  }
+
   async count(): Promise<number> {
     return this.prisma.borrowDetail.count()
   }
