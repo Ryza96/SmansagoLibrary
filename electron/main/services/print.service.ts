@@ -9,6 +9,11 @@ import { renderFinesBlockHtml } from '../../../src/shared/utils/receipt-fines-ht
 import { SettingService } from './setting.service'
 import { generateLabelsHtml } from '../../../src/main/services/label.service'
 import { BORROW_CARD_LAYOUT, buildBorrowCardData, generateBorrowCardHtml } from '../../../src/main/services/borrow-card.service'
+import { generateReportPrintHtml } from '../../../src/main/services/report-print-html.service'
+import { ReportPrintService, buildReportPdfFilename } from '../../../src/main/services/report-print.service'
+import { ReportRepository } from '../../../src/main/repositories/report.repository'
+import { paginateReportRows } from '../../../src/shared/config/report-print'
+import type { ReportPrintData, ReportPrintRequest } from '../../../src/shared/dto/report-print'
 import {
   buildCollectiveCardData,
   generateCollectiveCardHtml
@@ -104,7 +109,11 @@ export class PrintService {
     private borrowRepository: BorrowRepository,
     private settingService: SettingService,
     private assetRoot: string = '',
-    private fineRepository: FineRepository = new FineRepository()
+    private fineRepository: FineRepository = new FineRepository(),
+    // TAHAP 2 (additive, opsional): ReportPrintService untuk orkestrasi
+    // Laporan Cetak A4. Bila tidak di-inject (bootstrap lama), dibuat lazy
+    // dari singleton yang sama (ReportRepository + SettingService).
+    private reportPrintService?: ReportPrintService
   ) {}
 
   // Electron's webContents.print() fires callback with success=false when the
@@ -323,6 +332,75 @@ export class PrintService {
 
     const result = await dialog.showSaveDialog({
       title: 'Simpan Kartu Kolektif PDF',
+      defaultPath: join(app.getPath('documents'), filename),
+      filters: [{ name: 'PDF', extensions: ['pdf'] }]
+    })
+
+    if (result.canceled || !result.filePath) {
+      return { saved: false }
+    }
+
+    await writeFile(result.filePath, pdf)
+    return { saved: true, filePath: result.filePath }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Laporan Cetak A4 (TAHAP 2) — Preview / Cetak / Simpan PDF.
+  // Orkestrasi saja: data dari ReportPrintService.buildData (TAHAP 1),
+  // template murni generateReportPrintHtml, logo persis pola kartu
+  // (resolveAssetPath → readFileAsDataUri → fallback monogram di template).
+  // Cetak memakai pageSize A4 EKSPLISIT agar printer tidak jatuh ke ukuran
+  // default; landscape diteruskan sebagai landscape:true + pageSize A4
+  // portrait (Chromium memutarnya), sesuai mandat TAHAP 2.
+  // ---------------------------------------------------------------------------
+
+  private getReportPrintService(): ReportPrintService {
+    this.reportPrintService ??= new ReportPrintService(new ReportRepository(), this.settingService)
+    return this.reportPrintService
+  }
+
+  private async buildReportPrintHtml(request: ReportPrintRequest): Promise<{ html: string; data: ReportPrintData }> {
+    const [data, settings] = await Promise.all([
+      this.getReportPrintService().buildData(request),
+      this.settingService.get()
+    ])
+    const resolvedLogoPath = resolveAssetPath(settings.logoPath, this.assetRoot)
+    const logoDataUri = resolvedLogoPath ? await this.readFileAsDataUri(resolvedLogoPath) : null
+    const html = generateReportPrintHtml(data, { logoDataUri })
+    return { html, data }
+  }
+
+  async previewReport(request: ReportPrintRequest): Promise<{ html: string; pageCount: number; orientation: ReportPrintData['orientation']; title: string }> {
+    const { html, data } = await this.buildReportPrintHtml(request)
+    return {
+      html,
+      pageCount: paginateReportRows(data.totalRows, data.orientation).pages.length,
+      orientation: data.orientation,
+      title: data.title
+    }
+  }
+
+  async printReport(request: ReportPrintRequest): Promise<void> {
+    const { html, data } = await this.buildReportPrintHtml(request)
+    const landscape = data.orientation === 'landscape'
+    await this.printHtml(html, {
+      margins: { marginType: 'none' },
+      // A4 eksplisit dalam mikron (210×297mm). Untuk landscape, Chromium
+      // memutar halaman via landscape:true (pageSize tetap A4 portrait).
+      pageSize: { width: 210000, height: 297000 },
+      landscape
+      // silent TIDAK diisi → false (dialog cetak OS muncul), sama seperti
+      // printBorrowCard; pembatalan oleh user diperlakukan normal oleh printHtml.
+    })
+  }
+
+  async saveReportPdf(request: ReportPrintRequest): Promise<{ saved: boolean; filePath?: string }> {
+    const { html } = await this.buildReportPrintHtml(request)
+    const pdf = await this.renderPdf(html)
+    const filename = buildReportPdfFilename(request.type, request.filter)
+
+    const result = await dialog.showSaveDialog({
+      title: 'Simpan Laporan PDF',
       defaultPath: join(app.getPath('documents'), filename),
       filters: [{ name: 'PDF', extensions: ['pdf'] }]
     })

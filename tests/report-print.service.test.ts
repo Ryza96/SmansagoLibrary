@@ -17,7 +17,9 @@ const settingsProvider = {
     phone: '0800',
     email: 'uji@example.test',
     librarianName: 'Pustakawan Uji',
-    principalName: 'Kepala Uji'
+    principalName: 'Kepala Uji',
+    librarianNip: '19800101 001',
+    principalNip: '19750101 001'
   })
 }
 const printService = new ReportPrintService(repository, settingsProvider)
@@ -43,6 +45,10 @@ async function cleanup() {
   await prisma.bookCopy.deleteMany()
   await prisma.book.deleteMany()
   await prisma.member.deleteMany()
+  await prisma.class.deleteMany()
+  await prisma.curriculum.deleteMany()
+  await prisma.academicYear.deleteMany()
+  await prisma.category.deleteMany()
   await prisma.setting.deleteMany()
 }
 
@@ -416,5 +422,35 @@ describe('Paritas dengan ReportService (status & lateDays identik)', () => {
     expect(printedReturn.rows[0][6]).toBe(
       screenReturn.rows[0].status === 'LATE' ? 'Terlambat' : 'Tepat Waktu'
     )
+  })
+})
+
+describe('ReportPrintService — filterSummary tercetak sebagai NAMA (TAHAP 2)', () => {
+  async function seedMaster() {
+    const year = await prisma.academicYear.create({ data: { name: '2026/2027', startDate: daysAgo(60), endDate: daysFromNow(300), isActive: true } })
+    const curriculum = await prisma.curriculum.create({ data: { name: 'Kurikulum Merdeka' } })
+    const kelas = await prisma.class.create({ data: { academicYearId: year.id, curriculumId: curriculum.id, educationLevel: 'X', parallel: 'A', isActive: true } })
+    const category = await prisma.category.create({ data: { code: 'FIKSI', name: 'Fiksi' } })
+    return { year, kelas, category }
+  }
+
+  it('Kelas & Tahun Ajaran tercetak sebagai nama ("X A", "2026/2027"), bukan ID', async () => {
+    const { year, kelas } = await seedMaster()
+    const data = await printService.buildData({ type: 'members', filter: { classId: kelas.id, academicYearId: year.id } })
+    expect(data.filterSummary.find((f) => f.label === 'Kelas')?.value).toBe('X A')
+    expect(data.filterSummary.find((f) => f.label === 'Tahun Ajaran')?.value).toBe('2026/2027')
+  })
+
+  it('Kategori tercetak sebagai nama ("Fiksi")', async () => {
+    const { category } = await seedMaster()
+    const data = await printService.buildData({ type: 'collections', filter: { categoryId: category.id } })
+    expect(data.filterSummary.find((f) => f.label === 'Kategori')?.value).toBe('Fiksi')
+  })
+
+  it('ID tidak ditemukan → "(tidak ditemukan)", bukan error', async () => {
+    const members = await printService.buildData({ type: 'members', filter: { classId: 'id-tidak-ada' } })
+    expect(members.filterSummary.find((f) => f.label === 'Kelas')?.value).toBe('(tidak ditemukan)')
+    const collections = await printService.buildData({ type: 'collections', filter: { categoryId: 'id-tidak-ada' } })
+    expect(collections.filterSummary.find((f) => f.label === 'Kategori')?.value).toBe('(tidak ditemukan)')
   })
 })

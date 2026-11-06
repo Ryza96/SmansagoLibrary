@@ -52,6 +52,10 @@ export interface ReportPrintInstitution {
   email: string
   librarianName: string
   principalName: string
+  /** NIP pustakawan (Setting.librarianNip; TAHAP 2 untuk tanda tangan). */
+  librarianNip: string
+  /** NIP kepala sekolah (Setting.principalNip; TAHAP 2 untuk tanda tangan). */
+  principalNip: string
 }
 
 export interface ReportPrintData {

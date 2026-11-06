@@ -286,6 +286,11 @@ interface ElectronAPI {
     members: (filter: import('../../src/shared/dto/report').MemberReportFilter) => Promise<import('../../src/shared/dto/report').MemberReportDTO>,
     collections: (filter: import('../../src/shared/dto/report').CollectionReportFilter) => Promise<import('../../src/shared/dto/report').CollectionReportDTO>,
   }
+  reportPrint: {
+    preview: (request: import('../../src/shared/dto/report-print').ReportPrintRequest) => Promise<{ html: string; pageCount: number; orientation: 'portrait' | 'landscape'; title: string }>,
+    print: (request: import('../../src/shared/dto/report-print').ReportPrintRequest) => Promise<void>,
+    pdf: (request: import('../../src/shared/dto/report-print').ReportPrintRequest) => Promise<{ saved: boolean; filePath?: string }>,
+  }
   backupUI: {
     getTargetInfo: () => Promise<import('../../src/shared/dto/backup-ui').BackupTargetInfo>,
     openFolder: () => Promise<import('../../src/shared/dto/backup-ui').OpenFolderResult>,

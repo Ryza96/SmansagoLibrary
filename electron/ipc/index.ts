@@ -55,6 +55,7 @@ import { registerAssetEventHandlers } from './asset-event.ipc'
 import { registerSettingHandlers } from './setting.ipc'
 import { registerDashboardHandlers } from './dashboard.ipc'
 import { registerReportHandlers } from './report.ipc'
+import { registerReportPrintHandlers } from './report-print.ipc'
 import { registerBackupUIHandlers } from './backup-ui.ipc'
 import { registerAuthHandlers } from './auth.ipc'
 
@@ -130,6 +131,7 @@ export function registerAllHandlers(
   )
   registerDashboardHandlers(services.dashboardService)
   registerReportHandlers(services.reportService)
+  registerReportPrintHandlers(services.printService)
   registerBackupUIHandlers({
     backupUIController: services.backupUIController,
     restoreUIController: services.restoreUIController,

@@ -21,6 +21,7 @@ import { bookImportAPI } from './book-import.preload'
 import { fineAPI } from './fine.preload'
 import { dashboardAPI } from './dashboard.preload'
 import { reportAPI } from './report.preload'
+import { reportPrintAPI } from './report-print.preload'
 import { backupUIAPI } from './backup-ui.preload'
 import { authAPI } from './auth.preload'
 
@@ -46,6 +47,7 @@ const electronAPI = {
   ...bookImportAPI,
   ...dashboardAPI,
   ...reportAPI,
+  ...reportPrintAPI,
   ...backupUIAPI,
   ...authAPI,
   ...fineAPI

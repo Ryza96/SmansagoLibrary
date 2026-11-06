@@ -710,6 +710,29 @@ export class ReportRepository extends BaseRepository {
     const data = await this.withBookCounts(books)
     return { data, totalRows }
   }
+
+  // -------------------------------------------------------------------------
+  // Resolver nama untuk filterSummary Laporan Cetak (TAHAP 2, additive).
+  // Dipakai ReportPrintService untuk mencetak NAMA (bukan ID) pada baris
+  // meta Kelas / Kategori / Tahun Ajaran. ID tidak ditemukan → null (service
+  // mencetak "(tidak ditemukan)", bukan melempar error).
+  // -------------------------------------------------------------------------
+
+  async findClassLabelById(id: string): Promise<string | null> {
+    const row = await this.prisma.class.findUnique({ where: { id }, select: { educationLevel: true, parallel: true } })
+    // Format sama dengan kolom Kelas Laporan Anggota: "X A".
+    return row ? `${row.educationLevel} ${row.parallel}` : null
+  }
+
+  async findCategoryNameById(id: string): Promise<string | null> {
+    const row = await this.prisma.category.findUnique({ where: { id }, select: { name: true } })
+    return row?.name ?? null
+  }
+
+  async findAcademicYearNameById(id: string): Promise<string | null> {
+    const row = await this.prisma.academicYear.findUnique({ where: { id }, select: { name: true } })
+    return row?.name ?? null
+  }
 }
 
 // R-6 (G-6): search laporan koleksi = OR atas title, isbn, author.name, publisher.name

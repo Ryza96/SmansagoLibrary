@@ -53,3 +53,5 @@ electron-builder-cache/
 # referensi desain & harness test manual, sengaja tidak di-commit.
 design-reference/
 print_engine_experiment_phase3/
+report_print_smoke/out/
+report_print_smoke/smoke_out/

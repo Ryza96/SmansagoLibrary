@@ -43,6 +43,8 @@ export interface ReportPrintSettings {
   email: string
   librarianName: string
   principalName: string
+  librarianNip: string
+  principalNip: string
 }
 
 export interface ReportPrintSettingsProvider {
@@ -91,13 +93,14 @@ function toFileDatePart(value: string | undefined, fallback: Date): string {
 
 export function buildReportPdfFilename(
   type: ReportPrintRequest['type'],
-  filter: { from?: string; to?: string },
+  filter: { from?: string; to?: string } | object,
   now: Date = new Date()
 ): string {
+  const period = filter as { from?: string; to?: string }
   const title = sanitizeFileSegment(REPORT_PRINT_TITLES[type]).slice(0, 60) || 'Laporan'
-  const hasPeriod = Boolean(filter.from && filter.to)
+  const hasPeriod = Boolean(period.from && period.to)
   const datePart = hasPeriod
-    ? `${toFileDatePart(filter.from, now)} s.d. ${toFileDatePart(filter.to, now)}`
+    ? `${toFileDatePart(period.from, now)} s.d. ${toFileDatePart(period.to, now)}`
     : toFileDatePart(undefined, now)
   return `${title} - ${datePart}.pdf`
 }
@@ -213,8 +216,24 @@ export class ReportPrintService {
       phone: s.phone,
       email: s.email,
       librarianName: s.librarianName,
-      principalName: s.principalName
+      principalName: s.principalName,
+      librarianNip: s.librarianNip,
+      principalNip: s.principalNip
     }
+  }
+
+  // Resolver nama filter (TAHAP 2): cetak NAMA, bukan ID. ID tidak ditemukan
+  // → "(tidak ditemukan)" (tidak melempar error; dokumen tetap tercetak).
+  private async resolveClassName(id: string): Promise<string> {
+    return (await this.reportRepository.findClassLabelById(id)) ?? '(tidak ditemukan)'
+  }
+
+  private async resolveCategoryName(id: string): Promise<string> {
+    return (await this.reportRepository.findCategoryNameById(id)) ?? '(tidak ditemukan)'
+  }
+
+  private async resolveAcademicYearName(id: string): Promise<string> {
+    return (await this.reportRepository.findAcademicYearNameById(id)) ?? '(tidak ditemukan)'
   }
 
   private periodLine(from: Date, to: Date) {
@@ -391,8 +410,8 @@ export class ReportPrintService {
       const known = Object.values(MEMBER_TYPES).find((t) => t.code === filter.memberType)
       filterSummary.push({ label: 'Tipe Anggota', value: known ? known.label : filter.memberType })
     }
-    if (filter.classId) filterSummary.push({ label: 'Kelas', value: filter.classId })
-    if (filter.academicYearId) filterSummary.push({ label: 'Tahun Ajaran', value: filter.academicYearId })
+    if (filter.classId) filterSummary.push({ label: 'Kelas', value: await this.resolveClassName(filter.classId) })
+    if (filter.academicYearId) filterSummary.push({ label: 'Tahun Ajaran', value: await this.resolveAcademicYearName(filter.academicYearId) })
     if (filter.search) filterSummary.push({ label: 'Pencarian', value: filter.search })
 
     const countByType = new Map(typeCounts.map((t) => [t.memberType, t.count]))
@@ -436,7 +455,7 @@ export class ReportPrintService {
     ])
 
     const filterSummary: { label: string; value: string }[] = []
-    if (filter.categoryId) filterSummary.push({ label: 'Kategori', value: filter.categoryId })
+    if (filter.categoryId) filterSummary.push({ label: 'Kategori', value: await this.resolveCategoryName(filter.categoryId) })
     if (filter.search) filterSummary.push({ label: 'Pencarian', value: filter.search })
 
     return {
