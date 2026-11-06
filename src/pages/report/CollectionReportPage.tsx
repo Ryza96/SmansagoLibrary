@@ -1,8 +1,11 @@
 import { useState, useEffect } from 'react'
-import { Search, ChevronLeft, ChevronRight, BookMarked, Layers, Wallet, BookOpenCheck, Hand, PackageX, CircleAlert } from 'lucide-react'
-import type { CollectionReportDTO } from '../../shared/dto/report'
+import { useLocation, useNavigate } from 'react-router-dom'
+import { Search, ChevronLeft, ChevronRight, BookMarked, Layers, Wallet, BookOpenCheck, Hand, PackageX, CircleAlert, Printer } from 'lucide-react'
+import type { CollectionReportDTO, CollectionReportFilter } from '../../shared/dto/report'
 import type { CategoryDTO } from '../../types/dtos/master'
 import { LABELS } from '../../utils/labels'
+import { ROUTES } from '../../utils/navigation'
+import { buildCollectionsPrintRequest, extractNavFilter } from '../../utils/report-print'
 
 const api = window.electronAPI
 
@@ -37,8 +40,11 @@ const COUNT_BADGE: Record<'AVAILABLE' | 'BORROWED' | 'LOST' | 'DAMAGED', { label
 }
 
 export default function CollectionReportPage() {
-  const [search, setSearch] = useState('')
-  const [categoryId, setCategoryId] = useState('')
+  const navigate = useNavigate()
+  const location = useLocation()
+  const printInit = extractNavFilter(location.state) as CollectionReportFilter | null
+  const [search, setSearch] = useState(() => printInit?.search ?? '')
+  const [categoryId, setCategoryId] = useState(() => printInit?.categoryId ?? '')
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [report, setReport] = useState<CollectionReportDTO | null>(null)
@@ -90,9 +96,23 @@ export default function CollectionReportPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-800">{LABELS.REPORT.COLLECTIONS}</h1>
-        <p className="text-sm text-slate-500 mt-1">{LABELS.REPORT.COLLECTIONS_DESC}</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-800">{LABELS.REPORT.COLLECTIONS}</h1>
+          <p className="text-sm text-slate-500 mt-1">{LABELS.REPORT.COLLECTIONS_DESC}</p>
+        </div>
+        <button
+          onClick={() =>
+            navigate(ROUTES.REPORT_PRINT_PREVIEW, {
+              state: { request: buildCollectionsPrintRequest(categoryId, search), fromPath: ROUTES.REPORT_COLLECTIONS }
+            })
+          }
+          disabled={loading}
+          className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <Printer size={16} />
+          {LABELS.REPORT.PRINT}
+        </button>
       </div>
 
       {/* ── FILTER BAR ── */}

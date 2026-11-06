@@ -781,6 +781,17 @@ export const LABELS = {
     CATEGORY_FILTER: 'Kategori',
     CATEGORY_ALL: 'Semua Kategori',
     SEARCH_BOOK: 'Cari judul, ISBN, penulis, atau penerbit...',
+    PRINT: 'Cetak Laporan',
+    PRINT_PREVIEW_TITLE: 'Pratinjau Laporan',
+    PRINT_BACK: 'Kembali ke Laporan',
+    PRINT_PREVIEW_LOADING: 'Memuat pratinjau laporan...',
+    PRINT_PREVIEW_ERROR: 'Terjadi kesalahan saat memuat pratinjau laporan.',
+    PRINT_PREVIEW_NO_STATE: 'Pratinjau tidak dapat dibuka tanpa data laporan. Silakan kembali ke menu Laporan.',
+    PRINT_SAVED: 'Laporan berhasil disimpan: ',
+    PRINT_SENT: 'Laporan dikirim ke printer.',
+    PRINT_PAGES: 'halaman',
+    PRINT_PORTRAIT: 'Portrait',
+    PRINT_LANDSCAPE: 'Landscape'
   },
   BACKUP_RESTORE: {
     BACKUP_TITLE: 'Backup Data',

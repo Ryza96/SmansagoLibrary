@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import {
   Search,
   ChevronLeft,
@@ -7,10 +8,14 @@ import {
   BookMarked,
   BookUp,
   TriangleAlert,
-  CalendarDays
+  CalendarDays,
+  Printer
 } from 'lucide-react'
 import type { BorrowReportStatus, BorrowingReportDTO } from '../../shared/dto/report'
+import type { BorrowReportFilter } from '../../shared/dto/report'
 import { LABELS } from '../../utils/labels'
+import { ROUTES } from '../../utils/navigation'
+import { buildBorrowingsPrintRequest, extractNavFilter, toDateInputValue } from '../../utils/report-print'
 
 const api = window.electronAPI
 
@@ -57,10 +62,18 @@ const STATUS_OPTIONS: { value: '' | BorrowReportStatus; label: string }[] = [
 ]
 
 export default function BorrowingReportPage() {
-  const [from, setFrom] = useState('')
-  const [to, setTo] = useState('')
-  const [status, setStatus] = useState<'' | BorrowReportStatus>('')
-  const [search, setSearch] = useState('')
+  const navigate = useNavigate()
+  const location = useLocation()
+  // Filter utuh kembali dari preview (state navigasi); selain itu default.
+  const printInit = extractNavFilter(location.state) as BorrowReportFilter | null
+  const [from, setFrom] = useState(() => toDateInputValue(printInit?.from))
+  const [to, setTo] = useState(() => toDateInputValue(printInit?.to))
+  const [status, setStatus] = useState<'' | BorrowReportStatus>(() =>
+    printInit?.status === 'ACTIVE' || printInit?.status === 'COMPLETED' || printInit?.status === 'OVERDUE'
+      ? printInit.status
+      : ''
+  )
+  const [search, setSearch] = useState(() => printInit?.search ?? '')
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [report, setReport] = useState<BorrowingReportDTO | null>(null)
@@ -98,9 +111,23 @@ export default function BorrowingReportPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-800">{LABELS.REPORT.BORROWINGS}</h1>
-        <p className="text-sm text-slate-500 mt-1">{LABELS.REPORT.BORROWINGS_DESC}</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-800">{LABELS.REPORT.BORROWINGS}</h1>
+          <p className="text-sm text-slate-500 mt-1">{LABELS.REPORT.BORROWINGS_DESC}</p>
+        </div>
+        <button
+          onClick={() =>
+            navigate(ROUTES.REPORT_PRINT_PREVIEW, {
+              state: { request: buildBorrowingsPrintRequest(from, to, status, search), fromPath: ROUTES.REPORT_BORROWINGS }
+            })
+          }
+          disabled={loading}
+          className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <Printer size={16} />
+          {LABELS.REPORT.PRINT}
+        </button>
       </div>
 
       {/* ── FILTER BAR ── */}

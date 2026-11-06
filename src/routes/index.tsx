@@ -33,6 +33,7 @@ import ReturnReportPage from '../pages/report/ReturnReportPage'
 import OverdueReportPage from '../pages/report/OverdueReportPage'
 import MemberReportPage from '../pages/report/MemberReportPage'
 import CollectionReportPage from '../pages/report/CollectionReportPage'
+import ReportPrintPreviewPage from '../pages/report/ReportPrintPreviewPage'
 import SettingsPage from '../pages/SettingsPage'
 import AuthorListPage from '../pages/master/AuthorListPage'
 import AuthorFormPage from '../pages/master/AuthorFormPage'
@@ -107,6 +108,7 @@ export const router = createHashRouter([
       { path: 'reports/overdues', element: <OverdueReportPage /> },
       { path: 'reports/members', element: <MemberReportPage /> },
       { path: 'reports/collections', element: <CollectionReportPage /> },
+      { path: 'reports/print-preview', element: <ReportPrintPreviewPage /> },
       { path: 'backup', element: <BackupPage /> },
       { path: 'restore', element: <RestorePage /> },
       { path: 'settings', element: <SettingsPage /> },

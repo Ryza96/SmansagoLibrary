@@ -30,6 +30,7 @@ export const ROUTES = {
   REPORT_OVERDUES: '/reports/overdues',
   REPORT_MEMBERS: '/reports/members',
   REPORT_COLLECTIONS: '/reports/collections',
+  REPORT_PRINT_PREVIEW: '/reports/print-preview',
   SETTINGS: '/settings',
   CHANGE_PASSWORD: '/settings/change-password',
   MASTER_AUTHORS: '/master/authors',

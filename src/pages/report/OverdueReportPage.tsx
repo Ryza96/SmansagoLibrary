@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import {
   Search,
   ChevronLeft,
@@ -6,10 +7,13 @@ import {
   TriangleAlert,
   Clock,
   Undo2,
-  CalendarDays
+  CalendarDays,
+  Printer
 } from 'lucide-react'
-import type { OverdueCategory, OverdueReportDTO } from '../../shared/dto/report'
+import type { OverdueCategory, OverdueReportDTO, OverdueReportFilter } from '../../shared/dto/report'
 import { LABELS } from '../../utils/labels'
+import { ROUTES } from '../../utils/navigation'
+import { buildOverduesPrintRequest, extractNavFilter, toDateInputValue } from '../../utils/report-print'
 
 const api = window.electronAPI
 
@@ -48,9 +52,12 @@ function StatCard({ icon, label, value, color }: StatCardProps) {
 }
 
 export default function OverdueReportPage() {
-  const [from, setFrom] = useState('')
-  const [to, setTo] = useState('')
-  const [search, setSearch] = useState('')
+  const navigate = useNavigate()
+  const location = useLocation()
+  const printInit = extractNavFilter(location.state) as OverdueReportFilter | null
+  const [from, setFrom] = useState(() => toDateInputValue(printInit?.from))
+  const [to, setTo] = useState(() => toDateInputValue(printInit?.to))
+  const [search, setSearch] = useState(() => printInit?.search ?? '')
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [report, setReport] = useState<OverdueReportDTO | null>(null)
@@ -87,9 +94,23 @@ export default function OverdueReportPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-800">{LABELS.REPORT.OVERDUES}</h1>
-        <p className="text-sm text-slate-500 mt-1">{LABELS.REPORT.OVERDUES_DESC}</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-800">{LABELS.REPORT.OVERDUES}</h1>
+          <p className="text-sm text-slate-500 mt-1">{LABELS.REPORT.OVERDUES_DESC}</p>
+        </div>
+        <button
+          onClick={() =>
+            navigate(ROUTES.REPORT_PRINT_PREVIEW, {
+              state: { request: buildOverduesPrintRequest(from, to, search), fromPath: ROUTES.REPORT_OVERDUES }
+            })
+          }
+          disabled={loading}
+          className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <Printer size={16} />
+          {LABELS.REPORT.PRINT}
+        </button>
       </div>
 
       {/* ── FILTER BAR ── */}

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import {
   Search,
   ChevronLeft,
@@ -7,11 +8,14 @@ import {
   UserCheck,
   UserX,
   CalendarDays,
-  GraduationCap
+  GraduationCap,
+  Printer
 } from 'lucide-react'
-import type { MemberReportDTO } from '../../shared/dto/report'
+import type { MemberReportDTO, MemberReportFilter } from '../../shared/dto/report'
 import type { ClassDTO } from '../../shared/dto/academic'
 import { LABELS } from '../../utils/labels'
+import { ROUTES } from '../../utils/navigation'
+import { buildMembersPrintRequest, extractNavFilter } from '../../utils/report-print'
 
 const api = window.electronAPI
 
@@ -58,9 +62,14 @@ function StatCard({ icon, label, value, color }: StatCardProps) {
 }
 
 export default function MemberReportPage() {
-  const [search, setSearch] = useState('')
-  const [status, setStatus] = useState<'' | 'ACTIVE' | 'INACTIVE'>('')
-  const [classId, setClassId] = useState('')
+  const navigate = useNavigate()
+  const location = useLocation()
+  const printInit = extractNavFilter(location.state) as MemberReportFilter | null
+  const [search, setSearch] = useState(() => printInit?.search ?? '')
+  const [status, setStatus] = useState<'' | 'ACTIVE' | 'INACTIVE'>(() =>
+    printInit?.status === 'ACTIVE' || printInit?.status === 'INACTIVE' ? printInit.status : ''
+  )
+  const [classId, setClassId] = useState(() => printInit?.classId ?? '')
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [report, setReport] = useState<MemberReportDTO | null>(null)
@@ -112,9 +121,23 @@ export default function MemberReportPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-800">{LABELS.REPORT.MEMBERS}</h1>
-        <p className="text-sm text-slate-500 mt-1">{LABELS.REPORT.MEMBERS_DESC}</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-800">{LABELS.REPORT.MEMBERS}</h1>
+          <p className="text-sm text-slate-500 mt-1">{LABELS.REPORT.MEMBERS_DESC}</p>
+        </div>
+        <button
+          onClick={() =>
+            navigate(ROUTES.REPORT_PRINT_PREVIEW, {
+              state: { request: buildMembersPrintRequest(status, classId, search), fromPath: ROUTES.REPORT_MEMBERS }
+            })
+          }
+          disabled={loading}
+          className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <Printer size={16} />
+          {LABELS.REPORT.PRINT}
+        </button>
       </div>
 
       {/* ── FILTER BAR ── */}
