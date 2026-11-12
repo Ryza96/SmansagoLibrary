@@ -19,6 +19,7 @@ import type {
   ReturnReportRowDTO
 } from '../../shared/dto/report'
 import { MEMBER_TYPES } from '../../shared/config/member-type'
+import { AppError } from '../../../electron/main/errorHandler'
 
 // Report Module (R-1) — Service mapping repository → DTO.
 // KEPUTUSAN PO: laporan v1.0 tanpa kolom Petugas (K1) dan tanpa nominal denda (K2).
@@ -43,10 +44,14 @@ export function endOfDay(d: Date): Date {
 
 export function parseRange(from?: string, to?: string): { from: Date; to: Date } {
   const now = new Date()
-  return {
-    from: startOfDay(from ? new Date(from) : now),
-    to: endOfDay(to ? new Date(to) : now)
+  const parsedFrom = from ? startOfDay(new Date(from)) : startOfDay(now)
+  const parsedTo = to ? endOfDay(new Date(to)) : endOfDay(now)
+  // Validasi periode (P7): from > to ditolak 400 dengan pesan Indonesia.
+  // Berlaku untuk layar DAN cetak (ReportPrintService memakai parseRange yang sama).
+  if (from && to && parsedFrom.getTime() > parsedTo.getTime()) {
+    throw new AppError(400, 'Validation Error', 'Tanggal mulai tidak boleh setelah tanggal akhir.')
   }
+  return { from: parsedFrom, to: parsedTo }
 }
 
 export function iso(d: Date): string {
@@ -101,7 +106,7 @@ export class ReportService {
 
     const [result, summary] = await Promise.all([
       this.reportRepository.findBorrowingsBetween({ from, to, status: filter.status, search: filter.search, page: filter.page, limit: filter.limit }),
-      this.reportRepository.countBorrowStatusSummary(from, to, filter.search)
+      this.reportRepository.countBorrowStatusSummary(from, to, filter.search, filter.status)
     ])
 
     const rows: BorrowingReportRowDTO[] = []
@@ -113,7 +118,8 @@ export class ReportService {
           borrowDate: iso(b.borrowDate),
           memberNumber: b.memberNumber,
           memberName: b.memberName,
-          className: b.className,
+          // P5: kelas individu kosong → pakai kelas kolektif (snapshot transaksi).
+          className: b.className ?? b.collectiveClassName ?? null,
           bookTitle: d.bookTitle,
           dueDate: iso(b.dueDate),
           returnDate: b.returnDate ? iso(b.returnDate) : null,
@@ -156,7 +162,8 @@ export class ReportService {
         returnedAt: iso(returnedAt ?? new Date()),
         memberNumber: d.borrow.memberNumber,
         memberName: d.borrow.memberName,
-        className: d.borrow.className,
+        // P5: kelas individu kosong → kelas kolektif (snapshot transaksi).
+        className: d.borrow.className ?? d.borrow.collectiveClassName ?? null,
         bookTitle: d.bookTitle,
         conditionBack: d.conditionBack,
         dueDate: iso(d.borrow.dueDate),
@@ -223,7 +230,8 @@ export class ReportService {
       borrowDate: iso(d.borrow.borrowDate),
       memberNumber: d.borrow.memberNumber,
       memberName: d.borrow.memberName,
-      className: d.borrow.className,
+      // P5: kelas individu kosong → kelas kolektif (snapshot transaksi).
+      className: d.borrow.className ?? d.borrow.collectiveClassName ?? null,
       bookTitle: d.bookTitle,
       dueDate: iso(d.borrow.dueDate),
       returnDate: null,
@@ -236,7 +244,8 @@ export class ReportService {
       borrowDate: iso(r.borrowDate),
       memberNumber: r.memberNumber,
       memberName: r.memberName,
-      className: r.className,
+      // P5: kelas individu kosong → kelas kolektif (snapshot transaksi).
+      className: r.className ?? r.collectiveClassName ?? null,
       bookTitle: r.bookTitle,
       dueDate: iso(r.dueDate),
       returnDate: iso(r.returnedAt),

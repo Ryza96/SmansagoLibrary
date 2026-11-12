@@ -110,6 +110,18 @@ export function buildReportPdfFilename(
 // Indonesia (hitam-putih — tidak bergantung warna).
 // ---------------------------------------------------------------------------
 
+// Kolom "Nama Anggota" cetak = "<nomor anggota> · <nama>" (P2) untuk
+// Peminjaman, Pengembalian, Keterlambatan. Nomor = snapshot Borrow.memberNumber
+// (BUKAN Member master) — identik dengan nilai yang dicetak di layar.
+function memberPrintLabel(memberNumber: string, memberName: string): string {
+  return `${memberNumber} · ${memberName}`
+}
+
+// Kelas cetak: kelas individu kosong → kelas kolektif (P5), lalu fallback "-".
+function classPrintLabel(className: string | null, collectiveClassName: string | null): string {
+  return className ?? collectiveClassName ?? '-'
+}
+
 const COLUMNS: Record<ReportPrintRequest['type'], ReportPrintColumn[]> = {
   borrowings: [
     { key: 'borrowDate', label: 'Tanggal', align: 'center' },
@@ -249,7 +261,7 @@ export class ReportPrintService {
     const now = Date.now()
     const [exported, statusSummary] = await Promise.all([
       this.reportRepository.findAllBorrowingsForExport({ from, to, status: filter.status, search: filter.search }),
-      this.reportRepository.countBorrowStatusSummary(from, to, filter.search)
+      this.reportRepository.countBorrowStatusSummary(from, to, filter.search, filter.status)
     ])
 
     const rows: string[][] = []
@@ -259,8 +271,8 @@ export class ReportPrintService {
         rows.push([
           formatReportDateId(iso(b.borrowDate)),
           b.borrowNumber,
-          b.memberName,
-          b.className ?? '-',
+          memberPrintLabel(b.memberNumber, b.memberName),
+          classPrintLabel(b.className, b.collectiveClassName),
           d.bookTitle,
           formatReportDateId(iso(b.dueDate)),
           statusText
@@ -282,7 +294,9 @@ export class ReportPrintService {
       rows,
       totalRows: exported.totalRows,
       totals: [
-        { label: 'Total Transaksi', value: String(exported.data.length) },
+        // P1: Total Transaksi = Aktif + Selesai dari summary (filter-aware),
+        // bukan exported.data.length.
+        { label: 'Total Transaksi', value: String(statusSummary.active + statusSummary.completed) },
         { label: 'Aktif', value: String(statusSummary.active) },
         { label: 'Selesai', value: String(statusSummary.completed) },
         { label: 'Terlambat', value: String(statusSummary.overdue) }
@@ -308,8 +322,8 @@ export class ReportPrintService {
       return [
         formatReportDateId(iso(returnedAt ?? new Date())),
         d.borrow.borrowNumber,
-        d.borrow.memberName,
-        d.borrow.className ?? '-',
+        memberPrintLabel(d.borrow.memberNumber, d.borrow.memberName),
+        classPrintLabel(d.borrow.className, d.borrow.collectiveClassName),
         d.bookTitle,
         returnedAt ? `${diffDays(returnedAt, d.borrow.borrowDate)} hari` : '0 hari',
         RETURN_STATUS_TEXT[status] ?? status
@@ -352,8 +366,8 @@ export class ReportPrintService {
     const activeRows = exported.active.map((d) => [
       formatReportDateId(iso(d.borrow.borrowDate)),
       d.borrow.borrowNumber,
-      d.borrow.memberName,
-      d.borrow.className ?? '-',
+      memberPrintLabel(d.borrow.memberNumber, d.borrow.memberName),
+      classPrintLabel(d.borrow.className, d.borrow.collectiveClassName),
       d.bookTitle,
       formatReportDateId(iso(d.borrow.dueDate)),
       String(diffDays(nowDate, d.borrow.dueDate)),
@@ -362,8 +376,8 @@ export class ReportPrintService {
     const returnedRows = exported.returned.map((r) => [
       formatReportDateId(iso(r.borrowDate)),
       r.borrowNumber,
-      r.memberName,
-      r.className ?? '-',
+      memberPrintLabel(r.memberNumber, r.memberName),
+      classPrintLabel(r.className, r.collectiveClassName),
       r.bookTitle,
       formatReportDateId(iso(r.dueDate)),
       String(diffDays(r.returnedAt, r.dueDate)),

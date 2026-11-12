@@ -14,6 +14,14 @@ import { REPORT_PRINT_MAX_ROWS } from '../../shared/config/report-print'
 
 export type BorrowReportStatusFilter = 'ACTIVE' | 'COMPLETED' | 'OVERDUE'
 
+// Pencarian laporan: trim + truthy — spasi awal/akhir dianggap TANPA pencarian.
+// Satu sumber normalisasi agar Peminjaman/Pengembalian/Anggota/Koleksi berperilaku
+// identik (Keterlambatan sudah men-trim di buildActiveOverdueWhere/SQL masing-masing).
+export function normalizeSearch(search?: string): string | undefined {
+  const s = search?.trim()
+  return s ? s : undefined
+}
+
 export interface BorrowReportQuery {
   from: Date
   to: Date
@@ -131,6 +139,7 @@ export interface ReturnedLateRawRow {
   memberNumber: string
   memberName: string
   className: string | null
+  collectiveClassName: string | null
   bookTitle: string
   conditionBack: string | null
 }
@@ -145,8 +154,8 @@ function buildBorrowReportWhere(query: BorrowReportQuery): Prisma.BorrowWhereInp
     where.returnDate = null
     where.dueDate = { lt: new Date() }
   }
-  if (query.search) {
-    const s = query.search
+  const s = normalizeSearch(query.search)
+  if (s) {
     where.OR = [
       { borrowNumber: { contains: s } },
       {
@@ -170,8 +179,8 @@ function buildReturnReportWhere(query: ReturnReportQuery): Prisma.BorrowDetailWh
   const where: Prisma.BorrowDetailWhereInput = {
     returnedAt: { gte: query.from, lte: query.to }
   }
-  if (query.search) {
-    const s = query.search
+  const s = normalizeSearch(query.search)
+  if (s) {
     where.OR = [
       { borrow: { borrowNumber: { contains: s } } },
       { borrow: { memberNumber: { contains: s } } },
@@ -231,10 +240,11 @@ function buildReturnedLateSearchSql(search?: string): Prisma.Sql {
 function buildMemberReportWhere(query: MemberReportQuery): Prisma.MemberWhereInput {
   const where: Prisma.MemberWhereInput = {}
 
-  if (query.search) {
+  const s = normalizeSearch(query.search)
+  if (s) {
     where.OR = [
-      { memberNumber: { contains: query.search } },
-      { fullName: { contains: query.search } }
+      { memberNumber: { contains: s } },
+      { fullName: { contains: s } }
     ]
   }
   if (query.memberType) where.memberType = query.memberType
@@ -308,12 +318,36 @@ export class ReportRepository extends BaseRepository {
     return toPaginatedResult<BorrowReportRow>(data, total, { page: query.page, limit: query.limit })
   }
 
-  async countBorrowStatusSummary(from: Date, to: Date, search?: string) {
+  // Ringkasan status Peminjaman (R-2). Tanpa filter status: perilaku lama
+  // (active/completed/overdue dihitung semua; Terlambat ⊆ Aktif).
+  // Dengan filter status: komponen ikut terfilter agar identitas
+  // "Total Transaksi = Aktif + Selesai" tetap berlaku pada ringkasan layar
+  // DAN cetak (P1). Terlambat selalu ⊆ Aktif.
+  async countBorrowStatusSummary(from: Date, to: Date, search?: string, status?: BorrowReportStatusFilter) {
     const base = buildBorrowReportWhere({ from, to, search })
+    const now = new Date()
+
+    if (status === 'ACTIVE') {
+      const [active, overdue] = await Promise.all([
+        this.prisma.borrow.count({ where: { ...base, returnDate: null } }),
+        this.prisma.borrow.count({ where: { ...base, returnDate: null, dueDate: { lt: now } } })
+      ])
+      return { active, completed: 0, overdue }
+    }
+    if (status === 'COMPLETED') {
+      const completed = await this.prisma.borrow.count({ where: { ...base, returnDate: { not: null } } })
+      return { active: 0, completed, overdue: 0 }
+    }
+    if (status === 'OVERDUE') {
+      const overdue = await this.prisma.borrow.count({ where: { ...base, returnDate: null, dueDate: { lt: now } } })
+      // Aktif = seluruh transaksi yang terfilter (OVERDUE) → Total = Aktif + Selesai.
+      return { active: overdue, completed: 0, overdue }
+    }
+
     const [active, completed, overdue] = await Promise.all([
       this.prisma.borrow.count({ where: { ...base, returnDate: null } }),
       this.prisma.borrow.count({ where: { ...base, returnDate: { not: null } } }),
-      this.prisma.borrow.count({ where: { ...base, returnDate: null, dueDate: { lt: new Date() } } })
+      this.prisma.borrow.count({ where: { ...base, returnDate: null, dueDate: { lt: now } } })
     ])
     return { active, completed, overdue }
   }
@@ -462,7 +496,8 @@ export class ReportRepository extends BaseRepository {
         b.dueDate,
         b.memberNumber,
         b.memberName,
-        b.className
+        b.className,
+        b.collectiveClassName
       FROM BorrowDetail bd
       JOIN Borrow b ON b.id = bd.borrowId
       WHERE bd.returnedAt IS NOT NULL
@@ -741,8 +776,8 @@ export class ReportRepository extends BaseRepository {
 function buildBookReportWhere(query: Pick<BookReportQuery, 'categoryId' | 'search'>): Prisma.BookWhereInput {
   const where: Prisma.BookWhereInput = {}
   if (query.categoryId) where.categoryId = query.categoryId
-  if (query.search) {
-    const s = query.search
+  const s = normalizeSearch(query.search)
+  if (s) {
     where.OR = [
       { title: { contains: s } },
       { isbn: { contains: s } },
