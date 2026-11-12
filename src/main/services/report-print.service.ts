@@ -290,7 +290,11 @@ export class ReportPrintService {
 
     return {
       filterSummary,
-      notes: [] as string[],
+      // P4: catatan wajib pada dokumen Peminjaman — status per baris = status
+      // transaksi; total dihitung per transaksi, baris per buku.
+      notes: [
+        'Status menunjukkan keadaan transaksi. Satu transaksi dapat memuat beberapa buku (satu baris per buku), dan total dihitung per transaksi.'
+      ],
       rows,
       totalRows: exported.totalRows,
       totals: [

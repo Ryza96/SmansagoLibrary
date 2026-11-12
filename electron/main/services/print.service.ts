@@ -370,11 +370,13 @@ export class PrintService {
     return { html, data }
   }
 
-  async previewReport(request: ReportPrintRequest): Promise<{ html: string; pageCount: number; orientation: ReportPrintData['orientation']; title: string }> {
+  async previewReport(request: ReportPrintRequest): Promise<{ html: string; pageCount: number; totalRows: number; orientation: ReportPrintData['orientation']; title: string }> {
     const { html, data } = await this.buildReportPrintHtml(request)
     return {
       html,
       pageCount: paginateReportRows(data.totalRows, data.orientation).pages.length,
+      // T2 (additive): dipakai preview untuk banner "Laporan kosong untuk filter ini."
+      totalRows: data.totalRows,
       orientation: data.orientation,
       title: data.title
     }

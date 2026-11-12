@@ -232,9 +232,10 @@ export function generateReportPrintHtml(
   .report-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
   .report-table th, .report-table td {
     border: 0.2mm solid #6b7280;
-    padding: 0.6mm 1mm;
+    padding: 0.3mm 1mm;
     vertical-align: middle;
     overflow: hidden;
+    box-sizing: border-box;
   }
   .report-table thead th {
     background: #e5e7eb;
@@ -250,7 +251,10 @@ export function generateReportPrintHtml(
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
-    line-height: 1.25;
+    text-overflow: ellipsis;
+    line-height: 1.05;
+    /* 2 baris pada 8.5pt × 1.05 = 6.3mm < 6.5mm konten (7.5 − 0.6 padding − 0.4 border) */
+    max-height: ${geometry.rowHeightMm - 1}mm;
   }
   .cell-status { font-weight: 700; }
   .align-left { text-align: left; }
@@ -289,7 +293,6 @@ export function generateReportPrintHtml(
   }
 </style>
 </head>
-<body>
 <body>${sheets}
 </body>
 </html>`

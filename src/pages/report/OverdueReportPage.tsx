@@ -13,6 +13,7 @@ import {
 import type { OverdueCategory, OverdueReportDTO, OverdueReportFilter } from '../../shared/dto/report'
 import { LABELS } from '../../utils/labels'
 import { ROUTES } from '../../utils/navigation'
+import { useNotification } from '../../notification/NotificationContext'
 import { buildOverduesPrintRequest, extractNavFilter, toDateInputValue } from '../../utils/report-print'
 
 const api = window.electronAPI
@@ -54,6 +55,7 @@ function StatCard({ icon, label, value, color }: StatCardProps) {
 export default function OverdueReportPage() {
   const navigate = useNavigate()
   const location = useLocation()
+  const { notify } = useNotification()
   const printInit = extractNavFilter(location.state) as OverdueReportFilter | null
   const [from, setFrom] = useState(() => toDateInputValue(printInit?.from))
   const [to, setTo] = useState(() => toDateInputValue(printInit?.to))
@@ -78,8 +80,11 @@ export default function OverdueReportPage() {
       .then((result) => {
         if (!cancelled) setReport(result)
       })
-      .catch(() => {
-        if (!cancelled) setReport(null)
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          setReport(null)
+          notify.error(err instanceof Error && err.message ? err.message : LABELS.REPORT.LOAD_ERROR)
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -90,6 +95,7 @@ export default function OverdueReportPage() {
   }, [from, to, search, page])
 
   const summary = report?.summary
+  const overdueTotal = report ? (summary?.active ?? 0) + (summary?.returned ?? 0) : 0
   const totalPages = report?.pagination.totalPages ?? 1
 
   return (
@@ -105,7 +111,8 @@ export default function OverdueReportPage() {
               state: { request: buildOverduesPrintRequest(from, to, search), fromPath: ROUTES.REPORT_OVERDUES }
             })
           }
-          disabled={loading}
+          disabled={loading || overdueTotal === 0}
+          title={overdueTotal === 0 ? LABELS.REPORT.EMPTY_PRINT_TOOLTIP : undefined}
           className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <Printer size={16} />

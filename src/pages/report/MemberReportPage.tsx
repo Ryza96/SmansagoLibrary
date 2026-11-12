@@ -15,6 +15,7 @@ import type { MemberReportDTO, MemberReportFilter } from '../../shared/dto/repor
 import type { ClassDTO } from '../../shared/dto/academic'
 import { LABELS } from '../../utils/labels'
 import { ROUTES } from '../../utils/navigation'
+import { useNotification } from '../../notification/NotificationContext'
 import { buildMembersPrintRequest, extractNavFilter } from '../../utils/report-print'
 
 const api = window.electronAPI
@@ -64,6 +65,7 @@ function StatCard({ icon, label, value, color }: StatCardProps) {
 export default function MemberReportPage() {
   const navigate = useNavigate()
   const location = useLocation()
+  const { notify } = useNotification()
   const printInit = extractNavFilter(location.state) as MemberReportFilter | null
   const [search, setSearch] = useState(() => printInit?.search ?? '')
   const [status, setStatus] = useState<'' | 'ACTIVE' | 'INACTIVE'>(() =>
@@ -105,8 +107,11 @@ export default function MemberReportPage() {
       .then((result) => {
         if (!cancelled) setReport(result)
       })
-      .catch(() => {
-        if (!cancelled) setReport(null)
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          setReport(null)
+          notify.error(err instanceof Error && err.message ? err.message : LABELS.REPORT.LOAD_ERROR)
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -132,7 +137,8 @@ export default function MemberReportPage() {
               state: { request: buildMembersPrintRequest(status, classId, search), fromPath: ROUTES.REPORT_MEMBERS }
             })
           }
-          disabled={loading}
+          disabled={loading || !report || report.pagination.total === 0}
+          title={report && report.pagination.total === 0 ? LABELS.REPORT.EMPTY_PRINT_TOOLTIP : undefined}
           className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <Printer size={16} />

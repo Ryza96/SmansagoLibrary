@@ -5,6 +5,7 @@ import type { CollectionReportDTO, CollectionReportFilter } from '../../shared/d
 import type { CategoryDTO } from '../../types/dtos/master'
 import { LABELS } from '../../utils/labels'
 import { ROUTES } from '../../utils/navigation'
+import { useNotification } from '../../notification/NotificationContext'
 import { buildCollectionsPrintRequest, extractNavFilter } from '../../utils/report-print'
 
 const api = window.electronAPI
@@ -42,6 +43,7 @@ const COUNT_BADGE: Record<'AVAILABLE' | 'BORROWED' | 'LOST' | 'DAMAGED', { label
 export default function CollectionReportPage() {
   const navigate = useNavigate()
   const location = useLocation()
+  const { notify } = useNotification()
   const printInit = extractNavFilter(location.state) as CollectionReportFilter | null
   const [search, setSearch] = useState(() => printInit?.search ?? '')
   const [categoryId, setCategoryId] = useState(() => printInit?.categoryId ?? '')
@@ -80,8 +82,11 @@ export default function CollectionReportPage() {
       .then((result) => {
         if (!cancelled) setReport(result)
       })
-      .catch(() => {
-        if (!cancelled) setReport(null)
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          setReport(null)
+          notify.error(err instanceof Error && err.message ? err.message : LABELS.REPORT.LOAD_ERROR)
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -107,7 +112,8 @@ export default function CollectionReportPage() {
               state: { request: buildCollectionsPrintRequest(categoryId, search), fromPath: ROUTES.REPORT_COLLECTIONS }
             })
           }
-          disabled={loading}
+          disabled={loading || !report || report.pagination.total === 0}
+          title={report && report.pagination.total === 0 ? LABELS.REPORT.EMPTY_PRINT_TOOLTIP : undefined}
           className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <Printer size={16} />

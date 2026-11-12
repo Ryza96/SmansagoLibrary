@@ -41,6 +41,7 @@ export default function ReportPrintPreviewPage() {
   const [busyPdf, setBusyPdf] = useState(false)
   const [pdfStatus, setPdfStatus] = useState('')
   const [visibleCount, setVisibleCount] = useState(INITIAL_PAGES)
+  const [totalRows, setTotalRows] = useState(0)
 
   const scrollRef = useRef<HTMLDivElement>(null)
   const sentinelRef = useRef<HTMLDivElement>(null)
@@ -69,6 +70,7 @@ export default function ReportPrintPreviewPage() {
         setPageCount(preview.pageCount)
         setOrientation(preview.orientation)
         setTitle(preview.title)
+        setTotalRows(preview.totalRows ?? 0)
       })
       .catch((err: unknown) => {
         if (cancelled) return
@@ -244,6 +246,7 @@ export default function ReportPrintPreviewPage() {
             </div>
           ))}
           {hasMore && <div ref={sentinelRef} style={{ height: 1 }} />}
+          {totalRows === 0 && <p className="text-center text-slate-500 mt-4">{LABELS.REPORT.EMPTY_PREVIEW}</p>}
         </div>
       ) : (
         <p className="text-slate-400 text-sm">{LABELS.REPORT.PRINT_PREVIEW_ERROR}</p>

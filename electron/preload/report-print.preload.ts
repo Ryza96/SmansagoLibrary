@@ -7,6 +7,7 @@ export const reportPrintAPI = {
       ipcRenderer.invoke('reports:printPreview', request) as Promise<{
         html: string
         pageCount: number
+        totalRows: number
         orientation: 'portrait' | 'landscape'
         title: string
       }>,

@@ -287,7 +287,7 @@ interface ElectronAPI {
     collections: (filter: import('../../src/shared/dto/report').CollectionReportFilter) => Promise<import('../../src/shared/dto/report').CollectionReportDTO>,
   }
   reportPrint: {
-    preview: (request: import('../../src/shared/dto/report-print').ReportPrintRequest) => Promise<{ html: string; pageCount: number; orientation: 'portrait' | 'landscape'; title: string }>,
+    preview: (request: import('../../src/shared/dto/report-print').ReportPrintRequest) => Promise<{ html: string; pageCount: number; totalRows: number; orientation: 'portrait' | 'landscape'; title: string }>,
     print: (request: import('../../src/shared/dto/report-print').ReportPrintRequest) => Promise<void>,
     pdf: (request: import('../../src/shared/dto/report-print').ReportPrintRequest) => Promise<{ saved: boolean; filePath?: string }>,
   }

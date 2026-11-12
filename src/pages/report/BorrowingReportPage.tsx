@@ -15,6 +15,7 @@ import type { BorrowReportStatus, BorrowingReportDTO } from '../../shared/dto/re
 import type { BorrowReportFilter } from '../../shared/dto/report'
 import { LABELS } from '../../utils/labels'
 import { ROUTES } from '../../utils/navigation'
+import { useNotification } from '../../notification/NotificationContext'
 import { buildBorrowingsPrintRequest, extractNavFilter, toDateInputValue } from '../../utils/report-print'
 
 const api = window.electronAPI
@@ -64,6 +65,7 @@ const STATUS_OPTIONS: { value: '' | BorrowReportStatus; label: string }[] = [
 export default function BorrowingReportPage() {
   const navigate = useNavigate()
   const location = useLocation()
+  const { notify } = useNotification()
   // Filter utuh kembali dari preview (state navigasi); selain itu default.
   const printInit = extractNavFilter(location.state) as BorrowReportFilter | null
   const [from, setFrom] = useState(() => toDateInputValue(printInit?.from))
@@ -95,8 +97,11 @@ export default function BorrowingReportPage() {
       .then((result) => {
         if (!cancelled) setReport(result)
       })
-      .catch(() => {
-        if (!cancelled) setReport(null)
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          setReport(null)
+          notify.error(err instanceof Error && err.message ? err.message : LABELS.REPORT.LOAD_ERROR)
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -122,7 +127,8 @@ export default function BorrowingReportPage() {
               state: { request: buildBorrowingsPrintRequest(from, to, status, search), fromPath: ROUTES.REPORT_BORROWINGS }
             })
           }
-          disabled={loading}
+          disabled={loading || !report || report.pagination.total === 0}
+          title={report && report.pagination.total === 0 ? LABELS.REPORT.EMPTY_PRINT_TOOLTIP : undefined}
           className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <Printer size={16} />

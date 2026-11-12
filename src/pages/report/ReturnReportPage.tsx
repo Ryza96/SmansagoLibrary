@@ -13,6 +13,7 @@ import {
 import type { ReturnReportDTO, ReturnReportFilter, ReturnStatus } from '../../shared/dto/report'
 import { LABELS } from '../../utils/labels'
 import { ROUTES } from '../../utils/navigation'
+import { useNotification } from '../../notification/NotificationContext'
 import { buildReturnsPrintRequest, extractNavFilter, toDateInputValue } from '../../utils/report-print'
 
 const api = window.electronAPI
@@ -54,6 +55,7 @@ function StatCard({ icon, label, value, color }: StatCardProps) {
 export default function ReturnReportPage() {
   const navigate = useNavigate()
   const location = useLocation()
+  const { notify } = useNotification()
   const printInit = extractNavFilter(location.state) as ReturnReportFilter | null
   const [from, setFrom] = useState(() => toDateInputValue(printInit?.from))
   const [to, setTo] = useState(() => toDateInputValue(printInit?.to))
@@ -78,8 +80,11 @@ export default function ReturnReportPage() {
       .then((result) => {
         if (!cancelled) setReport(result)
       })
-      .catch(() => {
-        if (!cancelled) setReport(null)
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          setReport(null)
+          notify.error(err instanceof Error && err.message ? err.message : LABELS.REPORT.LOAD_ERROR)
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -105,7 +110,8 @@ export default function ReturnReportPage() {
               state: { request: buildReturnsPrintRequest(from, to, search), fromPath: ROUTES.REPORT_RETURNS }
             })
           }
-          disabled={loading}
+          disabled={loading || !report || report.pagination.total === 0}
+          title={report && report.pagination.total === 0 ? LABELS.REPORT.EMPTY_PRINT_TOOLTIP : undefined}
           className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <Printer size={16} />
