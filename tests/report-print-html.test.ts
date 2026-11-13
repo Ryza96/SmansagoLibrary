@@ -185,6 +185,17 @@ describe('generateReportPrintHtml — struktur', () => {
     expect(html).toMatch(/Dicetak:<\/span> <span>0[0-9]\/[0-9]{2}\/2026 [0-9]{2}:[0-9]{2}/)
   })
 
+  it('dokumen memuat tepat satu tag <body> (semua tipe & dokumen kosong)', () => {
+    for (const type of Object.keys(COLUMNS) as ReportPrintType[]) {
+      const html = generateReportPrintHtml(makeData(type, 120))
+      expect((html.match(/<body\b/g) ?? []).length, `<body> ${type}`).toBe(1)
+      expect((html.match(/<\/body>/g) ?? []).length, `</body> ${type}`).toBe(1)
+    }
+    const empty = generateReportPrintHtml(makeData('borrowings', 0))
+    expect((empty.match(/<body\b/g) ?? []).length).toBe(1)
+    expect((empty.match(/<\/body>/g) ?? []).length).toBe(1)
+  })
+
   it('tepat kapasitas halaman pertama & kapasitas+1 mengikuti paginateReportRows', () => {
     for (const n of [29, 30]) {
       const data = makeData('borrowings', n)

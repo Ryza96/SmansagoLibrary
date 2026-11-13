@@ -381,3 +381,44 @@ describe('P7 — from > to ditolak AppError 400 (layar + cetak)', () => {
     await expect(reportService.getBorrowingReport(same)).resolves.toBeDefined()
   })
 })
+
+describe('Catatan cetak — Peminjaman memuat catatan P4; Pengembalian/Keterlambatan tidak', () => {
+  const P4_NOTE =
+    'Status menunjukkan keadaan transaksi. Satu transaksi dapat memuat beberapa buku (satu baris per buku), dan total dihitung per transaksi.'
+
+  async function seedOneBorrowWithDetail(options: { returned: boolean; overdue: boolean }) {
+    const member = await seedMember({ memberNumber: 'S-FIX-6000', fullName: 'Dewi Lestari' })
+    const book = await seedBook('Buku Catatan')
+    const copy = await seedCopy(book.id, 9)
+    const borrowDate = daysAgo(options.overdue ? 20 : 3)
+    const dueDate = options.overdue ? daysAgo(12) : daysFromNow(5)
+    const returnDate = options.returned ? daysAgo(1) : null
+    const borrow = await seedBorrow({
+      borrowNumber: 'PJ-FIX-N1',
+      memberId: member.id,
+      memberName: member.fullName,
+      memberNumber: member.memberNumber,
+      borrowDate,
+      dueDate,
+      returnDate
+    })
+    await seedDetail(borrow.id, copy.id, book.title, returnDate)
+    return borrow
+  }
+
+  it('buildData Peminjaman memuat catatan P4 persis', async () => {
+    await seedOneBorrowWithDetail({ returned: true, overdue: false })
+    const period = { from: iso(daysAgo(25)), to: iso(daysFromNow(10)) }
+    const printed = await printService.buildData({ type: 'borrowings', filter: period })
+    expect(printed.notes).toContain(P4_NOTE)
+  })
+
+  it('buildData Pengembalian & Keterlambatan tidak memuat catatan P4', async () => {
+    await seedOneBorrowWithDetail({ returned: true, overdue: true })
+    const period = { from: iso(daysAgo(25)), to: iso(daysFromNow(10)) }
+    const returns = await printService.buildData({ type: 'returns', filter: period })
+    expect(returns.notes).not.toContain(P4_NOTE)
+    const overdues = await printService.buildData({ type: 'overdues', filter: period })
+    expect(overdues.notes).not.toContain(P4_NOTE)
+  })
+})
