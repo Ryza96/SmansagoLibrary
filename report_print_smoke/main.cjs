@@ -151,17 +151,24 @@ app.whenReady().then(async () => {
     buildData: async (request) => makeData(request.type, 3)
   }
   const printService = new PrintService(null, settingsStub, '', undefined, reportPrintStub)
-  await printService.printReport({ type: 'borrowings', filter: { from: '', to: '' } })
-  await printService.printReport({ type: 'overdues', filter: { from: '', to: '' } })
+  // Cetak kelima laporan agar orientasi tiap jenis terbukti, bukan diasumsikan.
+  const printTypes = Object.keys(COLUMNS)
+  for (const type of printTypes) {
+    await printService.printReport({ type, filter: { from: '', to: '' } })
+  }
   BrowserWindow.prototype.loadURL = origLoadURL
 
-  const portraitOpts = captured[0]
-  const landscapeOpts = captured[1]
-  report('print portrait pageSize eksplisit A4', !!portraitOpts && portraitOpts.pageSize?.width === 210000 && portraitOpts.pageSize?.height === 297000 && portraitOpts.landscape === false,
-    `portrait=${JSON.stringify(portraitOpts?.pageSize)} landscape=${portraitOpts?.landscape}`)
-  report('print landscape:true + pageSize A4', !!landscapeOpts && landscapeOpts.landscape === true && landscapeOpts.pageSize?.width === 210000 && landscapeOpts.pageSize?.height === 297000,
-    `landscape=${JSON.stringify(landscapeOpts?.pageSize)} landscapeFlag=${landscapeOpts?.landscape}`)
-  report('print margins none', !!portraitOpts && portraitOpts.margins?.marginType === 'none', `margins=${portraitOpts?.margins?.marginType}`)
+  // Orientasi aktual per laporan berasal dari config SSOT
+  // (REPORT_PRINT_ORIENTATION): Peminjaman/Keterlambatan/Koleksi = landscape,
+  // Pengembalian/Anggota = portrait. Flag `landscape` wajib mengikutinya.
+  printTypes.forEach((type, index) => {
+    const opts = captured[index]
+    const orientation = REPORT_PRINT_ORIENTATION[type]
+    const expectLandscape = orientation === 'landscape'
+    report(`print ${type} (${orientation}) pageSize eksplisit A4`, !!opts && opts.pageSize?.width === 210000 && opts.pageSize?.height === 297000 && opts.landscape === expectLandscape,
+      `pageSize=${JSON.stringify(opts?.pageSize)} landscapeFlag=${opts?.landscape} expected=${expectLandscape}`)
+  })
+  report('print margins none', !!captured[0] && captured[0].margins?.marginType === 'none', `margins=${captured[0]?.margins?.marginType}`)
 
   console.log(failures === 0 ? 'SMOKE OK' : `SMOKE FAILURES=${failures}`)
   app.exit(failures === 0 ? 0 : 1)
