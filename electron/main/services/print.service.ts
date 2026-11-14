@@ -12,7 +12,7 @@ import { BORROW_CARD_LAYOUT, buildBorrowCardData, generateBorrowCardHtml } from 
 import { generateReportPrintHtml } from '../../../src/main/services/report-print-html.service'
 import { ReportPrintService, buildReportPdfFilename } from '../../../src/main/services/report-print.service'
 import { ReportRepository } from '../../../src/main/repositories/report.repository'
-import { paginateReportRows } from '../../../src/shared/config/report-print'
+import { REPORT_PRINT_TYPES, paginateReportByType } from '../../../src/shared/config/report-print'
 import type { ReportPrintData, ReportPrintRequest } from '../../../src/shared/dto/report-print'
 import {
   buildCollectiveCardData,
@@ -376,10 +376,14 @@ export class PrintService {
       html,
       // Peminjaman & Pengembalian memakai paginasi berbasis tinggi baris; jumlah
       // halaman dihitung dari HTML hasil render agar selalu sama dengan dicetak.
-      pageCount:
-        data.type === 'borrowings' || data.type === 'returns'
-          ? (html.match(/<section class="a4-sheet/g) ?? []).length
-          : paginateReportRows(data.totalRows, data.orientation, data.type).pages.length,
+      pageCount: REPORT_PRINT_TYPES[data.type].heightPaginated
+        ? (html.match(/<section class="a4-sheet/g) ?? []).length
+        : paginateReportByType({
+            type: data.type,
+            rows: data.rows,
+            totalRows: data.totalRows,
+            orientation: data.orientation
+          }).pageCount,
       // T2 (additive): dipakai preview untuk banner "Laporan kosong untuk filter ini."
       totalRows: data.totalRows,
       orientation: data.orientation,

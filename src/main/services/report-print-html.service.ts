@@ -7,9 +7,7 @@
 // (pola --label-logo-url di label.service.ts); tanpa data URI → fallback
 // monogram (generateLogoMonogramSvg, sama seperti kartu/label).
 import {
-  BORROWINGS_COLUMN_WIDTH_PERCENT,
-  REPORT_PRINT_RETURNS_METRICS,
-  RETURNS_COLUMN_WIDTH_PERCENT,
+  REPORT_PRINT_TYPES,
   paginateBorrowingRowsByHeight,
   paginateReportRows,
   reportPrintGeometry
@@ -28,20 +26,19 @@ export interface ReportPrintPreview {
 
 // Lebar kolom per tipe (persen, jumlah = 100) — disesuaikan agar tabel
 // 11 kolom Koleksi tetap terbaca di landscape.
-const COLUMN_WIDTHS: Record<ReportPrintData['type'], number[]> = {
-  borrowings: [...BORROWINGS_COLUMN_WIDTH_PERCENT],
-  returns: [...RETURNS_COLUMN_WIDTH_PERCENT],
-  overdues: [10, 12, 16, 11, 25, 10, 8, 8],
-  members: [14, 28, 18, 18, 22],
-  collections: [12, 23, 12, 12, 11, 6, 7, 5, 5, 4, 3]
-}
+// Diturunkan dari peta konfigurasi (SSOT), bukan disalin per tipe.
+const COLUMN_WIDTHS: Record<ReportPrintData['type'], readonly number[]> = Object.fromEntries(
+  (Object.keys(REPORT_PRINT_TYPES) as ReportPrintType[]).map((type) => [
+    type,
+    REPORT_PRINT_TYPES[type].columnWidthPercent
+  ])
+) as Record<ReportPrintData['type'], readonly number[]>
 
-/**
- * Daftar tipe laporan yang memakai varian tabel TANPA pemotongan teks sekaligus
- * paginasi berbasis perkiraan tinggi baris. Daftar eksplisit (bukan "selain"
- * tipe tertentu) agar laporan baru tidak ikut berubah tanpa keputusan.
- */
-const NO_CLIP_TYPES: readonly ReportPrintType[] = ['borrowings', 'returns']
+/** Tipe dengan paginasi berbasis tinggi baris juga memakai varian tabel TANPA
+ * pemotongan teks (daftar diturunkan dari peta, bukan ditulis ulang). */
+const NO_CLIP_TYPES: readonly ReportPrintType[] = (
+  Object.keys(REPORT_PRINT_TYPES) as ReportPrintType[]
+).filter((type) => REPORT_PRINT_TYPES[type].heightPaginated)
 
 /**
  * CSS tabel. Laporan Peminjaman & Pengembalian (landscape) memakai varian TANPA
@@ -229,19 +226,17 @@ export function generateReportPrintHtml(
   options?: { logoDataUri?: string | null }
 ): string {
   const geometry = reportPrintGeometry(data.type, data.orientation)
-  // Laporan Peminjaman memakai paginasi berbasis perkiraan tinggi baris (isi
-  // halaman sampai penuh); laporan lain tetap kapasitas baris tetap (TAHAP 1).
-  const pagination =
-    data.type === 'borrowings'
-      ? paginateBorrowingRowsByHeight(data.rows, COLUMN_WIDTHS.borrowings, undefined, {
-          nowrapColumnIndex: data.columns.findIndex((c) => c.key === 'status')
-        })
-      : data.type === 'returns'
-        ? paginateBorrowingRowsByHeight(data.rows, RETURNS_COLUMN_WIDTH_PERCENT, REPORT_PRINT_RETURNS_METRICS.contentWidthMm, {
-            // Status = kolom ke-7 (indeks 6), dicetak nowrap.
-            nowrapColumnIndex: 6
-          })
-        : paginateReportRows(data.totalRows, data.orientation, data.type)
+  // Paginasi mengikuti konfigurasi tipe (peta): heightPaginated → isi halaman
+  // sampai penuh memakai perkiraan tinggi baris; tipe lain → kapasitas tetap.
+  const typeConfig = REPORT_PRINT_TYPES[data.type]
+  const pagination = typeConfig.heightPaginated
+    ? paginateBorrowingRowsByHeight(
+        data.rows,
+        typeConfig.columnWidthPercent,
+        typeConfig.metrics.contentWidthMm,
+        { nowrapColumnIndex: typeConfig.nowrapColumnIndex, metrics: typeConfig.metrics }
+      )
+    : paginateReportRows(data.totalRows, data.orientation, data.type)
   // Blok total + tanda tangan boleh pindah UTUH ke halaman baru.
   const blocksOnNewPage = pagination.signaturePage === 'new'
   const pageCount = pagination.pages.length + (blocksOnNewPage ? 1 : 0)

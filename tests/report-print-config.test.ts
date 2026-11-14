@@ -7,6 +7,7 @@ import {
   REPORT_PRINT_BORROWINGS_METRICS,
   REPORT_PRINT_RETURNS_PAGE,
   REPORT_PRINT_RETURNS_METRICS,
+  REPORT_PRINT_TYPES,
   BORROWINGS_COLUMN_WIDTH_PERCENT,
   RETURNS_COLUMN_WIDTH_PERCENT,
   estimateBorrowingRowHeightMm,
@@ -116,6 +117,35 @@ describe('report-print config — konstanta', () => {
     expect(reportPrintGeometry('overdues', 'landscape')).toBe(REPORT_PRINT_PAGE.landscape)
     expect(reportPrintGeometry('members', 'portrait')).toBe(REPORT_PRINT_PAGE.portrait)
     expect(reportPrintGeometry('collections', 'landscape')).toBe(REPORT_PRINT_PAGE.landscape)
+  })
+
+  it('peta tipe laporan punya entri untuk kelima tipe dengan lebar kolom total 100', () => {
+    const types = Object.keys(REPORT_PRINT_TYPES).sort()
+    expect(types).toEqual(['borrowings', 'collections', 'members', 'overdues', 'returns'])
+    for (const type of types as (keyof typeof REPORT_PRINT_TYPES)[]) {
+      const total = REPORT_PRINT_TYPES[type].columnWidthPercent.reduce((sum, width) => sum + width, 0)
+      expect(total, `${type}`).toBe(100)
+    }
+  })
+
+  it('heightPaginated hanya true untuk borrowings dan returns', () => {
+    const types = Object.keys(REPORT_PRINT_TYPES) as (keyof typeof REPORT_PRINT_TYPES)[]
+    const heightPaginated = types.filter((type) => REPORT_PRINT_TYPES[type].heightPaginated).sort()
+    expect(heightPaginated).toEqual(['borrowings', 'returns'])
+  })
+
+  it('paginateBorrowingRowsByHeight identik dengan/tanpa metrics Borrowings eksplisit', () => {
+    const rows = [
+      ['31/08/2026', 'PK20260001', 'Nama Anggota Yang Cukup Panjang Untuk Membungkus Baris', 'XI Merdeka 1', 'Judul Buku Yang Juga Panjang Sekali', '5 hari', 'Tepat Waktu']
+    ]
+    const withoutMetrics = paginateBorrowingRowsByHeight(rows, RETURNS_COLUMN_WIDTH_PERCENT, REPORT_PRINT_RETURNS_METRICS.contentWidthMm, {
+      nowrapColumnIndex: 6
+    })
+    const withMetrics = paginateBorrowingRowsByHeight(rows, RETURNS_COLUMN_WIDTH_PERCENT, REPORT_PRINT_RETURNS_METRICS.contentWidthMm, {
+      nowrapColumnIndex: 6,
+      metrics: REPORT_PRINT_BORROWINGS_METRICS
+    })
+    expect(withMetrics).toEqual(withoutMetrics)
   })
 })
 

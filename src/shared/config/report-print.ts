@@ -160,14 +160,74 @@ export const REPORT_PRINT_RETURNS_METRICS = {
   ...REPORT_PRINT_BORROWINGS_METRICS
 } as const
 
+export type ReportPrintMetrics = typeof REPORT_PRINT_BORROWINGS_METRICS
+
+export interface ReportPrintTypeConfig {
+  /** Lebar kolom (persen, total 100) persis seperti yang dipakai template. */
+  columnWidthPercent: readonly number[]
+  /** Geometri halaman efektif tipe ini (lihat reportPrintGeometry). */
+  page: ReportPrintPageGeometry
+  /** Metrik paginasi berbasis tinggi baris (dipakai bila heightPaginated). */
+  metrics: ReportPrintMetrics
+  /** Indeks kolom yang dicetak nowrap (bila ada). */
+  nowrapColumnIndex?: number
+  /** true = paginasi berbasis perkiraan tinggi baris (bukan kapasitas tetap). */
+  heightPaginated: boolean
+}
+
+/**
+ * SSOT konfigurasi per tipe laporan: orientasi tidak disimpan di sini (tetap di
+ * REPORT_PRINT_ORIENTATION), tetapi lebar kolom, geometri, metrik, indeks
+ * nowrap, dan cara paginasi disatukan. Menambah dukungan tipe baru cukup
+ * menambah satu entri — tanpa menyalin percabangan di service/template.
+ * Nilai di bawah adalah nilai efektif saat ini (tidak ada perubahan perilaku).
+ */
+export const REPORT_PRINT_TYPES: Record<ReportPrintType, ReportPrintTypeConfig> = {
+  borrowings: {
+    columnWidthPercent: BORROWINGS_COLUMN_WIDTH_PERCENT,
+    page: REPORT_PRINT_BORROWINGS_PAGE,
+    metrics: REPORT_PRINT_BORROWINGS_METRICS,
+    nowrapColumnIndex: 6,
+    heightPaginated: true
+  },
+  returns: {
+    columnWidthPercent: RETURNS_COLUMN_WIDTH_PERCENT,
+    page: REPORT_PRINT_RETURNS_PAGE,
+    metrics: REPORT_PRINT_RETURNS_METRICS,
+    nowrapColumnIndex: 6,
+    heightPaginated: true
+  },
+  overdues: {
+    columnWidthPercent: [10, 12, 16, 11, 25, 10, 8, 8],
+    page: REPORT_PRINT_PAGE.landscape,
+    metrics: REPORT_PRINT_BORROWINGS_METRICS,
+    heightPaginated: false
+  },
+  members: {
+    columnWidthPercent: [14, 28, 18, 18, 22],
+    page: REPORT_PRINT_PAGE.portrait,
+    metrics: REPORT_PRINT_BORROWINGS_METRICS,
+    heightPaginated: false
+  },
+  collections: {
+    columnWidthPercent: [12, 23, 12, 12, 11, 6, 7, 5, 5, 4, 3],
+    page: REPORT_PRINT_PAGE.landscape,
+    metrics: REPORT_PRINT_BORROWINGS_METRICS,
+    heightPaginated: false
+  }
+}
+
 /** Geometri halaman efektif sebuah laporan (landscape Peminjaman & Pengembalian
  * punya angka sendiri). */
 export function reportPrintGeometry(
   type: ReportPrintType,
   orientation: ReportPrintOrientation
 ): ReportPrintPageGeometry {
-  if (type === 'borrowings' && orientation === 'landscape') return REPORT_PRINT_BORROWINGS_PAGE
-  if (type === 'returns' && orientation === 'landscape') return REPORT_PRINT_RETURNS_PAGE
+  // Hanya borrowings/returns landscape yang punya geometri sendiri (dibaca dari
+  // peta); jalur lain tetap geometri umum sesuai orientasi.
+  if (orientation === 'landscape' && (type === 'borrowings' || type === 'returns')) {
+    return REPORT_PRINT_TYPES[type].page
+  }
   return REPORT_PRINT_PAGE[orientation]
 }
 
@@ -275,6 +335,8 @@ export interface BorrowingRowPaginationOptions {
   safeMarginRatio?: number
   /** Override tinggi blok total + tanda tangan (mm). */
   blocksHeightMm?: number
+  /** Override metrik paginasi (default: metrik Peminjaman). */
+  metrics?: ReportPrintMetrics
 }
 
 /**
@@ -298,7 +360,7 @@ export function estimateBorrowingRowHeightMm(
   contentWidthMm: number = REPORT_PRINT_BORROWINGS_METRICS.contentWidthMm,
   options?: BorrowingRowPaginationOptions
 ): number {
-  const m = REPORT_PRINT_BORROWINGS_METRICS
+  const m = options?.metrics ?? REPORT_PRINT_BORROWINGS_METRICS
   const nowrap = options?.nowrapColumnIndex ?? columnWidthsPercent.length - 1
   let maxLines = 1
   columnWidthsPercent.forEach((percent, i) => {
@@ -335,7 +397,7 @@ export function paginateBorrowingRowsByHeight(
   contentWidthMm: number = REPORT_PRINT_BORROWINGS_METRICS.contentWidthMm,
   options?: BorrowingRowPaginationOptions
 ): ReportPrintPagination {
-  const m = REPORT_PRINT_BORROWINGS_METRICS
+  const m = options?.metrics ?? REPORT_PRINT_BORROWINGS_METRICS
   const safeRatio = 1 - (options?.safeMarginRatio ?? m.safeMarginRatio)
   const blocksMm = options?.blocksHeightMm ?? m.lastPageBlocksMm
   const heights = rows.map((row) => estimateBorrowingRowHeightMm(row, columnWidthsPercent, contentWidthMm, options))
@@ -378,4 +440,29 @@ export function paginateBorrowingRowsByHeight(
   const lastIndex = pages.length - 1
   const blocksFit = usedMm[lastIndex] + blocksMm <= limitFor(lastIndex === 0)
   return { pages, totalRows: rows.length, signaturePage: blocksFit ? 'last' : 'new' }
+}
+
+/**
+ * Jumlah halaman sebuah laporan menurut konfigurasi tipenya (satu pintu untuk
+ * preview/print/harness): tipe heightPaginated memakai paginasi tinggi baris
+ * (blok total+tanda tangan di halaman baru ikut dihitung), tipe lain memakai
+ * paginasi kapasitas tetap.
+ */
+export function paginateReportByType(data: {
+  type: ReportPrintType
+  rows: readonly (readonly string[])[]
+  totalRows: number
+  orientation: ReportPrintOrientation
+}): { pageCount: number } {
+  const config = REPORT_PRINT_TYPES[data.type]
+  if (config.heightPaginated) {
+    const pagination = paginateBorrowingRowsByHeight(
+      data.rows,
+      config.columnWidthPercent,
+      config.metrics.contentWidthMm,
+      { nowrapColumnIndex: config.nowrapColumnIndex, metrics: config.metrics }
+    )
+    return { pageCount: pagination.pages.length + (pagination.signaturePage === 'new' ? 1 : 0) }
+  }
+  return { pageCount: paginateReportRows(data.totalRows, data.orientation, data.type).pages.length }
 }
