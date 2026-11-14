@@ -102,8 +102,24 @@ export const REPORT_PRINT_BORROWINGS_PAGE: ReportPrintPageGeometry = {
   signatureReserveRows: 6
 } as const
 
+/**
+ * Geometri Laporan Pengembalian (landscape, teks tidak dipotong — menyusul di
+ * sesi B). Sementara menyalin nilai Peminjaman: kertas, margin, tinggi baris,
+ * reserve total + tanda tangan sama; diukur ulang di sesi C bila perlu.
+ */
+export const REPORT_PRINT_RETURNS_PAGE: ReportPrintPageGeometry = {
+  ...REPORT_PRINT_BORROWINGS_PAGE
+} as const
+
 /** Lebar kolom Laporan Peminjaman (persen, total 100). */
 export const BORROWINGS_COLUMN_WIDTH_PERCENT: readonly number[] = [8, 12, 25, 10, 25, 9, 11]
+
+/**
+ * Lebar kolom Laporan Pengembalian (persen, total 100).
+ * Urutan: Tanggal Kembali, Nomor Transaksi, Nama Anggota, Kelas, Judul Buku,
+ * Lama Pinjam, Status. Kolom Status (indeks 6) dicetak nowrap.
+ */
+export const RETURNS_COLUMN_WIDTH_PERCENT: readonly number[] = [10, 12, 22, 10, 25, 9, 12]
 
 /**
  * Metrik hasil UKUR RENDER NYATA (Electron, A4 landscape, margin 12mm, font
@@ -137,12 +153,21 @@ export const REPORT_PRINT_BORROWINGS_METRICS = {
   safeMarginRatio: 0.05
 } as const
 
-/** Geometri halaman efektif sebuah laporan (landscape Peminjaman punya angka sendiri). */
+/** Metrik paginasi Laporan Pengembalian. Sementara menyalin nilai Peminjaman
+ * (landscape A4 yang sama, header/footer/blok total+tanda tangan sama);
+ * diukur ulang di sesi C bila perlu. */
+export const REPORT_PRINT_RETURNS_METRICS = {
+  ...REPORT_PRINT_BORROWINGS_METRICS
+} as const
+
+/** Geometri halaman efektif sebuah laporan (landscape Peminjaman & Pengembalian
+ * punya angka sendiri). */
 export function reportPrintGeometry(
   type: ReportPrintType,
   orientation: ReportPrintOrientation
 ): ReportPrintPageGeometry {
   if (type === 'borrowings' && orientation === 'landscape') return REPORT_PRINT_BORROWINGS_PAGE
+  if (type === 'returns' && orientation === 'landscape') return REPORT_PRINT_RETURNS_PAGE
   return REPORT_PRINT_PAGE[orientation]
 }
 

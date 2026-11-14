@@ -5,7 +5,10 @@ import {
   REPORT_PRINT_PAGE,
   REPORT_PRINT_BORROWINGS_PAGE,
   REPORT_PRINT_BORROWINGS_METRICS,
+  REPORT_PRINT_RETURNS_PAGE,
+  REPORT_PRINT_RETURNS_METRICS,
   BORROWINGS_COLUMN_WIDTH_PERCENT,
+  RETURNS_COLUMN_WIDTH_PERCENT,
   estimateBorrowingRowHeightMm,
   paginateBorrowingRowsByHeight,
   reportPrintGeometry,
@@ -76,6 +79,42 @@ describe('report-print config — konstanta', () => {
     expect(reportPrintGeometry('borrowings', 'portrait')).toBe(REPORT_PRINT_PAGE.portrait)
     expect(paginateReportRows(12, 'landscape', 'borrowings').pages[0].capacity).toBe(14)
     expect(paginateReportRows(12, 'landscape').pages[0].capacity).toBe(17)
+  })
+
+  it('lebar kolom Pengembalian: 7 kolom, total 100 persen', () => {
+    expect(RETURNS_COLUMN_WIDTH_PERCENT).toHaveLength(7)
+    expect(RETURNS_COLUMN_WIDTH_PERCENT.reduce((sum, w) => sum + w, 0)).toBe(100)
+    for (const width of RETURNS_COLUMN_WIDTH_PERCENT) {
+      expect(width).toBeGreaterThan(0)
+    }
+    // Status (indeks 6) = kolom terakhir yang dicetak nowrap.
+    expect(RETURNS_COLUMN_WIDTH_PERCENT[6]).toBe(12)
+  })
+
+  it('geometri Pengembalian disiapkan tanpa mengubah jalur lain', () => {
+    // Landscape Pengembalian punya konstanta sendiri, sementara menyalin
+    // geometri + metrik Peminjaman (diukur ulang di sesi C bila perlu).
+    expect(reportPrintGeometry('returns', 'landscape')).toBe(REPORT_PRINT_RETURNS_PAGE)
+    expect(REPORT_PRINT_RETURNS_PAGE).toMatchObject({
+      widthMm: 297,
+      heightMm: 210,
+      marginMm: 12,
+      rowHeightMm: 7.5,
+      firstPageRows: 14,
+      nextPageRows: 17,
+      totalsReserveRows: 4,
+      signatureReserveRows: 6
+    })
+    expect(REPORT_PRINT_RETURNS_METRICS).toMatchObject(REPORT_PRINT_BORROWINGS_METRICS)
+    // Jalur lama tidak berubah: returns masih portrait di orientasi config,
+    // dan geometry-nya tetap geometri portrait umum.
+    expect(REPORT_PRINT_ORIENTATION.returns).toBe('portrait')
+    expect(reportPrintGeometry('returns', 'portrait')).toBe(REPORT_PRINT_PAGE.portrait)
+    expect(reportPrintGeometry('borrowings', 'landscape')).toBe(REPORT_PRINT_BORROWINGS_PAGE)
+    expect(reportPrintGeometry('borrowings', 'portrait')).toBe(REPORT_PRINT_PAGE.portrait)
+    expect(reportPrintGeometry('overdues', 'landscape')).toBe(REPORT_PRINT_PAGE.landscape)
+    expect(reportPrintGeometry('members', 'portrait')).toBe(REPORT_PRINT_PAGE.portrait)
+    expect(reportPrintGeometry('collections', 'landscape')).toBe(REPORT_PRINT_PAGE.landscape)
   })
 })
 
