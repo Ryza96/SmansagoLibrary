@@ -105,11 +105,11 @@ function makeData(rowCount: number): ReportPrintData {
     { key: 'c2', label: 'Kolom 2', align: 'center' as const }
   ]
   return {
-    // Peminjaman & Pengembalian memakai paginasi berbasis tinggi baris; helper
-    // split diuji dengan tipe berkapasitas tetap agar harapan jumlah sheet jelas.
-    type: 'members',
+    // Peminjaman/Pengembalian/Anggota memakai paginasi berbasis tinggi baris;
+    // helper split diuji dengan tipe berkapasitas tetap (Keterlambatan).
+    type: 'overdues',
     title: 'Laporan Uji',
-    orientation: 'portrait',
+    orientation: 'landscape',
     institution: {
       libraryName: 'Perpustakaan Uji',
       schoolName: 'SD Uji',
@@ -135,7 +135,7 @@ describe('splitReportPrintHtml', () => {
   it('120 baris: jumlah sheet == jumlah halaman paginate; style & footer utuh', () => {
     const html = generateReportPrintHtml(makeData(120))
     const parts = splitReportPrintHtml(html)
-    const expected = paginateReportRows(120, 'portrait').pages.length
+    const expected = paginateReportRows(120, 'landscape').pages.length
     expect(parts.sheets).toHaveLength(expected)
     expect(parts.styleText).toContain('.a4-sheet')
     expect(parts.sheets[0]).toContain('BARIS-1')
@@ -148,7 +148,7 @@ describe('splitReportPrintHtml', () => {
   it('dokumen besar 5.000 baris: semua sheet terpotong, baris terakhir ada, tanpa duplikat/hilang', () => {
     const html = generateReportPrintHtml(makeData(5000))
     const parts = splitReportPrintHtml(html)
-    const expected = paginateReportRows(5000, 'portrait').pages.length
+    const expected = paginateReportRows(5000, 'landscape').pages.length
     expect(parts.sheets).toHaveLength(expected)
     const joined = parts.sheets.join('')
     expect(joined).toContain('BARIS-5000')

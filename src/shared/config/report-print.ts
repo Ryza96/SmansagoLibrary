@@ -38,7 +38,7 @@ export const REPORT_PRINT_ORIENTATION: Record<ReportPrintType, ReportPrintOrient
   borrowings: 'landscape',
   returns: 'landscape',
   overdues: 'landscape',
-  members: 'portrait',
+  members: 'landscape',
   collections: 'landscape'
 } as const
 
@@ -160,7 +160,27 @@ export const REPORT_PRINT_RETURNS_METRICS = {
   ...REPORT_PRINT_BORROWINGS_METRICS
 } as const
 
-export type ReportPrintMetrics = typeof REPORT_PRINT_BORROWINGS_METRICS
+/** Geometri Laporan Anggota (landscape, teks tidak dipotong). */
+export const REPORT_PRINT_MEMBERS_PAGE: ReportPrintPageGeometry = {
+  ...REPORT_PRINT_BORROWINGS_PAGE
+} as const
+
+/**
+ * Metrik paginasi Laporan Anggota. Diukur render nyata Electron A4 landscape
+ * (2026-11-14): header halaman 1 46.35mm (Peminjaman 42.31mm — Anggota punya
+ * tiga baris filter, tanpa Periode), blok total (6 baris) + tanda tangan
+ * 67.24mm (Peminjaman 59.30mm), satu baris teks pendek 4.30mm. Nilai pakai
+ * dibulatkan ke atas agar aman; field lain sama dengan Peminjaman.
+ */
+export const REPORT_PRINT_MEMBERS_METRICS = {
+  ...REPORT_PRINT_BORROWINGS_METRICS,
+  firstPageHeaderMm: 46.5,
+  lastPageBlocksMm: 67.5
+} as const
+
+export type ReportPrintMetrics = {
+  readonly [K in keyof typeof REPORT_PRINT_BORROWINGS_METRICS]: number
+}
 
 export interface ReportPrintTypeConfig {
   /** Lebar kolom (persen, total 100) persis seperti yang dipakai template. */
@@ -204,10 +224,12 @@ export const REPORT_PRINT_TYPES: Record<ReportPrintType, ReportPrintTypeConfig> 
     heightPaginated: false
   },
   members: {
-    columnWidthPercent: [14, 28, 18, 18, 22],
-    page: REPORT_PRINT_PAGE.portrait,
-    metrics: REPORT_PRINT_BORROWINGS_METRICS,
-    heightPaginated: false
+    // Nomor Anggota, Nama, Kelas, Status Keanggotaan (nowrap), Tanggal Bergabung.
+    columnWidthPercent: [14, 34, 16, 19, 17],
+    page: REPORT_PRINT_MEMBERS_PAGE,
+    metrics: REPORT_PRINT_MEMBERS_METRICS,
+    nowrapColumnIndex: 3,
+    heightPaginated: true
   },
   collections: {
     columnWidthPercent: [12, 23, 12, 12, 11, 6, 7, 5, 5, 4, 3],
@@ -223,9 +245,9 @@ export function reportPrintGeometry(
   type: ReportPrintType,
   orientation: ReportPrintOrientation
 ): ReportPrintPageGeometry {
-  // Hanya borrowings/returns landscape yang punya geometri sendiri (dibaca dari
-  // peta); jalur lain tetap geometri umum sesuai orientasi.
-  if (orientation === 'landscape' && (type === 'borrowings' || type === 'returns')) {
+  // Tipe heightPaginated punya geometri sendiri di peta (saat ini landscape);
+  // jalur lain tetap geometri umum sesuai orientasi.
+  if (orientation === 'landscape' && REPORT_PRINT_TYPES[type].heightPaginated) {
     return REPORT_PRINT_TYPES[type].page
   }
   return REPORT_PRINT_PAGE[orientation]

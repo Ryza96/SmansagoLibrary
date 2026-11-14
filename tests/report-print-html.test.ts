@@ -4,8 +4,7 @@ import {
   paginateBorrowingRowsByHeight,
   paginateReportRows,
   REPORT_PRINT_ORIENTATION,
-  REPORT_PRINT_RETURNS_METRICS,
-  RETURNS_COLUMN_WIDTH_PERCENT
+  paginateReportByType
 } from '../src/shared/config/report-print'
 import type { ReportPrintData, ReportPrintType } from '../src/shared/dto/report-print'
 
@@ -100,17 +99,13 @@ describe('generateReportPrintHtml — struktur', () => {
     for (const type of Object.keys(COLUMNS) as ReportPrintType[]) {
       const data = makeData(type, 120)
       const html = generateReportPrintHtml(data)
-      // Peminjaman & Pengembalian memakai paginasi berbasis tinggi baris;
-      // laporan lain tetap kapasitas baris tetap.
-      const heightPaginated =
-        type === 'borrowings'
-          ? paginateBorrowingRowsByHeight(data.rows)
-          : type === 'returns'
-            ? paginateBorrowingRowsByHeight(data.rows, RETURNS_COLUMN_WIDTH_PERCENT, REPORT_PRINT_RETURNS_METRICS.contentWidthMm, { nowrapColumnIndex: 6 })
-            : null
-      const expected = heightPaginated
-        ? heightPaginated.pages.length + (heightPaginated.signaturePage === 'new' ? 1 : 0)
-        : paginateReportRows(120, data.orientation, data.type).pages.length
+      // Satu pintu: konfigurasi per tipe menentukan cara paginasi.
+      const expected = paginateReportByType({
+        type,
+        rows: data.rows,
+        totalRows: data.totalRows,
+        orientation: data.orientation
+      }).pageCount
       expect(countSheets(html), `${type}`).toBe(expected)
     }
   })
@@ -132,7 +127,9 @@ describe('generateReportPrintHtml — struktur', () => {
   })
 
   it('@page size sesuai orientasi; tidak ada halaman kosong ekstra', () => {
-    const portrait = generateReportPrintHtml(makeData('members', 1))
+    // Data uji dengan orientasi portrait eksplisit (tidak ada tipe produksi
+    // portrait lagi selain jalur eksplisit ini).
+    const portrait = generateReportPrintHtml({ ...makeData('overdues', 1), orientation: 'portrait' })
     expect(portrait).toContain('size: A4 portrait')
     expect(portrait).toContain('width: 210mm')
     expect(portrait).toContain('height: 297mm')
@@ -248,7 +245,7 @@ describe('generateReportPrintHtml — struktur', () => {
     expect(returnsHtml).not.toContain('line-clamp')
     expect(returnsHtml).toContain('overflow-wrap: anywhere')
     // Laporan lain tetap memakai clamp (perilaku lama tidak berubah).
-    expect(generateReportPrintHtml(makeData('members', 3))).toContain('-webkit-line-clamp')
+    expect(generateReportPrintHtml(makeData('overdues', 3))).toContain('-webkit-line-clamp')
   })
 
   it('Peminjaman: jumlah halaman mengikuti paginasi berbasis tinggi baris', () => {
