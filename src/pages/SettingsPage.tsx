@@ -34,6 +34,9 @@ interface IdentityForm {
   libraryName: string
   schoolName: string
   librarianName: string
+  librarianNip: string
+  principalName: string
+  principalNip: string
   borrowCardPrinter: string
   barcodeFormat: string
   inventoryPrefix: string
@@ -96,6 +99,9 @@ export default function SettingsPage() {
           libraryName: data.libraryName,
           schoolName: data.schoolName,
           librarianName: data.librarianName,
+          librarianNip: data.librarianNip ?? '',
+          principalName: data.principalName ?? '',
+          principalNip: data.principalNip ?? '',
           borrowCardPrinter: data.borrowCardPrinter ?? '',
           barcodeFormat: normalizeBarcodeFormat(data.barcodeFormat),
           inventoryPrefix: data.inventoryPrefix ?? 'INV',
@@ -173,6 +179,9 @@ export default function SettingsPage() {
         libraryName: result.libraryName,
         schoolName: result.schoolName,
         librarianName: result.librarianName,
+        librarianNip: result.librarianNip ?? '',
+        principalName: result.principalName ?? '',
+        principalNip: result.principalNip ?? '',
         borrowCardPrinter: result.borrowCardPrinter ?? '',
         barcodeFormat: normalizeBarcodeFormat(result.barcodeFormat),
         inventoryPrefix: result.inventoryPrefix ?? 'INV',
@@ -407,6 +416,30 @@ export default function SettingsPage() {
               type="text"
               value={f.librarianName}
               onChange={(e) => set('librarianName', e.target.value)}
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </Field>
+          <Field label={LABELS.SETTINGS.FIELD_LIBRARIAN_NIP}>
+            <input
+              type="text"
+              value={f.librarianNip}
+              onChange={(e) => set('librarianNip', e.target.value)}
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </Field>
+          <Field label={LABELS.SETTINGS.FIELD_PRINCIPAL_NAME}>
+            <input
+              type="text"
+              value={f.principalName}
+              onChange={(e) => set('principalName', e.target.value)}
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </Field>
+          <Field label={LABELS.SETTINGS.FIELD_PRINCIPAL_NIP}>
+            <input
+              type="text"
+              value={f.principalNip}
+              onChange={(e) => set('principalNip', e.target.value)}
               className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </Field>

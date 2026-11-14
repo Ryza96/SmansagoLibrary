@@ -159,7 +159,7 @@ describe('generateReportPrintHtml — struktur', () => {
     expect((withLogo.match(/data:image\/png;base64/g) ?? []).length).toBe(1)
   })
 
-  it('nama penanda tangan kosong tidak menghasilkan "undefined"; NIP kosong tidak dicetak', () => {
+  it('nama penanda tangan kosong tidak menghasilkan "undefined"; NIP kosong dicetak sebagai "NIP. -"', () => {
     const data = makeData('members', 1, {
       institution: {
         ...makeData('members', 0).institution,
@@ -171,9 +171,29 @@ describe('generateReportPrintHtml — struktur', () => {
     })
     const html = generateReportPrintHtml(data)
     expect(html).not.toContain('undefined')
-    expect(html).not.toContain('NIP.')
+    expect(html).toContain('NIP. -')
     // Garis tanda tangan tetap tersedia (elemen signature-name kosong).
     expect(html).toContain('signature-name')
+  })
+
+  it('blok tanda tangan: NIP kedua penanda tangan tercetak, nama digarisbawahi tanpa border-top', () => {
+    const data = makeData('borrowings', 1, {
+      institution: {
+        ...makeData('borrowings', 0).institution,
+        librarianName: 'Pustakawan Uji',
+        librarianNip: '198001012005011001',
+        principalName: 'Kepala Uji',
+        principalNip: '197502022000031002'
+      }
+    })
+    const html = generateReportPrintHtml(data)
+    expect(html).toContain('NIP. 198001012005011001')
+    expect(html).toContain('NIP. 197502022000031002')
+    const ruleStart = html.indexOf('.signature-name {')
+    const rule = html.slice(ruleStart, html.indexOf('}', ruleStart))
+    expect(ruleStart).toBeGreaterThan(-1)
+    expect(rule).not.toContain('border-top')
+    expect(rule).toContain('text-decoration: underline')
   })
 
   it('header dokumen memuat judul, ringkasan filter, dan "Dicetak: dd/MM/yyyy HH:mm"', () => {

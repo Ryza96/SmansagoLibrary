@@ -123,7 +123,7 @@ function signatureBoxHtml(role: string, name: string, nip: string): string {
       <div class="signature-role">${escapeHtml(role)}</div>
       <div class="signature-space"></div>
       <div class="signature-name">${escapeHtml(name)}</div>
-      ${nip ? `<div class="signature-nip">NIP. ${escapeHtml(nip)}</div>` : ''}
+      <div class="signature-nip">NIP. ${escapeHtml(nip && nip.trim() ? nip.trim() : '-')}</div>
     </div>`
 }
 
@@ -274,12 +274,17 @@ export function generateReportPrintHtml(
     justify-content: space-between;
     gap: 20mm;
   }
-  .signature-box { width: 55mm; text-align: center; }
+  .signature-box {
+    width: 55mm;
+    text-align: center;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
   .signature-role { line-height: 1.3; }
   .signature-space { height: 18mm; }
   .signature-name {
     font-weight: 700;
-    border-top: 0.3mm solid #111111;
+    text-decoration: underline;
     padding-top: 1mm;
     min-height: 4mm;
   }
