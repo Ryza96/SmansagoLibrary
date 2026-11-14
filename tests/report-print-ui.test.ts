@@ -105,9 +105,9 @@ function makeData(rowCount: number): ReportPrintData {
     { key: 'c2', label: 'Kolom 2', align: 'center' as const }
   ]
   return {
-    // Peminjaman/Pengembalian/Anggota memakai paginasi berbasis tinggi baris;
-    // helper split diuji dengan tipe berkapasitas tetap (Keterlambatan).
-    type: 'overdues',
+    // Peminjaman/Pengembalian/Anggota/Keterlambatan memakai paginasi berbasis
+    // tinggi baris; helper split diuji dengan tipe berkapasitas tetap (Koleksi).
+    type: 'collections',
     title: 'Laporan Uji',
     orientation: 'landscape',
     institution: {

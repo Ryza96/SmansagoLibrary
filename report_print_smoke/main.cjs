@@ -118,8 +118,14 @@ app.whenReady().then(async () => {
   // Skenario batas: tepat kapasitas halaman pertama, +1, redistribusi.
   await render('borrowings', 29, 'edge-portrait-29')
   await render('borrowings', 30, 'edge-portrait-30')
-  await render('overdues', 17, 'edge-landscape-17')
-  await render('overdues', 18, 'edge-landscape-18')
+  // Kapasitas baris tetap (landscape) kini diuji lewat Koleksi.
+  await render('collections', 17, 'edge-capacity-17')
+  await render('collections', 18, 'edge-capacity-18')
+  // Cek edge tambahan: 25 baris pendek untuk tiap tipe ber-paginasi tinggi.
+  await render('borrowings', 25, 'edge-short-borrowings')
+  await render('returns', 25, 'edge-short-returns')
+  await render('members', 25, 'edge-short-members')
+  await render('overdues', 25, 'edge-short-overdues')
   await render('members', 0, 'empty-members')
 
   // Opsi cetak fisik: intercept webContents.print pada printReport asli.

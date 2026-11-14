@@ -8,6 +8,7 @@ import {
   REPORT_PRINT_RETURNS_PAGE,
   REPORT_PRINT_RETURNS_METRICS,
   REPORT_PRINT_MEMBERS_PAGE,
+  REPORT_PRINT_OVERDUES_PAGE,
   REPORT_PRINT_TYPES,
   BORROWINGS_COLUMN_WIDTH_PERCENT,
   RETURNS_COLUMN_WIDTH_PERCENT,
@@ -77,7 +78,7 @@ describe('report-print config — konstanta', () => {
     expect(REPORT_PRINT_BORROWINGS_PAGE.firstPageRows).toBeLessThan(REPORT_PRINT_PAGE.landscape.firstPageRows)
     expect(REPORT_PRINT_BORROWINGS_PAGE.nextPageRows).toBeLessThan(REPORT_PRINT_PAGE.landscape.nextPageRows)
     expect(reportPrintGeometry('borrowings', 'landscape')).toBe(REPORT_PRINT_BORROWINGS_PAGE)
-    expect(reportPrintGeometry('overdues', 'landscape')).toBe(REPORT_PRINT_PAGE.landscape)
+    expect(reportPrintGeometry('overdues', 'landscape')).toBe(REPORT_PRINT_OVERDUES_PAGE)
     expect(reportPrintGeometry('borrowings', 'portrait')).toBe(REPORT_PRINT_PAGE.portrait)
     expect(paginateReportRows(12, 'landscape', 'borrowings').pages[0].capacity).toBe(14)
     expect(paginateReportRows(12, 'landscape').pages[0].capacity).toBe(17)
@@ -115,7 +116,7 @@ describe('report-print config — konstanta', () => {
     expect(reportPrintGeometry('returns', 'portrait')).toBe(REPORT_PRINT_PAGE.portrait)
     expect(reportPrintGeometry('borrowings', 'landscape')).toBe(REPORT_PRINT_BORROWINGS_PAGE)
     expect(reportPrintGeometry('borrowings', 'portrait')).toBe(REPORT_PRINT_PAGE.portrait)
-    expect(reportPrintGeometry('overdues', 'landscape')).toBe(REPORT_PRINT_PAGE.landscape)
+    expect(reportPrintGeometry('overdues', 'landscape')).toBe(REPORT_PRINT_OVERDUES_PAGE)
     expect(reportPrintGeometry('members', 'landscape')).toBe(REPORT_PRINT_MEMBERS_PAGE)
     expect(reportPrintGeometry('members', 'portrait')).toBe(REPORT_PRINT_PAGE.portrait)
     expect(reportPrintGeometry('collections', 'landscape')).toBe(REPORT_PRINT_PAGE.landscape)
@@ -130,10 +131,10 @@ describe('report-print config — konstanta', () => {
     }
   })
 
-  it('heightPaginated hanya true untuk borrowings, members, dan returns', () => {
+  it('heightPaginated hanya true untuk borrowings, members, overdues, dan returns', () => {
     const types = Object.keys(REPORT_PRINT_TYPES) as (keyof typeof REPORT_PRINT_TYPES)[]
     const heightPaginated = types.filter((type) => REPORT_PRINT_TYPES[type].heightPaginated).sort()
-    expect(heightPaginated).toEqual(['borrowings', 'members', 'returns'])
+    expect(heightPaginated).toEqual(['borrowings', 'members', 'overdues', 'returns'])
   })
 
   it('paginateBorrowingRowsByHeight identik dengan/tanpa metrics Borrowings eksplisit', () => {

@@ -129,7 +129,7 @@ describe('generateReportPrintHtml — struktur', () => {
   it('@page size sesuai orientasi; tidak ada halaman kosong ekstra', () => {
     // Data uji dengan orientasi portrait eksplisit (tidak ada tipe produksi
     // portrait lagi selain jalur eksplisit ini).
-    const portrait = generateReportPrintHtml({ ...makeData('overdues', 1), orientation: 'portrait' })
+    const portrait = generateReportPrintHtml({ ...makeData('collections', 1), orientation: 'portrait' })
     expect(portrait).toContain('size: A4 portrait')
     expect(portrait).toContain('width: 210mm')
     expect(portrait).toContain('height: 297mm')
@@ -245,7 +245,7 @@ describe('generateReportPrintHtml — struktur', () => {
     expect(returnsHtml).not.toContain('line-clamp')
     expect(returnsHtml).toContain('overflow-wrap: anywhere')
     // Laporan lain tetap memakai clamp (perilaku lama tidak berubah).
-    expect(generateReportPrintHtml(makeData('overdues', 3))).toContain('-webkit-line-clamp')
+    expect(generateReportPrintHtml(makeData('collections', 3))).toContain('-webkit-line-clamp')
   })
 
   it('Peminjaman: jumlah halaman mengikuti paginasi berbasis tinggi baris', () => {
@@ -262,7 +262,7 @@ describe('generateReportPrintHtml — struktur', () => {
     expect(countSheets(html24)).toBeLessThanOrEqual(2)
     // Laporan lain tetap kapasitas baris tetap (TAHAP 1).
     for (const n of [17, 18]) {
-      const data = makeData('overdues', n)
+      const data = makeData('collections', n)
       const html = generateReportPrintHtml(data)
       expect(countSheets(html)).toBe(paginateReportRows(n, 'landscape').pages.length)
     }

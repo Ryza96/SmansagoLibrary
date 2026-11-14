@@ -111,6 +111,16 @@ export const REPORT_PRINT_RETURNS_PAGE: ReportPrintPageGeometry = {
   ...REPORT_PRINT_BORROWINGS_PAGE
 } as const
 
+/**
+ * Geometri Laporan Keterlambatan (landscape, teks tidak dipotong).
+ * Kertas, margin, tinggi baris dasar, dan reserve blok total+tanda tangan sama
+ * dengan Peminjaman; kapasitas baris tidak dipakai karena paginasi memakai
+ * perkiraan tinggi baris (lihat REPORT_PRINT_OVERDUES_METRICS).
+ */
+export const REPORT_PRINT_OVERDUES_PAGE: ReportPrintPageGeometry = {
+  ...REPORT_PRINT_BORROWINGS_PAGE
+} as const
+
 /** Lebar kolom Laporan Peminjaman (persen, total 100). */
 export const BORROWINGS_COLUMN_WIDTH_PERCENT: readonly number[] = [8, 12, 25, 10, 25, 9, 11]
 
@@ -178,6 +188,22 @@ export const REPORT_PRINT_MEMBERS_METRICS = {
   lastPageBlocksMm: 67.5
 } as const
 
+/**
+ * Metrik paginasi Laporan Keterlambatan. Diukur render nyata Electron A4
+ * landscape (2026-11-14), kasus terburuk (filter Pencarian tampil sehingga meta
+ * 3 baris): header halaman 1 42.31mm (Peminjaman 38.13mm, Anggota 46.35mm) dan
+ * blok total (3 baris) + catatan periode + tanda tangan 68.84mm (Peminjaman
+ * 59.30mm, Anggota 67.24mm). Catatan periode SELALU dicetak untuk Keterlambatan
+ * ("Periode hanya berlaku untuk buku yang sudah dikembalikan..."), jadi blok
+ * catatan ikut dihitung. Satu baris teks pendek 4.30mm. Nilai pakai dibulatkan
+ * ke atas; field lain sama dengan Peminjaman.
+ */
+export const REPORT_PRINT_OVERDUES_METRICS = {
+  ...REPORT_PRINT_BORROWINGS_METRICS,
+  firstPageHeaderMm: 42.5,
+  lastPageBlocksMm: 69
+} as const
+
 export type ReportPrintMetrics = {
   readonly [K in keyof typeof REPORT_PRINT_BORROWINGS_METRICS]: number
 }
@@ -218,10 +244,17 @@ export const REPORT_PRINT_TYPES: Record<ReportPrintType, ReportPrintTypeConfig> 
     heightPaginated: true
   },
   overdues: {
-    columnWidthPercent: [10, 12, 16, 11, 25, 10, 8, 8],
-    page: REPORT_PRINT_PAGE.landscape,
-    metrics: REPORT_PRINT_BORROWINGS_METRICS,
-    heightPaginated: false
+    // Tanggal Pinjam, Nomor Transaksi, Nama Anggota, Kelas, Judul Buku,
+    // Jatuh Tempo, Hari Terlambat, Status (nowrap). Nama Anggota dan Judul Buku
+    // dilebarkan (18/18) karena isinya paling panjang; tanggal 10 cukup untuk
+    // "dd/mm/yyyy" tanpa membungkus; Status 17 karena kolom status dicetak
+    // nowrap dan teks terpanjang "Sudah Dikembalikan Terlambat" terukur
+    // 44.19mm (Arial bold 8.5pt) — 17% ≈ 46.1mm area sel.
+    columnWidthPercent: [10, 11, 18, 10, 18, 10, 6, 17],
+    page: REPORT_PRINT_OVERDUES_PAGE,
+    metrics: REPORT_PRINT_OVERDUES_METRICS,
+    nowrapColumnIndex: 7,
+    heightPaginated: true
   },
   members: {
     // Nomor Anggota, Nama, Kelas, Status Keanggotaan (nowrap), Tanggal Bergabung.
