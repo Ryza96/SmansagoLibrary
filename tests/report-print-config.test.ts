@@ -60,8 +60,8 @@ describe('report-print config — konstanta', () => {
     expect(REPORT_PRINT_BORROWINGS_PAGE).toMatchObject({
       widthMm: 297,
       heightMm: 210,
-      firstPageRows: 11,
-      nextPageRows: 14,
+      firstPageRows: 14,
+      nextPageRows: 17,
       totalsReserveRows: 4,
       signatureReserveRows: 6
     })
@@ -70,7 +70,7 @@ describe('report-print config — konstanta', () => {
     expect(reportPrintGeometry('borrowings', 'landscape')).toBe(REPORT_PRINT_BORROWINGS_PAGE)
     expect(reportPrintGeometry('overdues', 'landscape')).toBe(REPORT_PRINT_PAGE.landscape)
     expect(reportPrintGeometry('borrowings', 'portrait')).toBe(REPORT_PRINT_PAGE.portrait)
-    expect(paginateReportRows(12, 'landscape', 'borrowings').pages[0].capacity).toBe(11)
+    expect(paginateReportRows(12, 'landscape', 'borrowings').pages[0].capacity).toBe(14)
     expect(paginateReportRows(12, 'landscape').pages[0].capacity).toBe(17)
   })
 })

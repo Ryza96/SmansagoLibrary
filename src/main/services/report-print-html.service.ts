@@ -22,7 +22,7 @@ export interface ReportPrintPreview {
 // Lebar kolom per tipe (persen, jumlah = 100) — disesuaikan agar tabel
 // 11 kolom Koleksi tetap terbaca di landscape.
 const COLUMN_WIDTHS: Record<ReportPrintData['type'], number[]> = {
-  borrowings: [9, 14, 25, 10, 26, 9, 7],
+  borrowings: [8, 12, 25, 10, 25, 9, 11],
   returns: [11, 13, 18, 12, 25, 10, 11],
   overdues: [10, 12, 16, 11, 25, 10, 8, 8],
   members: [14, 28, 18, 18, 22],
@@ -66,7 +66,12 @@ function tableCss(type: ReportPrintType, geometry: ReportPrintPageGeometry): str
     overflow: visible;
     line-height: 1.15;
   }
-  .cell-status { font-weight: 700; }`
+  .cell-status {
+    font-weight: 700;
+    white-space: nowrap;
+    overflow-wrap: normal;
+    word-break: normal;
+  }`
   }
   return `  .report-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
   .report-table th, .report-table td {

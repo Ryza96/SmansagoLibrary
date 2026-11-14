@@ -231,13 +231,13 @@ describe('generateReportPrintHtml — struktur', () => {
   })
 
   it('tepat kapasitas halaman pertama & kapasitas+1 mengikuti paginateReportRows', () => {
-    // Peminjaman landscape: kapasitas khusus (11 halaman pertama, 14 lanjutan).
-    for (const n of [11, 12]) {
+    // Peminjaman landscape: kapasitas khusus (14 halaman pertama, 17 lanjutan).
+    for (const n of [14, 15]) {
       const data = makeData('borrowings', n)
       const html = generateReportPrintHtml(data)
       expect(countSheets(html)).toBe(paginateReportRows(n, 'landscape', 'borrowings').pages.length)
     }
-    for (const n of [14, 15]) {
+    for (const n of [17, 18]) {
       const data = makeData('borrowings', n)
       const html = generateReportPrintHtml(data)
       expect(countSheets(html)).toBe(paginateReportRows(n, 'landscape', 'borrowings').pages.length)

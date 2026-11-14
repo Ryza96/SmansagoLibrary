@@ -86,18 +86,18 @@ export const REPORT_PRINT_PAGE: Record<ReportPrintOrientation, ReportPrintPageGe
 /**
  * Geometri khusus Laporan Peminjaman (landscape).
  * Sel laporan ini TIDAK dipotong (tanpa clamp/ellipsis), sehingga satu baris
- * bisa setinggi 2 baris teks; kapasitas baris karena itu lebih kecil daripada
- * landscape biasa (17/21). Angka di bawah adalah perkiraan konservatif untuk
- * baris rata-rata 2 baris teks (kasus 3 baris tetap muat karena baris memakai
- * min-height, bukan tinggi tetap). Reserve total + tanda tangan tidak berubah.
+ * bisa setinggi 2 baris teks. Kapasitas 14/17 diturunkan dari landscape biasa
+ * (17/21) untuk menyisakan ruang baris yang membungkus; baris memakai
+ * min-height sehingga baris 3 baris tetap muat tanpa memotong isi.
+ * Reserve total + tanda tangan tidak berubah.
  */
 export const REPORT_PRINT_BORROWINGS_PAGE: ReportPrintPageGeometry = {
   widthMm: 297,
   heightMm: 210,
   marginMm: 12,
   rowHeightMm: 7.5,
-  firstPageRows: 11,
-  nextPageRows: 14,
+  firstPageRows: 14,
+  nextPageRows: 17,
   totalsReserveRows: 4,
   signatureReserveRows: 6
 } as const
