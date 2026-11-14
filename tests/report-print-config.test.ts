@@ -3,6 +3,8 @@ import {
   REPORT_PRINT_MAX_ROWS,
   REPORT_PRINT_ORIENTATION,
   REPORT_PRINT_PAGE,
+  REPORT_PRINT_BORROWINGS_PAGE,
+  reportPrintGeometry,
   paginateReportRows
 } from '../src/shared/config/report-print'
 import { escapeHtml } from '../src/shared/utils/escape-html'
@@ -38,7 +40,7 @@ describe('report-print config — konstanta', () => {
 
   it('orientasi per laporan sesuai keputusan pemilik', () => {
     expect(REPORT_PRINT_ORIENTATION).toEqual({
-      borrowings: 'portrait',
+      borrowings: 'landscape',
       returns: 'portrait',
       overdues: 'landscape',
       members: 'portrait',
@@ -53,6 +55,23 @@ describe('report-print config — konstanta', () => {
     expect(REPORT_PRINT_PAGE.portrait.nextPageRows).toBe(32)
     expect(REPORT_PRINT_PAGE.landscape.firstPageRows).toBe(17)
     expect(REPORT_PRINT_PAGE.landscape.nextPageRows).toBe(21)
+    // Landscape Peminjaman punya geometri sendiri (teks tidak dipotong → baris
+    // lebih tinggi dari 7.5mm), sedangkan landscape laporan lain tidak berubah.
+    expect(REPORT_PRINT_BORROWINGS_PAGE).toMatchObject({
+      widthMm: 297,
+      heightMm: 210,
+      firstPageRows: 11,
+      nextPageRows: 14,
+      totalsReserveRows: 4,
+      signatureReserveRows: 6
+    })
+    expect(REPORT_PRINT_BORROWINGS_PAGE.firstPageRows).toBeLessThan(REPORT_PRINT_PAGE.landscape.firstPageRows)
+    expect(REPORT_PRINT_BORROWINGS_PAGE.nextPageRows).toBeLessThan(REPORT_PRINT_PAGE.landscape.nextPageRows)
+    expect(reportPrintGeometry('borrowings', 'landscape')).toBe(REPORT_PRINT_BORROWINGS_PAGE)
+    expect(reportPrintGeometry('overdues', 'landscape')).toBe(REPORT_PRINT_PAGE.landscape)
+    expect(reportPrintGeometry('borrowings', 'portrait')).toBe(REPORT_PRINT_PAGE.portrait)
+    expect(paginateReportRows(12, 'landscape', 'borrowings').pages[0].capacity).toBe(11)
+    expect(paginateReportRows(12, 'landscape').pages[0].capacity).toBe(17)
   })
 })
 

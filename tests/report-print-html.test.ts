@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { generateReportPrintHtml } from '../src/main/services/report-print-html.service'
-import { paginateReportRows } from '../src/shared/config/report-print'
+import { paginateReportRows, REPORT_PRINT_ORIENTATION } from '../src/shared/config/report-print'
 import type { ReportPrintData, ReportPrintType } from '../src/shared/dto/report-print'
 
 const COLUMNS: Record<ReportPrintType, { key: string; label: string; align: 'left' | 'center' | 'right' }[]> = {
@@ -62,7 +62,7 @@ function makeData(type: ReportPrintType, rowCount: number, overrides?: Partial<R
   return {
     type,
     title: `Laporan Uji ${type}`,
-    orientation: type === 'overdues' || type === 'collections' ? 'landscape' : 'portrait',
+    orientation: REPORT_PRINT_ORIENTATION[type],
     institution: {
       libraryName: 'Perpustakaan Uji',
       schoolName: 'SD Uji',
@@ -94,7 +94,7 @@ describe('generateReportPrintHtml — struktur', () => {
     for (const type of Object.keys(COLUMNS) as ReportPrintType[]) {
       const data = makeData(type, 120)
       const html = generateReportPrintHtml(data)
-      const expected = paginateReportRows(120, data.orientation).pages.length
+      const expected = paginateReportRows(120, data.orientation, data.type).pages.length
       expect(countSheets(html)).toBe(expected)
     }
   })
@@ -102,7 +102,7 @@ describe('generateReportPrintHtml — struktur', () => {
   it('setiap halaman punya <thead>; "Halaman X dari Y" benar; total + tanda tangan hanya di halaman terakhir', () => {
     const data = makeData('borrowings', 120)
     const html = generateReportPrintHtml(data)
-    const pageCount = paginateReportRows(120, 'portrait').pages.length
+    const pageCount = paginateReportRows(120, 'landscape', 'borrowings').pages.length
     expect((html.match(/<thead>/g) ?? []).length).toBe(pageCount)
     expect(html).toContain(`Halaman 1 dari ${pageCount}`)
     expect(html).toContain(`Halaman ${pageCount} dari ${pageCount}`)
@@ -216,11 +216,31 @@ describe('generateReportPrintHtml — struktur', () => {
     expect((empty.match(/<\/body>/g) ?? []).length).toBe(1)
   })
 
+  it('laporan Peminjaman tidak memotong teks: tanpa line-clamp/ellipsis/max-height, baris min-height', () => {
+    const html = generateReportPrintHtml(makeData('borrowings', 3))
+    expect(html).not.toContain('line-clamp')
+    expect(html).not.toContain('ellipsis')
+    expect(html).not.toContain('text-overflow')
+    expect(html).toContain('overflow-wrap: anywhere')
+    expect(html).toContain('word-break: break-word')
+    expect(html).toContain('min-height:')
+    expect(html).toContain('break-inside: avoid')
+    expect(html).toContain('height: auto')
+    // Laporan lain tetap memakai clamp (perilaku lama tidak berubah).
+    expect(generateReportPrintHtml(makeData('returns', 3))).toContain('-webkit-line-clamp')
+  })
+
   it('tepat kapasitas halaman pertama & kapasitas+1 mengikuti paginateReportRows', () => {
-    for (const n of [29, 30]) {
+    // Peminjaman landscape: kapasitas khusus (11 halaman pertama, 14 lanjutan).
+    for (const n of [11, 12]) {
       const data = makeData('borrowings', n)
       const html = generateReportPrintHtml(data)
-      expect(countSheets(html)).toBe(paginateReportRows(n, 'portrait').pages.length)
+      expect(countSheets(html)).toBe(paginateReportRows(n, 'landscape', 'borrowings').pages.length)
+    }
+    for (const n of [14, 15]) {
+      const data = makeData('borrowings', n)
+      const html = generateReportPrintHtml(data)
+      expect(countSheets(html)).toBe(paginateReportRows(n, 'landscape', 'borrowings').pages.length)
     }
     for (const n of [17, 18]) {
       const data = makeData('overdues', n)

@@ -92,7 +92,7 @@ app.whenReady().then(async () => {
     const html = generateReportPrintHtml(data)
     const pdf = await service.renderPdf(html)
     const boxes = extractMediaBoxes(pdf)
-    const expectedPages = paginateReportRows(n, data.orientation).pages.length
+    const expectedPages = paginateReportRows(n, data.orientation, data.type).pages.length
     const expectedName = data.orientation === 'portrait' ? '594.960x841.920' : '841.920x594.960'
     const first = boxes[0] ? `${boxes[0].w.toFixed(3)}x${boxes[0].h.toFixed(3)}` : 'none'
     const dimsOk = boxes.length > 0 &&

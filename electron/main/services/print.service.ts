@@ -374,7 +374,7 @@ export class PrintService {
     const { html, data } = await this.buildReportPrintHtml(request)
     return {
       html,
-      pageCount: paginateReportRows(data.totalRows, data.orientation).pages.length,
+      pageCount: paginateReportRows(data.totalRows, data.orientation, data.type).pages.length,
       // T2 (additive): dipakai preview untuk banner "Laporan kosong untuk filter ini."
       totalRows: data.totalRows,
       orientation: data.orientation,

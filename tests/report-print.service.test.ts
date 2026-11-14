@@ -111,7 +111,7 @@ describe('ReportPrintService — kolom & judul (keputusan pemilik)', () => {
       'Tanggal', 'Nomor Transaksi', 'Nama Anggota', 'Kelas', 'Judul Buku', 'Jatuh Tempo', 'Status'
     ])
     expect(borrowings.title).toBe('Laporan Peminjaman')
-    expect(borrowings.orientation).toBe('portrait')
+    expect(borrowings.orientation).toBe('landscape')
 
     const returns = await printService.buildData({ type: 'returns', filter: period })
     expect(returns.columns.map((c) => c.label)).toEqual([

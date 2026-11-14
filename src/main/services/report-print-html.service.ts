@@ -6,7 +6,8 @@
 // Logo: data URI disematkan SEKALI via CSS variable --report-logo-url
 // (pola --label-logo-url di label.service.ts); tanpa data URI → fallback
 // monogram (generateLogoMonogramSvg, sama seperti kartu/label).
-import { REPORT_PRINT_PAGE, paginateReportRows } from '../../shared/config/report-print'
+import { paginateReportRows, reportPrintGeometry } from '../../shared/config/report-print'
+import type { ReportPrintPageGeometry, ReportPrintType } from '../../shared/config/report-print'
 import type { ReportPrintColumn, ReportPrintData } from '../../shared/dto/report-print'
 import { escapeHtml } from '../../shared/utils/escape-html'
 import { generateLogoMonogramSvg } from './borrow-card.service'
@@ -21,11 +22,80 @@ export interface ReportPrintPreview {
 // Lebar kolom per tipe (persen, jumlah = 100) — disesuaikan agar tabel
 // 11 kolom Koleksi tetap terbaca di landscape.
 const COLUMN_WIDTHS: Record<ReportPrintData['type'], number[]> = {
-  borrowings: [10, 13, 18, 12, 25, 11, 11],
+  borrowings: [9, 14, 25, 10, 26, 9, 7],
   returns: [11, 13, 18, 12, 25, 10, 11],
   overdues: [10, 12, 16, 11, 25, 10, 8, 8],
   members: [14, 28, 18, 18, 22],
   collections: [12, 23, 12, 12, 11, 6, 7, 5, 5, 4, 3]
+}
+
+/**
+ * CSS tabel. Laporan Peminjaman (landscape) memakai varian TANPA pemotongan
+ * teks: tidak ada line-clamp / ellipsis / max-height, baris memakai min-height,
+ * sel membungkus kata panjang (overflow-wrap: anywhere), baris tidak terbelah
+ * antar halaman, dan header tabel diulang di tiap halaman.
+ * Laporan lain memakai CSS lama apa adanya (perilaku tidak berubah).
+ */
+function tableCss(type: ReportPrintType, geometry: ReportPrintPageGeometry): string {
+  if (type === 'borrowings') {
+    return `  .report-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  .report-table th, .report-table td {
+    border: 0.2mm solid #6b7280;
+    padding: 0.3mm 1mm;
+    vertical-align: top;
+    overflow: visible;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    box-sizing: border-box;
+  }
+  .report-table thead { display: table-header-group; }
+  .report-table thead th {
+    background: #e5e7eb;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    font-weight: 700;
+    height: ${geometry.rowHeightMm}mm;
+  }
+  .report-table tbody tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  .report-table tbody td { min-height: ${geometry.rowHeightMm}mm; height: auto; }
+  .cell-text {
+    display: block;
+    overflow: visible;
+    line-height: 1.15;
+  }
+  .cell-status { font-weight: 700; }`
+  }
+  return `  .report-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  .report-table th, .report-table td {
+    border: 0.2mm solid #6b7280;
+    padding: 0.3mm 1mm;
+    vertical-align: middle;
+    overflow: hidden;
+    box-sizing: border-box;
+  }
+  .report-table thead th {
+    background: #e5e7eb;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    font-weight: 700;
+    height: ${geometry.rowHeightMm}mm;
+  }
+  .report-table tbody tr { height: ${geometry.rowHeightMm}mm; }
+  .report-table tbody td { height: ${geometry.rowHeightMm}mm; }
+  .cell-text {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.05;
+    /* 2 baris pada 8.5pt × 1.05 = 6.3mm < 6.5mm konten (7.5 − 0.6 padding − 0.4 border) */
+    max-height: ${geometry.rowHeightMm - 1}mm;
+  }
+  .cell-status { font-weight: 700; }`
 }
 
 function formatPrintedAt(isoString: string): string {
@@ -139,8 +209,8 @@ export function generateReportPrintHtml(
   data: ReportPrintData,
   options?: { logoDataUri?: string | null }
 ): string {
-  const geometry = REPORT_PRINT_PAGE[data.orientation]
-  const pagination = paginateReportRows(data.totalRows, data.orientation)
+  const geometry = reportPrintGeometry(data.type, data.orientation)
+  const pagination = paginateReportRows(data.totalRows, data.orientation, data.type)
   const pageCount = pagination.pages.length
   const printedAt = formatPrintedAt(data.generatedAt)
   const monogram = options?.logoDataUri ? '' : generateLogoMonogramSvg(data.institution.schoolName, data.institution.libraryName)
@@ -229,34 +299,7 @@ export function generateReportPrintHtml(
   }
   .doc-title-compact { font-size: 11pt; font-weight: 700; }
   .doc-continued { font-size: 8.5pt; }
-  .report-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-  .report-table th, .report-table td {
-    border: 0.2mm solid #6b7280;
-    padding: 0.3mm 1mm;
-    vertical-align: middle;
-    overflow: hidden;
-    box-sizing: border-box;
-  }
-  .report-table thead th {
-    background: #e5e7eb;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-    font-weight: 700;
-    height: ${geometry.rowHeightMm}mm;
-  }
-  .report-table tbody tr { height: ${geometry.rowHeightMm}mm; }
-  .report-table tbody td { height: ${geometry.rowHeightMm}mm; }
-  .cell-text {
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    line-height: 1.05;
-    /* 2 baris pada 8.5pt × 1.05 = 6.3mm < 6.5mm konten (7.5 − 0.6 padding − 0.4 border) */
-    max-height: ${geometry.rowHeightMm - 1}mm;
-  }
-  .cell-status { font-weight: 700; }
+${tableCss(data.type, geometry)}
   .align-left { text-align: left; }
   .align-center { text-align: center; }
   .align-right { text-align: right; }

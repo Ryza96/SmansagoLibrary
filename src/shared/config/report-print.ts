@@ -35,7 +35,7 @@ export const REPORT_PRINT_MAX_ROWS = 5000
 
 // Orientasi per laporan (keputusan pemilik, final).
 export const REPORT_PRINT_ORIENTATION: Record<ReportPrintType, ReportPrintOrientation> = {
-  borrowings: 'portrait',
+  borrowings: 'landscape',
   returns: 'portrait',
   overdues: 'landscape',
   members: 'portrait',
@@ -83,6 +83,34 @@ export const REPORT_PRINT_PAGE: Record<ReportPrintOrientation, ReportPrintPageGe
   }
 } as const
 
+/**
+ * Geometri khusus Laporan Peminjaman (landscape).
+ * Sel laporan ini TIDAK dipotong (tanpa clamp/ellipsis), sehingga satu baris
+ * bisa setinggi 2 baris teks; kapasitas baris karena itu lebih kecil daripada
+ * landscape biasa (17/21). Angka di bawah adalah perkiraan konservatif untuk
+ * baris rata-rata 2 baris teks (kasus 3 baris tetap muat karena baris memakai
+ * min-height, bukan tinggi tetap). Reserve total + tanda tangan tidak berubah.
+ */
+export const REPORT_PRINT_BORROWINGS_PAGE: ReportPrintPageGeometry = {
+  widthMm: 297,
+  heightMm: 210,
+  marginMm: 12,
+  rowHeightMm: 7.5,
+  firstPageRows: 11,
+  nextPageRows: 14,
+  totalsReserveRows: 4,
+  signatureReserveRows: 6
+} as const
+
+/** Geometri halaman efektif sebuah laporan (landscape Peminjaman punya angka sendiri). */
+export function reportPrintGeometry(
+  type: ReportPrintType,
+  orientation: ReportPrintOrientation
+): ReportPrintPageGeometry {
+  if (type === 'borrowings' && orientation === 'landscape') return REPORT_PRINT_BORROWINGS_PAGE
+  return REPORT_PRINT_PAGE[orientation]
+}
+
 export interface ReportPrintPage {
   /** Nomor halaman (1-based). */
   page: number
@@ -126,8 +154,14 @@ export interface ReportPrintPagination {
 //     (Aturan ini berbeda dari collective-card yang memindahkan tanda tangan
 //     ke halaman baru; di sini redistribusi dipilih agar dokumen cetak
 //     selalu konsisten: halaman terakhir = baris + total + tanda tangan.)
-export function paginateReportRows(totalRows: number, orientation: ReportPrintOrientation): ReportPrintPagination {
-  const geometry = REPORT_PRINT_PAGE[orientation]
+export function paginateReportRows(
+  totalRows: number,
+  orientation: ReportPrintOrientation,
+  type?: ReportPrintType
+): ReportPrintPagination {
+  // `type` opsional: tanpa type, geometri murni orientation (perilaku lama,
+  // dipakai laporan lain). Hanya landscape Peminjaman yang bergeometri sendiri.
+  const geometry = type ? reportPrintGeometry(type, orientation) : REPORT_PRINT_PAGE[orientation]
   const reserveRows = geometry.totalsReserveRows + geometry.signatureReserveRows
 
   if (!Number.isInteger(totalRows) || totalRows < 0) {
