@@ -374,10 +374,10 @@ export class PrintService {
     const { html, data } = await this.buildReportPrintHtml(request)
     return {
       html,
-      // Peminjaman memakai paginasi berbasis tinggi baris; jumlah halaman
-      // dihitung dari HTML hasil render agar selalu sama dengan yang dicetak.
+      // Peminjaman & Pengembalian memakai paginasi berbasis tinggi baris; jumlah
+      // halaman dihitung dari HTML hasil render agar selalu sama dengan dicetak.
       pageCount:
-        data.type === 'borrowings'
+        data.type === 'borrowings' || data.type === 'returns'
           ? (html.match(/<section class="a4-sheet/g) ?? []).length
           : paginateReportRows(data.totalRows, data.orientation, data.type).pages.length,
       // T2 (additive): dipakai preview untuk banner "Laporan kosong untuk filter ini."

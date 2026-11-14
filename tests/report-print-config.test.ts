@@ -48,7 +48,7 @@ describe('report-print config — konstanta', () => {
   it('orientasi per laporan sesuai keputusan pemilik', () => {
     expect(REPORT_PRINT_ORIENTATION).toEqual({
       borrowings: 'landscape',
-      returns: 'portrait',
+      returns: 'landscape',
       overdues: 'landscape',
       members: 'portrait',
       collections: 'landscape'
@@ -106,9 +106,10 @@ describe('report-print config — konstanta', () => {
       signatureReserveRows: 6
     })
     expect(REPORT_PRINT_RETURNS_METRICS).toMatchObject(REPORT_PRINT_BORROWINGS_METRICS)
-    // Jalur lama tidak berubah: returns masih portrait di orientasi config,
-    // dan geometry-nya tetap geometri portrait umum.
-    expect(REPORT_PRINT_ORIENTATION.returns).toBe('portrait')
+    // Orientasi aktif Pengembalian kini landscape; jalur portrait tetap sah
+    // dipakai bila geometri diminta eksplisit (mis. cetak portrait manual) dan
+    // tetap jatuh ke geometri portrait umum.
+    expect(REPORT_PRINT_ORIENTATION.returns).toBe('landscape')
     expect(reportPrintGeometry('returns', 'portrait')).toBe(REPORT_PRINT_PAGE.portrait)
     expect(reportPrintGeometry('borrowings', 'landscape')).toBe(REPORT_PRINT_BORROWINGS_PAGE)
     expect(reportPrintGeometry('borrowings', 'portrait')).toBe(REPORT_PRINT_PAGE.portrait)

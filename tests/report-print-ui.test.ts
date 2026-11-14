@@ -105,9 +105,9 @@ function makeData(rowCount: number): ReportPrintData {
     { key: 'c2', label: 'Kolom 2', align: 'center' as const }
   ]
   return {
-    // Peminjaman memakai paginasi berbasis tinggi baris; helper split diuji
-    // dengan tipe berkapasitas tetap agar harapan jumlah sheet tetap jelas.
-    type: 'returns',
+    // Peminjaman & Pengembalian memakai paginasi berbasis tinggi baris; helper
+    // split diuji dengan tipe berkapasitas tetap agar harapan jumlah sheet jelas.
+    type: 'members',
     title: 'Laporan Uji',
     orientation: 'portrait',
     institution: {

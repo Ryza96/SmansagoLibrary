@@ -36,7 +36,7 @@ export const REPORT_PRINT_MAX_ROWS = 5000
 // Orientasi per laporan (keputusan pemilik, final).
 export const REPORT_PRINT_ORIENTATION: Record<ReportPrintType, ReportPrintOrientation> = {
   borrowings: 'landscape',
-  returns: 'portrait',
+  returns: 'landscape',
   overdues: 'landscape',
   members: 'portrait',
   collections: 'landscape'

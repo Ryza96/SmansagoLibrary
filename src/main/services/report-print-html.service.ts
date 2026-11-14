@@ -8,6 +8,8 @@
 // monogram (generateLogoMonogramSvg, sama seperti kartu/label).
 import {
   BORROWINGS_COLUMN_WIDTH_PERCENT,
+  REPORT_PRINT_RETURNS_METRICS,
+  RETURNS_COLUMN_WIDTH_PERCENT,
   paginateBorrowingRowsByHeight,
   paginateReportRows,
   reportPrintGeometry
@@ -28,21 +30,28 @@ export interface ReportPrintPreview {
 // 11 kolom Koleksi tetap terbaca di landscape.
 const COLUMN_WIDTHS: Record<ReportPrintData['type'], number[]> = {
   borrowings: [...BORROWINGS_COLUMN_WIDTH_PERCENT],
-  returns: [11, 13, 18, 12, 25, 10, 11],
+  returns: [...RETURNS_COLUMN_WIDTH_PERCENT],
   overdues: [10, 12, 16, 11, 25, 10, 8, 8],
   members: [14, 28, 18, 18, 22],
   collections: [12, 23, 12, 12, 11, 6, 7, 5, 5, 4, 3]
 }
 
 /**
- * CSS tabel. Laporan Peminjaman (landscape) memakai varian TANPA pemotongan
- * teks: tidak ada line-clamp / ellipsis / max-height, baris memakai min-height,
- * sel membungkus kata panjang (overflow-wrap: anywhere), baris tidak terbelah
- * antar halaman, dan header tabel diulang di tiap halaman.
+ * Daftar tipe laporan yang memakai varian tabel TANPA pemotongan teks sekaligus
+ * paginasi berbasis perkiraan tinggi baris. Daftar eksplisit (bukan "selain"
+ * tipe tertentu) agar laporan baru tidak ikut berubah tanpa keputusan.
+ */
+const NO_CLIP_TYPES: readonly ReportPrintType[] = ['borrowings', 'returns']
+
+/**
+ * CSS tabel. Laporan Peminjaman & Pengembalian (landscape) memakai varian TANPA
+ * pemotongan teks: tidak ada line-clamp / ellipsis / max-height, baris memakai
+ * min-height, sel membungkus kata panjang (overflow-wrap: anywhere), baris tidak
+ * terbelah antar halaman, dan header tabel diulang di tiap halaman.
  * Laporan lain memakai CSS lama apa adanya (perilaku tidak berubah).
  */
 function tableCss(type: ReportPrintType, geometry: ReportPrintPageGeometry): string {
-  if (type === 'borrowings') {
+  if (NO_CLIP_TYPES.includes(type)) {
     return `  .report-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
   .report-table th, .report-table td {
     border: 0.2mm solid #6b7280;
@@ -227,7 +236,12 @@ export function generateReportPrintHtml(
       ? paginateBorrowingRowsByHeight(data.rows, COLUMN_WIDTHS.borrowings, undefined, {
           nowrapColumnIndex: data.columns.findIndex((c) => c.key === 'status')
         })
-      : paginateReportRows(data.totalRows, data.orientation, data.type)
+      : data.type === 'returns'
+        ? paginateBorrowingRowsByHeight(data.rows, RETURNS_COLUMN_WIDTH_PERCENT, REPORT_PRINT_RETURNS_METRICS.contentWidthMm, {
+            // Status = kolom ke-7 (indeks 6), dicetak nowrap.
+            nowrapColumnIndex: 6
+          })
+        : paginateReportRows(data.totalRows, data.orientation, data.type)
   // Blok total + tanda tangan boleh pindah UTUH ke halaman baru.
   const blocksOnNewPage = pagination.signaturePage === 'new'
   const pageCount = pagination.pages.length + (blocksOnNewPage ? 1 : 0)

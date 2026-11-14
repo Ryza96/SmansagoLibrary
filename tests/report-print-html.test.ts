@@ -1,6 +1,12 @@
 import { describe, it, expect } from 'vitest'
 import { generateReportPrintHtml } from '../src/main/services/report-print-html.service'
-import { paginateBorrowingRowsByHeight, paginateReportRows, REPORT_PRINT_ORIENTATION } from '../src/shared/config/report-print'
+import {
+  paginateBorrowingRowsByHeight,
+  paginateReportRows,
+  REPORT_PRINT_ORIENTATION,
+  REPORT_PRINT_RETURNS_METRICS,
+  RETURNS_COLUMN_WIDTH_PERCENT
+} from '../src/shared/config/report-print'
 import type { ReportPrintData, ReportPrintType } from '../src/shared/dto/report-print'
 
 const COLUMNS: Record<ReportPrintType, { key: string; label: string; align: 'left' | 'center' | 'right' }[]> = {
@@ -94,13 +100,17 @@ describe('generateReportPrintHtml — struktur', () => {
     for (const type of Object.keys(COLUMNS) as ReportPrintType[]) {
       const data = makeData(type, 120)
       const html = generateReportPrintHtml(data)
-      const expected =
+      // Peminjaman & Pengembalian memakai paginasi berbasis tinggi baris;
+      // laporan lain tetap kapasitas baris tetap.
+      const heightPaginated =
         type === 'borrowings'
-          ? (() => {
-              const pag = paginateBorrowingRowsByHeight(data.rows)
-              return pag.pages.length + (pag.signaturePage === 'new' ? 1 : 0)
-            })()
-          : paginateReportRows(120, data.orientation, data.type).pages.length
+          ? paginateBorrowingRowsByHeight(data.rows)
+          : type === 'returns'
+            ? paginateBorrowingRowsByHeight(data.rows, RETURNS_COLUMN_WIDTH_PERCENT, REPORT_PRINT_RETURNS_METRICS.contentWidthMm, { nowrapColumnIndex: 6 })
+            : null
+      const expected = heightPaginated
+        ? heightPaginated.pages.length + (heightPaginated.signaturePage === 'new' ? 1 : 0)
+        : paginateReportRows(120, data.orientation, data.type).pages.length
       expect(countSheets(html), `${type}`).toBe(expected)
     }
   })
@@ -233,8 +243,12 @@ describe('generateReportPrintHtml — struktur', () => {
     expect(html).toContain('min-height:')
     expect(html).toContain('break-inside: avoid')
     expect(html).toContain('height: auto')
+    // Pengembalian kini ikut varian tanpa pemotongan teks.
+    const returnsHtml = generateReportPrintHtml(makeData('returns', 3))
+    expect(returnsHtml).not.toContain('line-clamp')
+    expect(returnsHtml).toContain('overflow-wrap: anywhere')
     // Laporan lain tetap memakai clamp (perilaku lama tidak berubah).
-    expect(generateReportPrintHtml(makeData('returns', 3))).toContain('-webkit-line-clamp')
+    expect(generateReportPrintHtml(makeData('members', 3))).toContain('-webkit-line-clamp')
   })
 
   it('Peminjaman: jumlah halaman mengikuti paginasi berbasis tinggi baris', () => {
