@@ -6,7 +6,12 @@
 // Logo: data URI disematkan SEKALI via CSS variable --report-logo-url
 // (pola --label-logo-url di label.service.ts); tanpa data URI → fallback
 // monogram (generateLogoMonogramSvg, sama seperti kartu/label).
-import { paginateReportRows, reportPrintGeometry } from '../../shared/config/report-print'
+import {
+  BORROWINGS_COLUMN_WIDTH_PERCENT,
+  paginateBorrowingRowsByHeight,
+  paginateReportRows,
+  reportPrintGeometry
+} from '../../shared/config/report-print'
 import type { ReportPrintPageGeometry, ReportPrintType } from '../../shared/config/report-print'
 import type { ReportPrintColumn, ReportPrintData } from '../../shared/dto/report-print'
 import { escapeHtml } from '../../shared/utils/escape-html'
@@ -22,7 +27,7 @@ export interface ReportPrintPreview {
 // Lebar kolom per tipe (persen, jumlah = 100) — disesuaikan agar tabel
 // 11 kolom Koleksi tetap terbaca di landscape.
 const COLUMN_WIDTHS: Record<ReportPrintData['type'], number[]> = {
-  borrowings: [8, 12, 25, 10, 25, 9, 11],
+  borrowings: [...BORROWINGS_COLUMN_WIDTH_PERCENT],
   returns: [11, 13, 18, 12, 25, 10, 11],
   overdues: [10, 12, 16, 11, 25, 10, 8, 8],
   members: [14, 28, 18, 18, 22],
@@ -215,8 +220,17 @@ export function generateReportPrintHtml(
   options?: { logoDataUri?: string | null }
 ): string {
   const geometry = reportPrintGeometry(data.type, data.orientation)
-  const pagination = paginateReportRows(data.totalRows, data.orientation, data.type)
-  const pageCount = pagination.pages.length
+  // Laporan Peminjaman memakai paginasi berbasis perkiraan tinggi baris (isi
+  // halaman sampai penuh); laporan lain tetap kapasitas baris tetap (TAHAP 1).
+  const pagination =
+    data.type === 'borrowings'
+      ? paginateBorrowingRowsByHeight(data.rows, COLUMN_WIDTHS.borrowings, undefined, {
+          nowrapColumnIndex: data.columns.findIndex((c) => c.key === 'status')
+        })
+      : paginateReportRows(data.totalRows, data.orientation, data.type)
+  // Blok total + tanda tangan boleh pindah UTUH ke halaman baru.
+  const blocksOnNewPage = pagination.signaturePage === 'new'
+  const pageCount = pagination.pages.length + (blocksOnNewPage ? 1 : 0)
   const printedAt = formatPrintedAt(data.generatedAt)
   const monogram = options?.logoDataUri ? '' : generateLogoMonogramSvg(data.institution.schoolName, data.institution.libraryName)
   const logoVar = options?.logoDataUri
@@ -226,7 +240,7 @@ export function generateReportPrintHtml(
   const sheets = pagination.pages
     .map((page, index) => {
       const isFirst = index === 0
-      const isLast = index === pageCount - 1
+      const isLast = index === pagination.pages.length - 1 && !blocksOnNewPage
       const pageRows = data.rows.slice(page.startIndex, page.endIndex)
       const header = isFirst ? firstPageHeaderHtml(data, printedAt, monogram) : continuationHeaderHtml(data)
       const lastBlocks = isLast ? `${totalsHtml(data)}${notesHtml(data)}${signaturesHtml(data)}` : ''
@@ -243,6 +257,17 @@ export function generateReportPrintHtml(
   </section>`
     })
     .join('')
+
+  // Blok total + catatan + tanda tangan pindah UTUH ke halaman baru bila tidak
+  // muat di halaman tabel terakhir (tanpa memindahkan baris data).
+  const blocksSheet = blocksOnNewPage
+    ? `
+  <section class="a4-sheet a4-sheet--last">
+    ${continuationHeaderHtml(data)}
+    ${totalsHtml(data)}${notesHtml(data)}${signaturesHtml(data)}
+    <footer class="sheet-footer"><span>Halaman ${pageCount} dari ${pageCount}</span></footer>
+  </section>`
+    : ''
 
   return `<!DOCTYPE html>
 <html lang="id">
@@ -346,7 +371,7 @@ ${tableCss(data.type, geometry)}
   }
 </style>
 </head>
-<body>${sheets}
+<body>${sheets}${blocksSheet}
 </body>
 </html>`
 }

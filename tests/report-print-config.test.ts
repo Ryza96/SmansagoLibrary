@@ -4,6 +4,10 @@ import {
   REPORT_PRINT_ORIENTATION,
   REPORT_PRINT_PAGE,
   REPORT_PRINT_BORROWINGS_PAGE,
+  REPORT_PRINT_BORROWINGS_METRICS,
+  BORROWINGS_COLUMN_WIDTH_PERCENT,
+  estimateBorrowingRowHeightMm,
+  paginateBorrowingRowsByHeight,
   reportPrintGeometry,
   paginateReportRows
 } from '../src/shared/config/report-print'
@@ -119,6 +123,92 @@ describe('paginateReportRows', () => {
   it('totalRows tidak valid → 1 halaman kosong (tidak throw)', () => {
     expect(paginateReportRows(-1, 'portrait').pages[0].rowCount).toBe(0)
     expect(paginateReportRows(1.5, 'portrait').pages[0].rowCount).toBe(0)
+  })
+})
+
+const BORROWING_METRICS = REPORT_PRINT_BORROWINGS_METRICS
+
+function borrowingRow(i: number, title?: string): string[] {
+  return [
+    `0${(i % 9) + 1}/11/2026`,
+    `PJ2026110${String(i + 1).padStart(3, '0')}`,
+    `Anggota ${i + 1}`,
+    'XI MERDEKA 1',
+    title ?? `Buku Uji ${i + 1}`,
+    '30/11/2026',
+    i % 2 ? 'DIKEMBALIKAN' : 'AKTIF'
+  ]
+}
+
+function borrowingPageLimitMm(isFirst: boolean): number {
+  const m = BORROWING_METRICS
+  return (m.contentHeightMm - (isFirst ? m.firstPageHeaderMm : m.continuationHeaderMm) - m.tableHeadMm - m.footerMm) * (1 - m.safeMarginRatio)
+}
+
+describe('paginateBorrowingRowsByHeight', () => {
+  it('24 baris satu-baris-teks → paling banyak 2 halaman, tidak ada halaman berisi 1 baris', () => {
+    const rows = Array.from({ length: 24 }, (_, i) => borrowingRow(i))
+    const pag = paginateBorrowingRowsByHeight(rows)
+    expect(pag.totalRows).toBe(24)
+    expect(pag.pages.length + (pag.signaturePage === 'new' ? 1 : 0)).toBeLessThanOrEqual(2)
+    for (const p of pag.pages) expect(p.rowCount).not.toBe(1)
+    // Jauh lebih penuh daripada kapasitas tetap lama (14).
+    expect(pag.pages[0].rowCount).toBeGreaterThan(14)
+  })
+
+  it('baris dengan teks 200 karakter dihitung lebih tinggi daripada baris pendek', () => {
+    const short = estimateBorrowingRowHeightMm(borrowingRow(0))
+    const long = estimateBorrowingRowHeightMm(borrowingRow(1, 'Judul '.repeat(34).slice(0, 200)))
+    expect(long).toBeGreaterThan(short)
+    expect(long).toBeGreaterThan(short * 3)
+  })
+
+  it('pengisian greedy: tidak ada halaman non-terakhir yang masih muat baris berikutnya', () => {
+    const rows = Array.from({ length: 120 }, (_, i) =>
+      borrowingRow(i, i % 5 === 0 ? 'Judul panjang yang membungkus beberapa baris '.repeat(2) : `Buku Uji ${i + 1}`)
+    )
+    const pag = paginateBorrowingRowsByHeight(rows)
+    const heights = rows.map((r) => estimateBorrowingRowHeightMm(r))
+    pag.pages.forEach((p, idx) => {
+      if (idx === pag.pages.length - 1 || p.endIndex >= rows.length) return
+      const used = heights.slice(p.startIndex, p.endIndex).reduce((a, b) => a + b, 0)
+      expect(used + heights[p.endIndex]).toBeGreaterThan(borrowingPageLimitMm(idx === 0))
+    })
+  })
+
+  it('blok total+tanda tangan pindah UTUH ke halaman baru bila tidak muat (tanpa memindah baris)', () => {
+    // 64 baris = 29 (halaman 1) + 35 (halaman 2 penuh) → blok tidak muat.
+    const full = Array.from({ length: 64 }, (_, i) => borrowingRow(i))
+    const pagFull = paginateBorrowingRowsByHeight(full)
+    expect(pagFull.pages.map((p) => p.rowCount)).toEqual([29, 35])
+    expect(pagFull.signaturePage).toBe('new')
+    expect(pagFull.pages[pagFull.pages.length - 1].endIndex).toBe(64)
+    expect(full[64 - 1][4]).toBe('Buku Uji 64')
+
+    // 70 baris → halaman terakhir sisa 6 baris, blok tetap di halaman itu.
+    const roomy = Array.from({ length: 70 }, (_, i) => borrowingRow(i))
+    const pagRoomy = paginateBorrowingRowsByHeight(roomy)
+    expect(pagRoomy.signaturePage).toBe('last')
+    expect(pagRoomy.pages[pagRoomy.pages.length - 1].rowCount).toBe(6)
+  })
+
+  it('0 baris → 1 halaman kosong, blok total tetap di halaman itu', () => {
+    const pag = paginateBorrowingRowsByHeight([])
+    expect(pag.pages).toHaveLength(1)
+    expect(pag.pages[0]).toMatchObject({ page: 1, startIndex: 0, endIndex: 0, rowCount: 0 })
+    expect(pag.signaturePage).toBe('last')
+  })
+
+  it('gabungan halaman = seluruh baris, urutan terjaga, tidak ada baris terbelah', () => {
+    const rows = Array.from({ length: 37 }, (_, i) => borrowingRow(i))
+    const pag = paginateBorrowingRowsByHeight(rows, BORROWINGS_COLUMN_WIDTH_PERCENT)
+    let cursor = 0
+    for (const p of pag.pages) {
+      expect(p.startIndex).toBe(cursor)
+      expect(p.endIndex - p.startIndex).toBe(p.rowCount)
+      cursor = p.endIndex
+    }
+    expect(cursor).toBe(37)
   })
 })
 

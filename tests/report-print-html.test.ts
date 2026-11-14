@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { generateReportPrintHtml } from '../src/main/services/report-print-html.service'
-import { paginateReportRows, REPORT_PRINT_ORIENTATION } from '../src/shared/config/report-print'
+import { paginateBorrowingRowsByHeight, paginateReportRows, REPORT_PRINT_ORIENTATION } from '../src/shared/config/report-print'
 import type { ReportPrintData, ReportPrintType } from '../src/shared/dto/report-print'
 
 const COLUMNS: Record<ReportPrintType, { key: string; label: string; align: 'left' | 'center' | 'right' }[]> = {
@@ -90,20 +90,27 @@ function countSheets(html: string): number {
 }
 
 describe('generateReportPrintHtml — struktur', () => {
-  it('jumlah .a4-sheet == jumlah halaman paginateReportRows (120 baris, semua tipe)', () => {
+  it('jumlah .a4-sheet == jumlah halaman paginasi tiap tipe (120 baris)', () => {
     for (const type of Object.keys(COLUMNS) as ReportPrintType[]) {
       const data = makeData(type, 120)
       const html = generateReportPrintHtml(data)
-      const expected = paginateReportRows(120, data.orientation, data.type).pages.length
-      expect(countSheets(html)).toBe(expected)
+      const expected =
+        type === 'borrowings'
+          ? (() => {
+              const pag = paginateBorrowingRowsByHeight(data.rows)
+              return pag.pages.length + (pag.signaturePage === 'new' ? 1 : 0)
+            })()
+          : paginateReportRows(120, data.orientation, data.type).pages.length
+      expect(countSheets(html), `${type}`).toBe(expected)
     }
   })
 
-  it('setiap halaman punya <thead>; "Halaman X dari Y" benar; total + tanda tangan hanya di halaman terakhir', () => {
+  it('setiap halaman data punya <thead>; "Halaman X dari Y" benar; total + tanda tangan hanya di halaman terakhir', () => {
     const data = makeData('borrowings', 120)
     const html = generateReportPrintHtml(data)
-    const pageCount = paginateReportRows(120, 'landscape', 'borrowings').pages.length
-    expect((html.match(/<thead>/g) ?? []).length).toBe(pageCount)
+    const pag = paginateBorrowingRowsByHeight(data.rows)
+    const pageCount = pag.pages.length + (pag.signaturePage === 'new' ? 1 : 0)
+    expect((html.match(/<thead>/g) ?? []).length).toBe(pag.pages.length)
     expect(html).toContain(`Halaman 1 dari ${pageCount}`)
     expect(html).toContain(`Halaman ${pageCount} dari ${pageCount}`)
     expect((html.match(/class="totals-block"/g) ?? []).length).toBe(1)
@@ -230,18 +237,19 @@ describe('generateReportPrintHtml — struktur', () => {
     expect(generateReportPrintHtml(makeData('returns', 3))).toContain('-webkit-line-clamp')
   })
 
-  it('tepat kapasitas halaman pertama & kapasitas+1 mengikuti paginateReportRows', () => {
-    // Peminjaman landscape: kapasitas khusus (14 halaman pertama, 17 lanjutan).
-    for (const n of [14, 15]) {
+  it('Peminjaman: jumlah halaman mengikuti paginasi berbasis tinggi baris', () => {
+    // Isi halaman sampai penuh; blok total+tanda tangan boleh pindah ke halaman
+    // baru (satu sheet tambahan).
+    for (const n of [0, 1, 14, 24, 29, 64, 70]) {
       const data = makeData('borrowings', n)
-      const html = generateReportPrintHtml(data)
-      expect(countSheets(html)).toBe(paginateReportRows(n, 'landscape', 'borrowings').pages.length)
+      const pag = paginateBorrowingRowsByHeight(data.rows)
+      expect(countSheets(generateReportPrintHtml(data)), `n=${n}`).toBe(pag.pages.length + (pag.signaturePage === 'new' ? 1 : 0))
     }
-    for (const n of [17, 18]) {
-      const data = makeData('borrowings', n)
-      const html = generateReportPrintHtml(data)
-      expect(countSheets(html)).toBe(paginateReportRows(n, 'landscape', 'borrowings').pages.length)
-    }
+    // 24 baris pendek: paling banyak 2 halaman, halaman data pertama terisi penuh.
+    const data24 = makeData('borrowings', 24)
+    const html24 = generateReportPrintHtml(data24)
+    expect(countSheets(html24)).toBeLessThanOrEqual(2)
+    // Laporan lain tetap kapasitas baris tetap (TAHAP 1).
     for (const n of [17, 18]) {
       const data = makeData('overdues', n)
       const html = generateReportPrintHtml(data)

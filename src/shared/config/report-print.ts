@@ -102,6 +102,41 @@ export const REPORT_PRINT_BORROWINGS_PAGE: ReportPrintPageGeometry = {
   signatureReserveRows: 6
 } as const
 
+/** Lebar kolom Laporan Peminjaman (persen, total 100). */
+export const BORROWINGS_COLUMN_WIDTH_PERCENT: readonly number[] = [8, 12, 25, 10, 25, 9, 11]
+
+/**
+ * Metrik hasil UKUR RENDER NYATA (Electron, A4 landscape, margin 12mm, font
+ * 8.5pt) yang dipakai paginasi berbasis perkiraan tinggi baris Peminjaman.
+ * Satuan mm. Angka "terukur" dicatat agar mudah dibandingkan ulang.
+ */
+export const REPORT_PRINT_BORROWINGS_METRICS = {
+  /** Tinggi area isi halaman: 210 − 2×12 (terukur 186.08). */
+  contentHeightMm: 186,
+  /** Lebar area isi halaman: 297 − 2×12 (terukur 273.13). */
+  contentWidthMm: 273,
+  /** Kop + judul + meta halaman pertama (terukur 38.13). */
+  firstPageHeaderMm: 38.5,
+  /** Header ringkas halaman lanjutan + garis (terukur 7.99). */
+  continuationHeaderMm: 8.2,
+  /** Tinggi thead (terukur 7.5). */
+  tableHeadMm: 7.5,
+  /** Footer "Halaman X dari Y" + garis + jarak (terukur 5.02). */
+  footerMm: 6,
+  /** Padding + border per baris (terukur 0.85). */
+  rowOverheadMm: 0.9,
+  /** Tinggi satu baris teks: 8.5pt × line-height 1.15 (terukur 3.45). */
+  textLineHeightMm: 3.45,
+  /** Lebar rata-rata karakter 8.5pt (konservatif). */
+  charWidthMm: 1.8,
+  /** Padding kiri+kanan sel (0.3mm + 1mm per sisi ≈ 2mm). */
+  cellPaddingMm: 2,
+  /** Blok total + tanda tangan di halaman terakhir (terukur 51.39). */
+  lastPageBlocksMm: 52,
+  /** Margin aman pengisian greedy. */
+  safeMarginRatio: 0.05
+} as const
+
 /** Geometri halaman efektif sebuah laporan (landscape Peminjaman punya angka sendiri). */
 export function reportPrintGeometry(
   type: ReportPrintType,
@@ -206,4 +241,116 @@ export function paginateReportRows(
   }
 
   return { pages, totalRows, signaturePage: 'last' }
+}
+
+export interface BorrowingRowPaginationOptions {
+  /** Indeks kolom yang tidak boleh membungkus (Status, bold nowrap). */
+  nowrapColumnIndex?: number
+  /** Override margin aman (0–1); default dari metrik (0.05). */
+  safeMarginRatio?: number
+  /** Override tinggi blok total + tanda tangan (mm). */
+  blocksHeightMm?: number
+}
+
+/**
+ * Perkiraan jumlah baris teks satu sel: ceil(panjang teks / karakter per baris),
+ * dengan karakter per baris = (lebar kolom − padding) / lebar karakter.
+ */
+function estimateTextLines(text: string, columnWidthMm: number, charWidthMm: number, paddingMm: number): number {
+  const usableMm = Math.max(columnWidthMm - paddingMm, charWidthMm)
+  const charsPerLine = Math.max(Math.floor(usableMm / charWidthMm), 1)
+  return Math.max(1, Math.ceil(text.trim().length / charsPerLine))
+}
+
+/**
+ * Perkiraan tinggi satu baris data Peminjaman (mm): jumlah baris teks terbanyak
+ * di antara sel × tinggi baris teks + padding/border. Kolom nowrap (Status)
+ * dihitung satu baris.
+ */
+export function estimateBorrowingRowHeightMm(
+  row: readonly string[],
+  columnWidthsPercent: readonly number[] = BORROWINGS_COLUMN_WIDTH_PERCENT,
+  contentWidthMm: number = REPORT_PRINT_BORROWINGS_METRICS.contentWidthMm,
+  options?: BorrowingRowPaginationOptions
+): number {
+  const m = REPORT_PRINT_BORROWINGS_METRICS
+  const nowrap = options?.nowrapColumnIndex ?? columnWidthsPercent.length - 1
+  let maxLines = 1
+  columnWidthsPercent.forEach((percent, i) => {
+    const text = row[i] ?? ''
+    if (i === nowrap) {
+      maxLines = Math.max(maxLines, 1)
+      return
+    }
+    const columnWidthMm = (contentWidthMm * percent) / 100
+    maxLines = Math.max(maxLines, estimateTextLines(text, columnWidthMm, m.charWidthMm, m.cellPaddingMm))
+  })
+  return maxLines * m.textLineHeightMm + m.rowOverheadMm
+}
+
+/**
+ * Paginasi berbasis perkiraan tinggi baris untuk Laporan Peminjaman.
+ *
+ * Berbeda dari `paginateReportRows` (kapasitas baris tetap), fungsi ini mengisi
+ * halaman secara GREEDY memakai perkiraan tinggi tiap baris, sehingga halaman
+ * tidak setengah kosong hanya karena satu baris judul panjang.
+ *
+ * Jaminan (diuji di tests/report-print-config.test.ts):
+ *  1. Tidak ada baris hilang/ganda dan urutan terjaga.
+ *  2. Tidak ada halaman non-terakhir yang masih muat untuk baris berikutnya.
+ *  3. Baris tidak pernah dibelah antar halaman.
+ *  4. Blok total + tanda tangan dicetak di halaman terakhir bila muat; bila
+ *     tidak muat, blok itu pindah UTUH ke halaman baru (`signaturePage: 'new'`)
+ *     TANPA memindahkan baris data yang sudah muat.
+ *  5. totalRows = 0 tetap menghasilkan 1 halaman (blok total tetap tercetak).
+ */
+export function paginateBorrowingRowsByHeight(
+  rows: readonly (readonly string[])[],
+  columnWidthsPercent: readonly number[] = BORROWINGS_COLUMN_WIDTH_PERCENT,
+  contentWidthMm: number = REPORT_PRINT_BORROWINGS_METRICS.contentWidthMm,
+  options?: BorrowingRowPaginationOptions
+): ReportPrintPagination {
+  const m = REPORT_PRINT_BORROWINGS_METRICS
+  const safeRatio = 1 - (options?.safeMarginRatio ?? m.safeMarginRatio)
+  const blocksMm = options?.blocksHeightMm ?? m.lastPageBlocksMm
+  const heights = rows.map((row) => estimateBorrowingRowHeightMm(row, columnWidthsPercent, contentWidthMm, options))
+
+  const limitFor = (isFirst: boolean): number =>
+    (m.contentHeightMm -
+      (isFirst ? m.firstPageHeaderMm : m.continuationHeaderMm) -
+      m.tableHeadMm -
+      m.footerMm) *
+    safeRatio
+
+  const pages: ReportPrintPage[] = []
+  const usedMm: number[] = []
+  let start = 0
+  while (start < rows.length) {
+    const isFirst = pages.length === 0
+    const limit = limitFor(isFirst)
+    let used = 0
+    let end = start
+    while (end < rows.length) {
+      const h = heights[end]
+      if (used + h > limit) break
+      used += h
+      end += 1
+    }
+    if (end === start) {
+      // Baris tunggal lebih tinggi dari ruang halaman: paksa satu baris.
+      end = start + 1
+      used = heights[start]
+    }
+    pages.push({ page: pages.length + 1, startIndex: start, endIndex: end, rowCount: end - start, capacity: end - start })
+    usedMm.push(used)
+    start = end
+  }
+  if (pages.length === 0) {
+    pages.push({ page: 1, startIndex: 0, endIndex: 0, rowCount: 0, capacity: 0 })
+    usedMm.push(0)
+  }
+
+  const lastIndex = pages.length - 1
+  const blocksFit = usedMm[lastIndex] + blocksMm <= limitFor(lastIndex === 0)
+  return { pages, totalRows: rows.length, signaturePage: blocksFit ? 'last' : 'new' }
 }

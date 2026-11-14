@@ -32,7 +32,7 @@ const SMOKE_OUT = path.join(__dirname, 'smoke_out')
 fs.mkdirSync(SMOKE_OUT, { recursive: true })
 
 const { generateReportPrintHtml } = require(path.join(OUT_DIR, 'src', 'main', 'services', 'report-print-html.service.js'))
-const { REPORT_PRINT_ORIENTATION, paginateReportRows } = require(path.join(OUT_DIR, 'src', 'shared', 'config', 'report-print.js'))
+const { REPORT_PRINT_ORIENTATION, paginateReportRows, paginateBorrowingRowsByHeight } = require(path.join(OUT_DIR, 'src', 'shared', 'config', 'report-print.js'))
 const { PrintService } = require(path.join(OUT_DIR, 'electron', 'main', 'services', 'print.service.js'))
 
 const COLUMNS = {
@@ -92,7 +92,13 @@ app.whenReady().then(async () => {
     const html = generateReportPrintHtml(data)
     const pdf = await service.renderPdf(html)
     const boxes = extractMediaBoxes(pdf)
-    const expectedPages = paginateReportRows(n, data.orientation, data.type).pages.length
+    const expectedPages =
+      data.type === 'borrowings'
+        ? (() => {
+            const pag = paginateBorrowingRowsByHeight(data.rows)
+            return pag.pages.length + (pag.signaturePage === 'new' ? 1 : 0)
+          })()
+        : paginateReportRows(n, data.orientation, data.type).pages.length
     const expectedName = data.orientation === 'portrait' ? '594.960x841.920' : '841.920x594.960'
     const first = boxes[0] ? `${boxes[0].w.toFixed(3)}x${boxes[0].h.toFixed(3)}` : 'none'
     const dimsOk = boxes.length > 0 &&
