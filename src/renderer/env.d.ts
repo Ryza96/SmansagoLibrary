@@ -364,6 +364,7 @@ interface ElectronAPI {
       updatedAt: string
     }>
     pickLogo: () => Promise<import('../../src/shared/dto/logo').PickLogoResult>
+    getLogoPreview: () => Promise<import('../../src/shared/dto/logo').SavedLogoPreview>
     resetDatabase: () => Promise<void>
     listPrinters: () => Promise<import('../../src/shared/dto/print').PrinterInfoDTO[]>
   }

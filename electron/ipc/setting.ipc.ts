@@ -1,7 +1,7 @@
 import { BrowserWindow, dialog, ipcMain, type IpcMainInvokeEvent } from 'electron'
 import type { SettingService } from '../main/services/setting.service'
 import type { ResetDatabaseService } from '../../src/main/services/reset-database.service'
-import type { PickLogoResult } from '../../src/shared/dto/logo'
+import type { PickLogoResult, SavedLogoPreview } from '../../src/shared/dto/logo'
 import type { PrinterInfoDTO } from '../../src/shared/dto/print'
 
 export function registerSettingHandlers(
@@ -28,6 +28,11 @@ export function registerSettingHandlers(
   // lolos ke wrapper Electron, renderer menerima Error dengan message.
   ipcMain.handle('settings:resetDatabase', async () =>
     resetDatabaseService.resetDatabase()
+  )
+
+  // Pratinjau logo TERSIMPAN (READ ONLY) — data URL dibentuk di main.
+  ipcMain.handle('settings:getLogoPreview', async (): Promise<SavedLogoPreview> =>
+    settingService.getSavedLogoPreview()
   )
 
   // RFC §15.1 — pilih file logo: dialog OS → validasi + resize + preview di main.

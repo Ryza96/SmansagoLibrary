@@ -13,3 +13,10 @@ export type PickLogoResult =
       sizeBytes: number
       previewUri: string
     }
+
+// Pratinjau logo yang SUDAH TERSIMPAN (dibaca dari Setting.logoPath).
+// Data URL dibentuk di main (file logo tidak pernah dikirim mentah ke renderer);
+// logo tidak ada / tidak terbaca → { hasLogo: false } tanpa melempar error.
+export type SavedLogoPreview =
+  | { hasLogo: false }
+  | { hasLogo: true; previewUri: string }

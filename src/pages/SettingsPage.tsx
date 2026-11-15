@@ -73,6 +73,8 @@ export default function SettingsPage() {
   const [dbInfo, setDbInfo] = useState<AppDatabaseInfoDTO | null>(null)
   const [backupDir, setBackupDir] = useState<string | null>(null)
   const [logoPreview, setLogoPreview] = useState<LogoPreview | null>(null)
+  // Pratinjau logo yang SUDAH TERSIMPAN (data URL dari main, READ ONLY).
+  const [savedLogoUri, setSavedLogoUri] = useState<string | null>(null)
   const [logoPicking, setLogoPicking] = useState(false)
   const [resetting, setResetting] = useState(false)
   const [printers, setPrinters] = useState<PrinterInfoDTO[]>([])
@@ -82,6 +84,15 @@ export default function SettingsPage() {
   const [recoveryNewCode, setRecoveryNewCode] = useState<string | null>(null)
   const [recoveryError, setRecoveryError] = useState<string | null>(null)
   const [recoveryBusy, setRecoveryBusy] = useState(false)
+
+  async function loadSavedLogo(): Promise<void> {
+    try {
+      const preview = await api.settings.getLogoPreview()
+      setSavedLogoUri(preview.hasLogo ? preview.previewUri : null)
+    } catch {
+      setSavedLogoUri(null)
+    }
+  }
 
   function loadPrinters() {
     api.settings.listPrinters()
@@ -131,6 +142,7 @@ export default function SettingsPage() {
       })
       .catch(() => {})
     loadPrinters()
+    loadSavedLogo()
     return () => {
       cancelled = true
     }
@@ -189,6 +201,7 @@ export default function SettingsPage() {
         defaultBookValue: String((result as any).defaultBookValue ?? defaultBookValueNum),
       })
       setLogoPreview(null)
+      await loadSavedLogo()
       notify.success(LABELS.SETTINGS.SAVED)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : LABELS.SETTINGS.VALIDATION_LOADING)
@@ -375,9 +388,18 @@ export default function SettingsPage() {
                       alt={LABELS.SETTINGS.FIELD_LOGO}
                       className="w-full h-full object-contain"
                     />
+                  ) : savedLogoUri ? (
+                    <img
+                      src={savedLogoUri}
+                      alt={LABELS.SETTINGS.FIELD_LOGO}
+                      className="w-full h-full object-contain"
+                    />
                   ) : (
-                    <div className="flex items-center justify-center px-2">
+                    <div className="flex flex-col items-center justify-center px-2 gap-1">
                       <ImagePlus size={22} className="text-slate-300" />
+                      <span className="text-[10px] leading-tight text-center text-slate-400">
+                        {LABELS.SETTINGS.LOGO_EMPTY}
+                      </span>
                     </div>
                   )}
                 </div>
@@ -392,7 +414,13 @@ export default function SettingsPage() {
                           ? `${Math.round(logoPreview.sizeBytes)} B`
                           : `${(Math.round((logoPreview.sizeBytes / 1024) * 10) / 10).toFixed(1)} KB`}
                       </p>
+                      <p className="text-xs font-medium text-amber-600 mt-0.5">
+                        {LABELS.SETTINGS.LOGO_UNSAVED}
+                      </p>
                     </>
+                  )}
+                  {!logoPreview && savedLogoUri && (
+                    <p className="text-xs font-medium text-emerald-600">{LABELS.SETTINGS.LOGO_SAVED}</p>
                   )}
                   <button
                     type="button"

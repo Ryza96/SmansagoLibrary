@@ -1,7 +1,7 @@
 import { promises as fsp } from 'fs'
 import path from 'path'
 import { randomUUID } from 'crypto'
-import { cleanupLegacyLogos } from '../../../src/main/infrastructure/asset/asset-resolver'
+import { cleanupLegacyLogos, resolveAssetPath } from '../../../src/main/infrastructure/asset/asset-resolver'
 import {
   LOGO_BASENAME,
   LOGO_IMAGE_MIME,
@@ -11,6 +11,7 @@ import { resizeLogoImage } from '../../../src/main/infrastructure/asset/logo-res
 import { moveFilePreserving, resolveWithin } from '../../../src/main/infrastructure/restore/fs-utils'
 import { SettingRepository } from '../repositories/setting.repository'
 import { AppError } from '../errorHandler'
+import type { SavedLogoPreview } from '../../../src/shared/dto/logo'
 
 // WO-2 (LOGO MANAGEMENT — BACKEND) — sisa alur pengaturan + logo sekolah.
 // Sumber: RFC_LOGO_MANAGEMENT_ARCHITECTURE.md (LOCKED REVISION 1):
@@ -55,6 +56,32 @@ export class SettingService {
     const mime = LOGO_IMAGE_MIME[extension]
     const previewUri = `data:${mime};base64,${buffer.toString('base64')}`
     return { filePath, sizeBytes, previewUri }
+  }
+
+  // Pratinjau logo yang SUDAH TERSIMPAN — READ ONLY.
+  // Membaca Setting.logoPath → resolveAssetPath (satu-satunya pembaca path, RFC §12)
+  // → baca file → data URL dengan mime dari ekstensi (LOGO_IMAGE_MIME).
+  // logoPath kosong / file tidak ada / gagal dibaca → { hasLogo: false }
+  // (tidak melempar error, renderer menampilkan "Belum ada logo").
+  async getSavedLogoPreview(): Promise<SavedLogoPreview> {
+    const settings = await this.settingRepository.get()
+    const value = settings?.logoPath ?? ''
+    if (!value) return { hasLogo: false }
+
+    // assetSchoolLogoDir = <root>/assets/school-logo → root = dua tingkat di atasnya
+    // (logoPath disimpan relatif terhadap root, RFC §5).
+    const assetRoot = path.dirname(path.dirname(this.assetSchoolLogoDir))
+    const resolved = resolveAssetPath(value, assetRoot)
+    if (!resolved) return { hasLogo: false }
+
+    try {
+      const mime = LOGO_IMAGE_MIME[path.extname(resolved).toLowerCase()]
+      if (!mime) return { hasLogo: false }
+      const buffer = await fsp.readFile(resolved)
+      return { hasLogo: true, previewUri: `data:${mime};base64,${buffer.toString('base64')}` }
+    } catch {
+      return { hasLogo: false }
+    }
   }
 
   // RFC §7/§8/§9/§10 (WO-2 REVISION 1 — ATOMIC SAVE FIX).
