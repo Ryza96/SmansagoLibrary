@@ -12,6 +12,10 @@ import { BORROW_CARD_LAYOUT, buildBorrowCardData, generateBorrowCardHtml } from 
 import { generateReportPrintHtml } from '../../../src/main/services/report-print-html.service'
 import { ReportPrintService, buildReportPdfFilename } from '../../../src/main/services/report-print.service'
 import { ReportRepository } from '../../../src/main/repositories/report.repository'
+import { generateBorrowingChartHtml } from '../../../src/main/services/borrowing-chart-html.service'
+import { BorrowingChartService } from '../../../src/main/services/borrowing-chart.service'
+import { buildBorrowingChartPdfFilename } from '../../../src/shared/dto/borrowing-chart'
+import type { BorrowingChartData, BorrowingChartFilter } from '../../../src/shared/dto/borrowing-chart'
 import { REPORT_PRINT_TYPES, paginateReportByType } from '../../../src/shared/config/report-print'
 import type { ReportPrintData, ReportPrintRequest } from '../../../src/shared/dto/report-print'
 import {
@@ -113,7 +117,12 @@ export class PrintService {
     // TAHAP 2 (additive, opsional): ReportPrintService untuk orkestrasi
     // Laporan Cetak A4. Bila tidak di-inject (bootstrap lama), dibuat lazy
     // dari singleton yang sama (ReportRepository + SettingService).
-    private reportPrintService?: ReportPrintService
+    private reportPrintService?: ReportPrintService,
+    // SESI 3 (additive, opsional): service Grafik Peminjaman. Tipe
+    // `borrowing-chart` BERDIRI SENDIRI — tidak pernah masuk ReportPrintType.
+    // Bila tidak di-inject, dibuat lazy dari singleton yang sama
+    // (ReportRepository + SettingService), persis pola reportPrintService.
+    private borrowingChartService?: BorrowingChartService
   ) {}
 
   // Electron's webContents.print() fires callback with success=false when the
@@ -412,6 +421,64 @@ export class PrintService {
 
     const result = await dialog.showSaveDialog({
       title: 'Simpan Laporan PDF',
+      defaultPath: join(app.getPath('documents'), filename),
+      filters: [{ name: 'PDF', extensions: ['pdf'] }]
+    })
+
+    if (result.canceled || !result.filePath) {
+      return { saved: false }
+    }
+
+    await writeFile(result.filePath, pdf)
+    return { saved: true, filePath: result.filePath }
+  }
+
+  // ---------------------------------------------------------------------------
+  // SESI 3 — Grafik Peminjaman. Channel BARU: reports:chartPreview /
+  // reports:chartPrint / reports:chartPdf. Metode laporan tabel di atas TIDAK
+  // diubah dan tipe `borrowing-chart` tidak pernah masuk ReportPrintType.
+  // ---------------------------------------------------------------------------
+
+  private getBorrowingChartService(): BorrowingChartService {
+    // Wiring SAMA dengan getReportPrintService(): ReportRepository + SettingService.
+    this.borrowingChartService ??= new BorrowingChartService(new ReportRepository(), this.settingService)
+    return this.borrowingChartService
+  }
+
+  private async buildBorrowingChartHtml(filter?: BorrowingChartFilter): Promise<{ html: string; data: BorrowingChartData }> {
+    const data = await this.getBorrowingChartService().buildBorrowingChartData(filter)
+    // Grafik selalu SATU halaman. Kop dokumen berasal dari `data.institution`
+    // yang dibaca Service dari Settings, jadi tidak ada logo yang perlu
+    // disuntikkan di sini.
+    return { html: generateBorrowingChartHtml(data), data }
+  }
+
+  async previewBorrowingChart(
+    filter?: BorrowingChartFilter
+  ): Promise<{ html: string; pageCount: 1; title: string }> {
+    const { html, data } = await this.buildBorrowingChartHtml(filter)
+    return { html, pageCount: 1, title: data.title }
+  }
+
+  async printBorrowingChart(filter?: BorrowingChartFilter): Promise<void> {
+    const { html } = await this.buildBorrowingChartHtml(filter)
+    // Sama seperti printReport: A4 eksplisit dalam mikron, margin none, dan
+    // landscape:true (Chromium memutar halaman; pageSize tetap A4 portrait).
+    await this.printHtml(html, {
+      margins: { marginType: 'none' },
+      pageSize: { width: 210000, height: 297000 },
+      landscape: true
+    })
+  }
+
+  async saveBorrowingChartPdf(filter?: BorrowingChartFilter): Promise<{ saved: boolean; filePath?: string }> {
+    const { html } = await this.buildBorrowingChartHtml(filter)
+    const pdf = await this.renderPdf(html)
+    // Nama file disusun di main (renderer tidak menyusun nama file).
+    const filename = buildBorrowingChartPdfFilename()
+
+    const result = await dialog.showSaveDialog({
+      title: 'Simpan Grafik Peminjaman PDF',
       defaultPath: join(app.getPath('documents'), filename),
       filters: [{ name: 'PDF', extensions: ['pdf'] }]
     })

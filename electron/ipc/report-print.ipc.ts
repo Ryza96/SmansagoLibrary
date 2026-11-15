@@ -2,6 +2,8 @@ import { ipcMain } from 'electron'
 import { AppError } from '../main/errorHandler'
 import type { PrintService } from '../main/services/print.service'
 import type { ReportPrintRequest, ReportPrintType } from '../../src/shared/dto/report-print'
+import { validateBorrowingChartRequest } from '../../src/shared/dto/borrowing-chart'
+import type { BorrowingChartFilter, BorrowingChartRequest } from '../../src/shared/dto/borrowing-chart'
 
 // Laporan Cetak A4 (TAHAP 2) — channel reports:printPreview / reports:print /
 // reports:pdf. Validasi sederhana di main (type dari 5 nilai sah, filter
@@ -23,7 +25,32 @@ function validateReportPrintRequest(request: unknown): ReportPrintRequest {
   return request as ReportPrintRequest
 }
 
+// SESI 3 — Grafik Peminjaman: channel BARU, terpisah dari tiga channel laporan
+// tabel di atas. Validator murni ada di DTO; di sini hanya diterjemahkan ke
+// AppError 400.
+function validateChartRequest(request: unknown): BorrowingChartRequest {
+  const result = validateBorrowingChartRequest(request)
+  if (result.ok === false) {
+    throw new AppError(400, 'Validation Error', result.message)
+  }
+  return result.request
+}
+
+function chartFilter(request: BorrowingChartRequest): BorrowingChartFilter {
+  return request.filter
+}
+
 export function registerReportPrintHandlers(printService: PrintService): void {
+  ipcMain.handle('reports:chartPreview', (_event, request: unknown) =>
+    printService.previewBorrowingChart(chartFilter(validateChartRequest(request)))
+  )
+  ipcMain.handle('reports:chartPrint', (_event, request: unknown) =>
+    printService.printBorrowingChart(chartFilter(validateChartRequest(request)))
+  )
+  ipcMain.handle('reports:chartPdf', (_event, request: unknown) =>
+    printService.saveBorrowingChartPdf(chartFilter(validateChartRequest(request)))
+  )
+
   ipcMain.handle('reports:printPreview', (_event, request: unknown) =>
     printService.previewReport(validateReportPrintRequest(request))
   )

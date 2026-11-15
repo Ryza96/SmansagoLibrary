@@ -424,6 +424,89 @@ app.whenReady().then(async () => {
   })
   report('print margins none', !!captured[0] && captured[0].margins?.marginType === 'none', `margins=${captured[0]?.margins?.marginType}`)
 
+  // -------------------------------------------------------------------------
+  // SESI 3 — GRAFIK PEMINJAMAN (cek BARU di akhir; seluruh cek di atas utuh).
+  // Render HTML grafik via renderPdf ASLI + intercept webContents.print untuk
+  // membuktikan opsi cetak fisik. Tanpa DB: data grafik berupa fixture DTO.
+  // -------------------------------------------------------------------------
+  const { generateBorrowingChartHtml, buildBorrowingChartPdfFilename } = (() => {
+    const html = require(path.join(OUT_DIR, 'src', 'main', 'services', 'borrowing-chart-html.service.js'))
+    const dto = require(path.join(OUT_DIR, 'src', 'shared', 'dto', 'borrowing-chart.js'))
+    return { generateBorrowingChartHtml: html.generateBorrowingChartHtml, buildBorrowingChartPdfFilename: dto.buildBorrowingChartPdfFilename }
+  })()
+
+  const chartData = {
+    title: 'Grafik Peminjaman',
+    orientation: 'landscape',
+    institution: {
+      libraryName: 'Perpustakaan Smoke',
+      schoolName: 'SD Smoke',
+      address: 'Jl. Smoke No. 1',
+      phone: '0800',
+      email: 'smoke@example.test',
+      librarianName: 'Pustakawan Smoke',
+      principalName: 'Kepala Smoke',
+      librarianNip: '19800101 001',
+      principalNip: '19750101 001'
+    },
+    periodLabel: 'Jun 2026 - Nov 2026',
+    generatedAt: new Date(2026, 10, 15, 9, 45).toISOString(),
+    summary: { totalBorrowings: 12, totalBooks: 18, activeBorrowers: 7 },
+    monthly: [
+      { label: 'Jun 2026', count: 1 },
+      { label: 'Jul 2026', count: 2 },
+      { label: 'Agu 2026', count: 3 },
+      { label: 'Sep 2026', count: 2 },
+      { label: 'Okt 2026', count: 4 },
+      { label: 'Nov 2026', count: 0 }
+    ],
+    topBooks: [
+      { title: 'Buku Smoke Populer', count: 5 },
+      { title: 'Buku Smoke Kedua', count: 3 }
+    ],
+    byClass: [
+      { className: 'X MERDEKA 1', count: 6 },
+      { className: 'Tanpa Kelas', count: 6 }
+    ]
+  }
+
+  const chartHtml = generateBorrowingChartHtml(chartData)
+  const chartPdf = await service.renderPdf(chartHtml)
+  const chartBoxes = extractMediaBoxes(chartPdf)
+  const chartFirst = chartBoxes[0] ? `${chartBoxes[0].w.toFixed(3)}x${chartBoxes[0].h.toFixed(3)}` : 'none'
+  report('chart 1 halaman PDF', chartBoxes.length === 1, `pdfPages=${chartBoxes.length} expected=1 htmlLen=${chartHtml.length}`)
+  report(
+    'chart MediaBox A4 landscape',
+    chartBoxes.length === 1 && Math.abs(chartBoxes[0].w - 841.92) < 1 && Math.abs(chartBoxes[0].h - 594.96) < 1,
+    `first=${chartFirst} expected≈841.920x594.960`
+  )
+  fs.writeFileSync(path.join(SMOKE_OUT, 'chart-borrowing.pdf'), chartPdf)
+
+  const chartCaptured = []
+  const origLoadURLChart = BrowserWindow.prototype.loadURL
+  BrowserWindow.prototype.loadURL = function (...args) {
+    const p = origLoadURLChart.apply(this, args)
+    this.webContents.print = (opts, cb) => {
+      chartCaptured.push(opts)
+      cb(true)
+    }
+    return p
+  }
+  const chartServiceStub = { buildBorrowingChartData: async () => chartData }
+  const chartPrintService = new PrintService(null, settingsStub, '', undefined, undefined, chartServiceStub)
+  await chartPrintService.printBorrowingChart({ from: '2026-06-01', to: '2026-11-15' })
+  BrowserWindow.prototype.loadURL = origLoadURLChart
+
+  const chartOpts = chartCaptured[0]
+  report(
+    'chart print landscape=true pageSize A4',
+    !!chartOpts && chartOpts.landscape === true && chartOpts.pageSize?.width === 210000 && chartOpts.pageSize?.height === 297000,
+    `pageSize=${JSON.stringify(chartOpts?.pageSize)} landscapeFlag=${chartOpts?.landscape}`
+  )
+  report('chart print margins none', !!chartOpts && chartOpts.margins?.marginType === 'none', `margins=${chartOpts?.margins?.marginType}`)
+  const chartFilename = buildBorrowingChartPdfFilename(new Date(2026, 10, 15))
+  report('chart nama file PDF bertanggal', chartFilename === 'grafik-peminjaman-20261115.pdf', `filename=${chartFilename}`)
+
   console.log(failures === 0 ? 'SMOKE OK' : `SMOKE FAILURES=${failures}`)
   app.exit(failures === 0 ? 0 : 1)
 })

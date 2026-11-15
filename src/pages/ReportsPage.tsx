@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom'
-import { FileText, Undo2, TriangleAlert, Users, BookMarked, ChevronRight } from 'lucide-react'
+import { FileText, Undo2, TriangleAlert, Users, BookMarked, ChevronRight, ChartColumn } from 'lucide-react'
 import { LABELS } from '../utils/labels'
+import { ROUTES } from '../utils/navigation'
 
 export default function ReportsPage() {
   const navigate = useNavigate()
@@ -77,6 +78,21 @@ export default function ReportsPage() {
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-slate-800">{LABELS.REPORT.COLLECTIONS}</p>
             <p className="text-xs text-slate-500 mt-0.5">{LABELS.REPORT.COLLECTIONS_DESC}</p>
+          </div>
+          <ChevronRight size={18} className="text-slate-300 shrink-0" />
+        </button>
+
+        {/* SESI 3 — kartu baru; pola tombol sama dengan lima kartu laporan tabel. */}
+        <button
+          onClick={() => navigate(ROUTES.REPORT_BORROWING_CHART)}
+          className="flex items-center gap-5 p-5 rounded-xl border border-slate-200 bg-white hover:shadow-lg hover:-translate-y-0.5 hover:border-slate-300 transition-all duration-200 text-left w-full"
+        >
+          <div className="p-3 rounded-xl shrink-0 text-violet-600 bg-violet-50">
+            <ChartColumn size={24} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-slate-800">{LABELS.REPORT.CHART}</p>
+            <p className="text-xs text-slate-500 mt-0.5">{LABELS.REPORT.CHART_DESC}</p>
           </div>
           <ChevronRight size={18} className="text-slate-300 shrink-0" />
         </button>

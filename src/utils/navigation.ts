@@ -31,6 +31,7 @@ export const ROUTES = {
   REPORT_MEMBERS: '/reports/members',
   REPORT_COLLECTIONS: '/reports/collections',
   REPORT_PRINT_PREVIEW: '/reports/print-preview',
+  REPORT_BORROWING_CHART: '/reports/borrowing-chart',
   SETTINGS: '/settings',
   CHANGE_PASSWORD: '/settings/change-password',
   MASTER_AUTHORS: '/master/authors',

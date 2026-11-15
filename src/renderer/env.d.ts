@@ -290,6 +290,9 @@ interface ElectronAPI {
     preview: (request: import('../../src/shared/dto/report-print').ReportPrintRequest) => Promise<{ html: string; pageCount: number; totalRows: number; orientation: 'portrait' | 'landscape'; title: string }>,
     print: (request: import('../../src/shared/dto/report-print').ReportPrintRequest) => Promise<void>,
     pdf: (request: import('../../src/shared/dto/report-print').ReportPrintRequest) => Promise<{ saved: boolean; filePath?: string }>,
+    chartPreview: (request: import('../../src/shared/dto/borrowing-chart').BorrowingChartRequest) => Promise<{ html: string; pageCount: number; title: string }>,
+    chartPrint: (request: import('../../src/shared/dto/borrowing-chart').BorrowingChartRequest) => Promise<void>,
+    chartPdf: (request: import('../../src/shared/dto/borrowing-chart').BorrowingChartRequest) => Promise<{ saved: boolean; filePath?: string }>,
   }
   backupUI: {
     getTargetInfo: () => Promise<import('../../src/shared/dto/backup-ui').BackupTargetInfo>,
