@@ -768,6 +768,98 @@ export class ReportRepository extends BaseRepository {
     const row = await this.prisma.academicYear.findUnique({ where: { id }, select: { name: true } })
     return row?.name ?? null
   }
+
+  // -------------------------------------------------------------------------
+  // Grafik Peminjaman (tipe laporan baru `borrowing-chart`).
+  // ADITIF: metode laporan tabel di atas TIDAK diubah/dipanggil ulang di sini.
+  // Semua READ-ONLY, tanpa fetch-all: select kolom tunggal, count, groupBy,
+  // dan raw SQL berparameter (Prisma.sql — tidak ada string concat).
+  // -------------------------------------------------------------------------
+
+  // Tanggal pinjam saja (kolom tunggal). Pengelompokan bulan dilakukan Service
+  // secara lokal — TIDAK memakai strftime/UTC (SQLite menyimpan UTC, sedangkan
+  // bulan yang dimaksud user adalah bulan lokal).
+  async borrowDatesBetween(from: Date, to: Date): Promise<Date[]> {
+    const rows = await this.prisma.borrow.findMany({
+      where: { borrowDate: { gte: from, lte: to } },
+      select: { borrowDate: true },
+      orderBy: { borrowDate: 'asc' }
+    })
+    return rows.map((r) => r.borrowDate)
+  }
+
+  // Judul buku terpopuler (maks `limit`, default 10). Judul diambil dari
+  // Book (master) melalui BorrowDetail → BookCopy → Book; grouping per
+  // (id, title) agar dua buku berjudul sama tidak tergabung. Tie-break: title asc.
+  async topBookTitlesBetween(
+    from: Date,
+    to: Date,
+    limit = 10
+  ): Promise<Array<{ title: string; count: number }>> {
+    const rows = await this.prisma.$queryRaw<Array<{ title: string; count: number | bigint }>>(Prisma.sql`
+      SELECT bk.title AS title, COUNT(*) AS count
+      FROM BorrowDetail bd
+      JOIN Borrow b ON b.id = bd.borrowId
+      JOIN BookCopy bc ON bc.id = bd.bookCopyId
+      JOIN Book bk ON bk.id = bc.bookId
+      WHERE b.borrowDate >= ${from} AND b.borrowDate <= ${to}
+      GROUP BY bk.id, bk.title
+      ORDER BY count DESC, bk.title ASC
+      LIMIT ${limit}
+    `)
+    return rows.map((r) => ({ title: r.title, count: Number(r.count) }))
+  }
+
+  // Distribusi per kelas memakai SNAPSHOT nama kelas pada transaksi
+  // (Borrow.className; peminjaman kolektif memakai collectiveClassName).
+  // Tidak ada keduanya → "Tanpa Kelas". `groupBy` + Map merge (bukan fetch-all),
+  // karena satu label bisa berasal dari dua kolom berbeda.
+  async borrowCountByClassBetween(
+    from: Date,
+    to: Date
+  ): Promise<Array<{ className: string; count: number }>> {
+    const grouped = await this.prisma.borrow.groupBy({
+      by: ['className', 'collectiveClassName'],
+      where: { borrowDate: { gte: from, lte: to } },
+      _count: { _all: true }
+    })
+
+    const totals = new Map<string, number>()
+    for (const row of grouped) {
+      const label = row.className?.trim() || row.collectiveClassName?.trim() || 'Tanpa Kelas'
+      totals.set(label, (totals.get(label) ?? 0) + row._count._all)
+    }
+
+    return [...totals.entries()]
+      .map(([className, count]) => ({ className, count }))
+      .sort((a, b) => b.count - a.count || a.className.localeCompare(b.className, 'id'))
+  }
+
+  // Ringkasan periode (3 angka) dari agregasi DB — bukan turunan array grafik.
+  // totalBorrowings = jumlah transaksi; totalBooks = jumlah baris buku;
+  // activeBorrowers = anggota unik yang meminjam (COUNT DISTINCT memberId).
+  async countBorrowPeriodSummary(
+    from: Date,
+    to: Date
+  ): Promise<{ totalBorrowings: number; totalBooks: number; activeBorrowers: number }> {
+    const [totalBorrowings, totalBooks, distinctRows] = await Promise.all([
+      this.prisma.borrow.count({ where: { borrowDate: { gte: from, lte: to } } }),
+      this.prisma.borrowDetail.count({
+        where: { borrow: { borrowDate: { gte: from, lte: to } } }
+      }),
+      this.prisma.$queryRaw<Array<{ activeBorrowers: number | bigint }>>(Prisma.sql`
+        SELECT COUNT(DISTINCT b.memberId) AS activeBorrowers
+        FROM Borrow b
+        WHERE b.borrowDate >= ${from} AND b.borrowDate <= ${to}
+      `)
+    ])
+
+    return {
+      totalBorrowings,
+      totalBooks,
+      activeBorrowers: Number(distinctRows[0]?.activeBorrowers ?? 0)
+    }
+  }
 }
 
 // R-6 (G-6): search laporan koleksi = OR atas title, isbn, author.name, publisher.name
