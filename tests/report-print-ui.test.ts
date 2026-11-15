@@ -12,7 +12,7 @@ import {
   toDateInputValue
 } from '../src/utils/report-print'
 import { generateReportPrintHtml } from '../src/main/services/report-print-html.service'
-import { paginateReportRows } from '../src/shared/config/report-print'
+import { paginateReportByType } from '../src/shared/config/report-print'
 import type { ReportPrintData } from '../src/shared/dto/report-print'
 
 describe('pembuat request cetak (page/limit tidak dikirim)', () => {
@@ -105,8 +105,8 @@ function makeData(rowCount: number): ReportPrintData {
     { key: 'c2', label: 'Kolom 2', align: 'center' as const }
   ]
   return {
-    // Peminjaman/Pengembalian/Anggota/Keterlambatan memakai paginasi berbasis
-    // tinggi baris; helper split diuji dengan tipe berkapasitas tetap (Koleksi).
+    // Kelima tipe memakai paginasi berbasis tinggi baris; helper split diuji
+    // dengan tipe Koleksi (11 kolom, landscape).
     type: 'collections',
     title: 'Laporan Uji',
     orientation: 'landscape',
@@ -133,9 +133,10 @@ function makeData(rowCount: number): ReportPrintData {
 
 describe('splitReportPrintHtml', () => {
   it('120 baris: jumlah sheet == jumlah halaman paginate; style & footer utuh', () => {
-    const html = generateReportPrintHtml(makeData(120))
+    const data = makeData(120)
+    const html = generateReportPrintHtml(data)
     const parts = splitReportPrintHtml(html)
-    const expected = paginateReportRows(120, 'landscape').pages.length
+    const expected = paginateReportByType({ type: data.type, rows: data.rows, totalRows: data.totalRows, orientation: data.orientation }).pageCount
     expect(parts.sheets).toHaveLength(expected)
     expect(parts.styleText).toContain('.a4-sheet')
     expect(parts.sheets[0]).toContain('BARIS-1')
@@ -146,9 +147,10 @@ describe('splitReportPrintHtml', () => {
   })
 
   it('dokumen besar 5.000 baris: semua sheet terpotong, baris terakhir ada, tanpa duplikat/hilang', () => {
-    const html = generateReportPrintHtml(makeData(5000))
+    const data = makeData(5000)
+    const html = generateReportPrintHtml(data)
     const parts = splitReportPrintHtml(html)
-    const expected = paginateReportRows(5000, 'landscape').pages.length
+    const expected = paginateReportByType({ type: data.type, rows: data.rows, totalRows: data.totalRows, orientation: data.orientation }).pageCount
     expect(parts.sheets).toHaveLength(expected)
     const joined = parts.sheets.join('')
     expect(joined).toContain('BARIS-5000')

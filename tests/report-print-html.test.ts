@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest'
 import { generateReportPrintHtml } from '../src/main/services/report-print-html.service'
 import {
   paginateBorrowingRowsByHeight,
-  paginateReportRows,
   REPORT_PRINT_ORIENTATION,
   paginateReportByType
 } from '../src/shared/config/report-print'
@@ -244,8 +243,12 @@ describe('generateReportPrintHtml — struktur', () => {
     const returnsHtml = generateReportPrintHtml(makeData('returns', 3))
     expect(returnsHtml).not.toContain('line-clamp')
     expect(returnsHtml).toContain('overflow-wrap: anywhere')
-    // Laporan lain tetap memakai clamp (perilaku lama tidak berubah).
-    expect(generateReportPrintHtml(makeData('collections', 3))).toContain('-webkit-line-clamp')
+    // Seluruh tipe laporan kini memakai varian tanpa pemotongan teks (Koleksi
+    // ikut landscape tanpa clamp + paginasi tinggi baris).
+    const collectionsHtml = generateReportPrintHtml(makeData('collections', 3))
+    expect(collectionsHtml).not.toContain('line-clamp')
+    expect(collectionsHtml).not.toContain('text-overflow')
+    expect(collectionsHtml).toContain('overflow-wrap: anywhere')
   })
 
   it('Peminjaman: jumlah halaman mengikuti paginasi berbasis tinggi baris', () => {
@@ -260,11 +263,13 @@ describe('generateReportPrintHtml — struktur', () => {
     const data24 = makeData('borrowings', 24)
     const html24 = generateReportPrintHtml(data24)
     expect(countSheets(html24)).toBeLessThanOrEqual(2)
-    // Laporan lain tetap kapasitas baris tetap (TAHAP 1).
-    for (const n of [17, 18]) {
+    // Seluruh tipe kini kapasitas berbasis tinggi baris (satu pintu:
+    // paginateReportByType), termasuk Koleksi.
+    for (const n of [7, 25, 70]) {
       const data = makeData('collections', n)
       const html = generateReportPrintHtml(data)
-      expect(countSheets(html)).toBe(paginateReportRows(n, 'landscape').pages.length)
+      const pag = paginateReportByType({ type: 'collections', rows: data.rows, totalRows: data.totalRows, orientation: 'landscape' })
+      expect(countSheets(html), `collections n=${n}`).toBe(pag.pageCount)
     }
   })
 })

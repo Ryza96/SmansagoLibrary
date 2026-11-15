@@ -204,6 +204,29 @@ export const REPORT_PRINT_OVERDUES_METRICS = {
   lastPageBlocksMm: 69
 } as const
 
+/** Geometri Laporan Koleksi Buku (landscape, teks tidak dipotong). Kertas,
+ * margin, tinggi baris dasar, dan reserve blok total+tanda tangan sama dengan
+ * Peminjaman; kapasitas baris tidak dipakai karena paginasi memakai perkiraan
+ * tinggi baris (lihat REPORT_PRINT_COLLECTIONS_METRICS). */
+export const REPORT_PRINT_COLLECTIONS_PAGE: ReportPrintPageGeometry = {
+  ...REPORT_PRINT_BORROWINGS_PAGE
+} as const
+
+/**
+ * Metrik paginasi Laporan Koleksi Buku. Diukur render nyata Electron A4
+ * landscape (2026-11-15), kasus terburuk (filter Kategori + Pencarian tampil
+ * sehingga meta 3 baris; ringkasan 3 nilai: Total Judul / Total Eksemplar /
+ * Nilai Aset; catatan tidak ada): header halaman 1 42.18mm, blok total +
+ * tanda tangan 58.51mm (Peminjaman 50.57mm dengan definisi ukur yang sama).
+ * Satu baris teks pendek 4.30mm (sama). Nilai pakai dibulatkan ke atas agar
+ * aman; field lain sama dengan Peminjaman.
+ */
+export const REPORT_PRINT_COLLECTIONS_METRICS = {
+  ...REPORT_PRINT_BORROWINGS_METRICS,
+  firstPageHeaderMm: 42.5,
+  lastPageBlocksMm: 59
+} as const
+
 export type ReportPrintMetrics = {
   readonly [K in keyof typeof REPORT_PRINT_BORROWINGS_METRICS]: number
 }
@@ -265,10 +288,24 @@ export const REPORT_PRINT_TYPES: Record<ReportPrintType, ReportPrintTypeConfig> 
     heightPaginated: true
   },
   collections: {
-    columnWidthPercent: [12, 23, 12, 12, 11, 6, 7, 5, 5, 4, 3],
-    page: REPORT_PRINT_PAGE.landscape,
-    metrics: REPORT_PRINT_BORROWINGS_METRICS,
-    heightPaginated: false
+    // ISBN (nowrap), Judul, Penulis, Penerbit, Kategori, Tahun, Jumlah
+    // Eksemplar, Tersedia, Dipinjam, Hilang, Rusak. Lebar diukur Arial 8.5pt
+    // (2026-11-15, konten 273mm → 1% = 2.73mm, padding sel ≈ 2.4mm):
+    // teks terpanjang per kolom ISBN 25.67mm, Judul 101.14mm, Penulis 69.03mm,
+    // Penerbit 47.00mm, Kategori 39.33mm, Tahun 6.67mm, Jumlah Eksemplar
+    // 5.00mm, Tersedia/Dipinjam/Hilang/Rusak 5.00mm. Header bold: Tersedia
+    // 12.11mm, Dipinjam 12.66mm, Hilang 9.16mm, Rusak 9.00mm, Tahun 8.77mm.
+    // Alokasi: ISBN 10.5% (28.7mm ≥ 25.67+2.4 → muat satu baris), Judul 21.8%,
+    // Penulis 14.5%, Penerbit 11%, Kategori 10% (membungkus per kata, bukan per
+    // huruf), Tahun 4.5% (12.3mm), Jumlah Eksemplar 7.5% (20.5mm agar kata
+    // "Eksemplar" utuh), Tersedia 5.5% (15.0mm ≥ 12.11+2.4), Dipinjam 5.7%
+    // (15.6mm ≥ 12.66+2.4), Hilang 4.5% (12.3mm ≥ 11.56), Rusak 4.5%
+    // (12.3mm ≥ 11.40). Total 100.
+    columnWidthPercent: [10.5, 21.8, 14.5, 11, 10, 4.5, 7.5, 5.5, 5.7, 4.5, 4.5],
+    page: REPORT_PRINT_COLLECTIONS_PAGE,
+    metrics: REPORT_PRINT_COLLECTIONS_METRICS,
+    nowrapColumnIndex: 0,
+    heightPaginated: true
   }
 }
 

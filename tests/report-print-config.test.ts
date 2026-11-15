@@ -9,6 +9,7 @@ import {
   REPORT_PRINT_RETURNS_METRICS,
   REPORT_PRINT_MEMBERS_PAGE,
   REPORT_PRINT_OVERDUES_PAGE,
+  REPORT_PRINT_COLLECTIONS_PAGE,
   REPORT_PRINT_TYPES,
   BORROWINGS_COLUMN_WIDTH_PERCENT,
   RETURNS_COLUMN_WIDTH_PERCENT,
@@ -119,7 +120,8 @@ describe('report-print config — konstanta', () => {
     expect(reportPrintGeometry('overdues', 'landscape')).toBe(REPORT_PRINT_OVERDUES_PAGE)
     expect(reportPrintGeometry('members', 'landscape')).toBe(REPORT_PRINT_MEMBERS_PAGE)
     expect(reportPrintGeometry('members', 'portrait')).toBe(REPORT_PRINT_PAGE.portrait)
-    expect(reportPrintGeometry('collections', 'landscape')).toBe(REPORT_PRINT_PAGE.landscape)
+    expect(reportPrintGeometry('collections', 'landscape')).toBe(REPORT_PRINT_COLLECTIONS_PAGE)
+    expect(reportPrintGeometry('collections', 'portrait')).toBe(REPORT_PRINT_PAGE.portrait)
   })
 
   it('peta tipe laporan punya entri untuk kelima tipe dengan lebar kolom total 100', () => {
@@ -131,10 +133,14 @@ describe('report-print config — konstanta', () => {
     }
   })
 
-  it('heightPaginated hanya true untuk borrowings, members, overdues, dan returns', () => {
+  it('heightPaginated true untuk kelima tipe laporan', () => {
     const types = Object.keys(REPORT_PRINT_TYPES) as (keyof typeof REPORT_PRINT_TYPES)[]
     const heightPaginated = types.filter((type) => REPORT_PRINT_TYPES[type].heightPaginated).sort()
-    expect(heightPaginated).toEqual(['borrowings', 'members', 'overdues', 'returns'])
+    expect(heightPaginated).toEqual(['borrowings', 'collections', 'members', 'overdues', 'returns'])
+    // Koleksi kini memakai paginasi tinggi baris (teks tidak dipotong); geometri
+    // landscape-nya konstanta sendiri, bukan geometri landscape umum.
+    expect(REPORT_PRINT_TYPES.collections.page).toBe(REPORT_PRINT_COLLECTIONS_PAGE)
+    expect(REPORT_PRINT_COLLECTIONS_PAGE.firstPageRows).toBeLessThan(REPORT_PRINT_PAGE.landscape.firstPageRows)
   })
 
   it('paginateBorrowingRowsByHeight identik dengan/tanpa metrics Borrowings eksplisit', () => {
