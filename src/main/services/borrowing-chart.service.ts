@@ -20,6 +20,7 @@ import { parseRange } from './report.service'
 export const BORROWING_CHART_TITLE = 'Grafik Peminjaman'
 export const BORROWING_CHART_MAX_MONTHS = 24
 export const BORROWING_CHART_TOP_BOOKS = 10
+export const BORROWING_CHART_TOP_CATEGORIES = 10
 
 // Label bulan Indonesia (3 huruf) — dipakai label seri, mis. "Jan 2026".
 export const MONTH_LABELS_ID = [
@@ -111,9 +112,10 @@ export class BorrowingChartService {
     // Validasi periode yang SAMA dengan laporan Peminjaman (AppError 400).
     const { from, to } = parseRange(filter?.from, filter?.to)
 
-    const [dates, topBooks, byClass, summary, institution] = await Promise.all([
+    const [dates, topBooks, topCategories, byClass, summary, institution] = await Promise.all([
       this.repository.borrowDatesBetween(from, to),
       this.repository.topBookTitlesBetween(from, to, BORROWING_CHART_TOP_BOOKS),
+      this.repository.topCategoriesBetween(from, to, BORROWING_CHART_TOP_CATEGORIES),
       this.repository.borrowCountByClassBetween(from, to),
       this.repository.countBorrowPeriodSummary(from, to),
       this.readInstitution()
@@ -132,6 +134,7 @@ export class BorrowingChartService {
       // Bulan tanpa data TETAP tampil (count 0) — seri tidak berlubang.
       monthly: points.map((p) => ({ label: p.label, count: countsByMonth.get(p.key) ?? 0 })),
       topBooks,
+      topCategories,
       byClass
     }
   }

@@ -4,6 +4,8 @@ import { generateBorrowingChartHtml } from '../src/main/services/borrowing-chart
 
 const LONG_TITLE =
   'Sejarah Kebudayaan Indonesia Pada Masa Kerajaan Majapahit dan Sriwijaya Serta Warisannya'
+const LONG_CATEGORY =
+  'Kategori Buku Referensi Ilmiah Tingkat Lanjut untuk Penelitian Siswa dan Guru'
 
 function baseData(overrides: Partial<BorrowingChartData> = {}): BorrowingChartData {
   return {
@@ -42,6 +44,13 @@ function baseData(overrides: Partial<BorrowingChartData> = {}): BorrowingChartDa
       { title: 'Negeri 5 Menara', count: 18 },
       { title: 'Buku <script>alert("x")</script> & "kutip"', count: 11 }
     ],
+    topCategories: [
+      { category: 'Fiksi', count: 40 },
+      { category: 'Sains', count: 33 },
+      { category: LONG_CATEGORY, count: 21 },
+      { category: 'Sejarah', count: 18 },
+      { category: 'Kategori <script>alert("x")</script> & "kutip"', count: 11 }
+    ],
     byClass: [
       { className: 'X Merdeka 1', count: 15 },
       { className: 'X Merdeka 2', count: 14 },
@@ -54,6 +63,13 @@ function baseData(overrides: Partial<BorrowingChartData> = {}): BorrowingChartDa
     ],
     ...overrides
   }
+}
+
+// Kartu kanan bawah (tabel kategori) — dipisah agar bisa dipastikan tidak
+// memuat judul buku (judul tetap hanya di grafik "10 Buku Terpopuler").
+function tableCard(html: string): string {
+  const match = html.match(/<section class="chart-card chart-card--table">[\s\S]*?<\/section>/)
+  return match ? match[0] : ''
 }
 
 function countOccurrences(haystack: string, needle: RegExp): number {
@@ -133,11 +149,12 @@ describe('generateBorrowingChartHtml', () => {
     expect(html).toContain('&amp;')
   })
 
-  it('memotong judul buku panjang dengan "…" dan menyimpan judul lengkap', () => {
+  // Tabel judul buku dihilangkan (diganti tabel kategori), jadi judul panjang
+  // hanya tampil di grafik: label dipotong "…", nama lengkap di <title> SVG.
+  it('memotong judul buku panjang di grafik dengan "…" dan menyimpan judul lengkap di tooltip', () => {
     const html = generateBorrowingChartHtml(baseData())
 
     expect(html).toContain('…')
-    expect(html).toContain(`title="${LONG_TITLE}"`)
     expect(html).toContain(`<title>${LONG_TITLE} (21)</title>`)
     expect(html).not.toContain(`>${LONG_TITLE}<`)
   })
@@ -156,6 +173,56 @@ describe('generateBorrowingChartHtml', () => {
     expectCleanHtml(html)
   })
 
+  it('tabel kanan bawah memakai kategori: caption, kepala kolom, dan maks 10 baris', () => {
+    const html = generateBorrowingChartHtml(baseData())
+    const card = tableCard(html)
+
+    expect(card).toContain('Kategori Buku Paling Diminati')
+    expect(card).toContain('<th class="cell-index">No</th><th>Kategori</th><th class="cell-number">Jml</th>')
+    expect(countOccurrences(card, /<tr><td class="cell-index">/g)).toBe(5)
+    expect(card).toContain('Fiksi')
+    expect(card).toContain('Sains')
+    expect(card).not.toContain('Tabel Angka Buku Terpopuler')
+
+    const eleven = Array.from({ length: 11 }, (_, index) => ({ category: `Kategori ${index + 1}`, count: 11 - index }))
+    const capped = tableCard(generateBorrowingChartHtml(baseData({ topCategories: eleven })))
+    expect(countOccurrences(capped, /<tr><td class="cell-index">/g)).toBe(10)
+    expect(capped).not.toContain('>Kategori 11<')
+  })
+
+  it('judul buku TIDAK muncul di tabel kategori (hanya di grafik)', () => {
+    const html = generateBorrowingChartHtml(baseData())
+    const card = tableCard(html)
+
+    expect(card).not.toContain('Laskar Pelangi')
+    expect(card).not.toContain('Bumi Manusia')
+    expect(card).not.toContain('Negeri 5 Menara')
+    // Grafik buku tetap memuat judul tersebut.
+    expect(html).toContain('10 Buku Terpopuler')
+    expect(html).toContain('Laskar Pelangi')
+    expect(html).toContain('Bumi Manusia')
+  })
+
+  it('memotong nama kategori panjang dengan "…" dan menyimpan nama lengkap', () => {
+    const card = tableCard(generateBorrowingChartHtml(baseData()))
+
+    expect(card).toContain('…')
+    expect(card).toContain(`title="${LONG_CATEGORY}"`)
+    expect(card).not.toContain(`>${LONG_CATEGORY}<`)
+  })
+
+  it('meng-escape nama kategori dan menulis "Tidak ada data." saat kosong', () => {
+    const escaped = tableCard(generateBorrowingChartHtml(baseData()))
+    expect(escaped).toContain('Kategori &lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt; &amp; &quot;kutip&quot;')
+    expect(escaped).not.toMatch(/<script/i)
+
+    const empty = tableCard(generateBorrowingChartHtml(baseData({ topCategories: [] })))
+    expect(empty).toContain('Kategori Buku Paling Diminati')
+    expect(empty).toContain('Tidak ada data.')
+    expect(empty).not.toContain('<table')
+    expect(empty).not.toMatch(/NaN|undefined|Infinity/)
+  })
+
   it('24 bulan: tabel angka bulanan disembunyikan, grafik tetap lengkap', () => {
     const months = Array.from({ length: 24 }, (_, index) => ({
       label: `B${index + 1} 2026`,
@@ -164,7 +231,7 @@ describe('generateBorrowingChartHtml', () => {
     const html = generateBorrowingChartHtml(baseData({ monthly: months }))
 
     expect(html).toContain('Tabel angka bulanan disembunyikan (24 bulan)')
-    expect(countOccurrences(html, /<table class="numeric-table">/g)).toBe(1) // hanya tabel buku
+    expect(countOccurrences(html, /<table class="numeric-table">/g)).toBe(1) // hanya tabel kategori
     expect(html).toContain('Peminjaman per Bulan')
     expectCleanHtml(html)
   })
@@ -175,6 +242,7 @@ describe('generateBorrowingChartHtml', () => {
         summary: { totalBorrowings: 0, totalBooks: 0, activeBorrowers: 0 },
         monthly: [],
         topBooks: [],
+        topCategories: [],
         byClass: []
       })
     )

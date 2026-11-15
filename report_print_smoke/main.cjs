@@ -464,6 +464,18 @@ app.whenReady().then(async () => {
       { title: 'Buku Smoke Populer', count: 5 },
       { title: 'Buku Smoke Kedua', count: 3 }
     ],
+    topCategories: [
+      { category: 'Fiksi', count: 5 },
+      { category: 'Sains', count: 4 },
+      { category: 'Sejarah Kebudayaan Indonesia Pada Masa Kerajaan Majapahit dan Sriwijaya', count: 3 },
+      { category: 'Teknologi', count: 2 },
+      { category: 'Agama', count: 2 },
+      { category: 'Bahasa', count: 1 },
+      { category: 'Seni', count: 1 },
+      { category: 'Olahraga', count: 1 },
+      { category: 'Referensi', count: 1 },
+      { category: 'Tanpa Kategori', count: 1 }
+    ],
     byClass: [
       { className: 'X MERDEKA 1', count: 6 },
       { className: 'Tanpa Kelas', count: 6 }

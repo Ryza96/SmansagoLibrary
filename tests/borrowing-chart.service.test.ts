@@ -53,6 +53,8 @@ async function cleanup() {
   await prisma.assetEvent.deleteMany()
   await prisma.bookCopy.deleteMany()
   await prisma.book.deleteMany()
+  // Hanya kategori buatan suite ini (code CAT-CHART-*) yang dibersihkan.
+  await prisma.category.deleteMany({ where: { code: { startsWith: 'CAT-CHART-' } } })
   await prisma.memberEnrollment.deleteMany()
   await prisma.member.deleteMany()
 }
@@ -115,6 +117,23 @@ interface SeedBorrowInput {
   collectiveClassName?: string | null
 }
 
+// Kategori uji (code ber-prefix CAT-CHART- agar cleanup tidak menyentuh data
+// kategori lain di DB pengujian).
+async function seedCategories(names: string[]) {
+  const categories = names.map((name, i) => ({
+    id: randomUUID(),
+    code: `CAT-CHART-${String(i + 1).padStart(3, '0')}-${randomUUID().slice(0, 8)}`,
+    name
+  }))
+  await prisma.category.createMany({ data: categories })
+  return categories
+}
+
+// Book.categoryId bertipe TUNGGAL (nullable) — satu buku hanya satu kategori.
+async function setBookCategory(bookId: string, categoryId: string) {
+  await prisma.book.update({ where: { id: bookId }, data: { categoryId } })
+}
+
 async function seedBorrows(
   input: SeedBorrowInput[],
   library: { books: { id: string; title: string }[]; copies: { id: string }[] }
@@ -157,6 +176,7 @@ describe('BorrowingChartService — periode kosong', () => {
     expect(data.summary).toEqual({ totalBorrowings: 0, totalBooks: 0, activeBorrowers: 0 })
     expect(data.monthly).toEqual([{ label: 'Jan 2025', count: 0 }])
     expect(data.topBooks).toEqual([])
+    expect(data.topCategories).toEqual([])
     expect(data.byClass).toEqual([])
     expect(typeof data.generatedAt).toBe('string')
   })
@@ -305,5 +325,86 @@ describe('BorrowingChartService — validasi & batas seri', () => {
     expect(data.monthly[0].label).toBe('Jul 2024')
     expect(data.monthly[data.monthly.length - 1].label).toBe('Jun 2026')
     expect(data.periodLabel).toBe('24 bulan terakhir (Jul 2024 - Jun 2026)')
+  })
+})
+
+describe('BorrowingChartService — kategori buku paling diminati', () => {
+  it('(g) urut count desc lalu nama kategori asc; buku tanpa kategori berlabel "Tanpa Kategori"', async () => {
+    const members = await seedMembers(1)
+    const categories = await seedCategories(['Fiksi', 'Sains', 'Sejarah'])
+    const library = await seedBooks(['Buku A', 'Buku B', 'Buku C', 'Buku D', 'Buku E'])
+    await setBookCategory(library.books[0].id, categories[0].id) // Fiksi
+    await setBookCategory(library.books[1].id, categories[0].id) // Fiksi
+    await setBookCategory(library.books[2].id, categories[1].id) // Sains
+    await setBookCategory(library.books[3].id, categories[2].id) // Sejarah
+    // Buku E sengaja tanpa kategori.
+    await seedBorrows(
+      [
+        { member: members[0], bookIndex: 0, borrowDate: localDate(2026, 7, 5) },
+        { member: members[0], bookIndex: 1, borrowDate: localDate(2026, 7, 6) },
+        { member: members[0], bookIndex: 2, borrowDate: localDate(2026, 7, 7) },
+        { member: members[0], bookIndex: 3, borrowDate: localDate(2026, 7, 8) },
+        { member: members[0], bookIndex: 4, borrowDate: localDate(2026, 7, 9) }
+      ],
+      library
+    )
+
+    const data = await service.buildBorrowingChartData(period(2026, 7, 1, 2026, 7, 31))
+
+    // count desc; nilai sama diurutkan nama kategori asc (S < S-e < T).
+    expect(data.topCategories).toEqual([
+      { category: 'Fiksi', count: 2 },
+      { category: 'Sains', count: 1 },
+      { category: 'Sejarah', count: 1 },
+      { category: 'Tanpa Kategori', count: 1 }
+    ])
+    // topBooks / grafik buku TIDAK terpengaruh perubahan ini.
+    expect(data.topBooks).toHaveLength(5)
+    expect(data.summary.totalBooks).toBe(5)
+  })
+
+  it('(h) maksimal 10 kategori walau jumlah pinjaman lebih banyak', async () => {
+    const members = await seedMembers(1)
+    const names = Array.from({ length: 12 }, (_, i) => `Kategori ${String(i + 1).padStart(2, '0')}`)
+    const categories = await seedCategories(names)
+    const library = await seedBooks(names.map((_, i) => `Buku Uji ${String(i + 1).padStart(2, '0')}`))
+    for (let i = 0; i < categories.length; i += 1) {
+      await setBookCategory(library.books[i].id, categories[i].id)
+    }
+    await seedBorrows(
+      library.books.map((_, bookIndex) => ({
+        member: members[0],
+        bookIndex,
+        borrowDate: localDate(2026, 8, 5)
+      })),
+      library
+    )
+
+    const data = await service.buildBorrowingChartData(period(2026, 8, 1, 2026, 8, 31))
+
+    // Semua count = 1 → 10 nama terkecil (asc), sisanya dipotong.
+    expect(data.topCategories).toHaveLength(10)
+    expect(data.topCategories.map((row) => row.category)).toEqual([
+      'Kategori 01',
+      'Kategori 02',
+      'Kategori 03',
+      'Kategori 04',
+      'Kategori 05',
+      'Kategori 06',
+      'Kategori 07',
+      'Kategori 08',
+      'Kategori 09',
+      'Kategori 10'
+    ])
+    expect(data.topCategories.map((row) => row.count)).toEqual([1, 1, 1, 1, 1, 1, 1, 1, 1, 1])
+    expect(data.topCategories.map((row) => row.category)).not.toContain('Kategori 11')
+    expect(data.topCategories.map((row) => row.category)).not.toContain('Kategori 12')
+  })
+
+  it('(i) periode kosong → topCategories []', async () => {
+    const data = await service.buildBorrowingChartData(period(2024, 12, 1, 2024, 12, 31))
+
+    expect(data.topCategories).toEqual([])
+    expect(data.topBooks).toEqual([])
   })
 })

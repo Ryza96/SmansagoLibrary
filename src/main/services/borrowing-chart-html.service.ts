@@ -192,26 +192,30 @@ function byClassCardHtml(data: BorrowingChartData): string {
     </section>`
 }
 
-function bookTableHtml(data: BorrowingChartData): string {
-  const books = Array.isArray(data.topBooks) ? data.topBooks : []
-  if (books.length === 0) {
+// Kartu kanan bawah: tabel KATEGORI (bukan judul buku — judul tetap hanya di
+// grafik "10 Buku Terpopuler"). Maks 10 baris; label panjang dipotong "…"
+// dengan nama lengkap di atribut title; seluruh teks di-escape.
+function categoriesTableHtml(data: BorrowingChartData): string {
+  const categories = Array.isArray(data.topCategories) ? data.topCategories.slice(0, 10) : []
+  if (categories.length === 0) {
     return `
     <section class="chart-card chart-card--table">
-      <div class="chart-caption">Tabel Angka Buku Terpopuler</div>
+      <div class="chart-caption">Kategori Buku Paling Diminati</div>
       <div class="chart-note">Tidak ada data.</div>
     </section>`
   }
-  const rows = books
-    .map((book, index) => {
-      const title = safeText(book?.title) || '-'
-      return `<tr><td class="cell-index">${index + 1}</td><td title="${escapeHtml(title)}">${escapeHtml(truncateChartLabel(title, 44))}</td><td class="cell-number">${escapeHtml(String(toCount(book?.count)))}</td></tr>`
+  const rows = categories
+    .map((row, index) => {
+      const name = safeText(row?.category) || '-'
+      const short = truncateChartLabel(name, 40)
+      return `<tr><td class="cell-index">${index + 1}</td><td title="${escapeHtml(name)}">${escapeHtml(short)}</td><td class="cell-number">${escapeHtml(String(toCount(row?.count)))}</td></tr>`
     })
     .join('')
   return `
     <section class="chart-card chart-card--table">
-      <div class="chart-caption">Tabel Angka Buku Terpopuler</div>
+      <div class="chart-caption">Kategori Buku Paling Diminati</div>
       <table class="numeric-table">
-        <thead><tr><th class="cell-index">No</th><th>Judul</th><th class="cell-number">Jml</th></tr></thead>
+        <thead><tr><th class="cell-index">No</th><th>Kategori</th><th class="cell-number">Jml</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
     </section>`
@@ -311,7 +315,7 @@ const STYLES = `
   .numeric-table th { font-weight: 700; border-bottom: 0.2mm solid #94a3b8; }
   .numeric-table td { overflow: hidden; }
   /*
-   * Kartu "Tabel Angka Buku Terpopuler" (kanan bawah) harus memuat 10 baris
+   * Kartu "Kategori Buku Paling Diminati" (kanan bawah) harus memuat 10 baris
    * di dalam kartu 42mm. Dengan 6.8pt/1.2 barisnya ~46mm sehingga terpotong
    * ~8mm; tabel di kartu ini dirapatkan (6.2pt, padding 0.2mm, line-height 1.1)
    * agar seluruh baris masuk tanpa membuang bagian.
@@ -379,7 +383,7 @@ export function generateBorrowingChartHtml(data: BorrowingChartData): string {
       ${monthlyCardHtml(months)}
       ${topBooksCardHtml(data)}
       ${byClassCardHtml(data)}
-      ${bookTableHtml(data)}
+      ${categoriesTableHtml(data)}
     </div>
     ${signaturesHtml(data)}
     <footer class="sheet-footer"><span>Halaman 1 dari 1</span></footer>

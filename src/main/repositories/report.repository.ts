@@ -810,6 +810,32 @@ export class ReportRepository extends BaseRepository {
     return rows.map((r) => ({ title: r.title, count: Number(r.count) }))
   }
 
+  // Kategori buku paling diminati (maks `limit`, default 10). Dihitung per
+  // KATEGORI buku melalui BorrowDetail → BookCopy → Book → Category.
+  // Book.categoryId nullable dan bertipe TUNGGAL (satu buku = satu kategori),
+  // jadi hitungan = jumlah eksemplar per kategori. Buku tanpa kategori
+  // dilabeli "Tanpa Kategori". GROUP BY ekspresi label agar kategori bernama
+  // sama (dan semua baris tanpa kategori) tergabung. Tie-break: nama asc.
+  async topCategoriesBetween(
+    from: Date,
+    to: Date,
+    limit = 10
+  ): Promise<Array<{ category: string; count: number }>> {
+    const rows = await this.prisma.$queryRaw<Array<{ category: string; count: number | bigint }>>(Prisma.sql`
+      SELECT COALESCE(NULLIF(TRIM(cat.name), ''), ${'Tanpa Kategori'}) AS category, COUNT(*) AS count
+      FROM BorrowDetail bd
+      JOIN Borrow b ON b.id = bd.borrowId
+      JOIN BookCopy bc ON bc.id = bd.bookCopyId
+      JOIN Book bk ON bk.id = bc.bookId
+      LEFT JOIN Category cat ON cat.id = bk.categoryId
+      WHERE b.borrowDate >= ${from} AND b.borrowDate <= ${to}
+      GROUP BY COALESCE(NULLIF(TRIM(cat.name), ''), ${'Tanpa Kategori'})
+      ORDER BY count DESC, category ASC
+      LIMIT ${limit}
+    `)
+    return rows.map((r) => ({ category: r.category, count: Number(r.count) }))
+  }
+
   // Distribusi per kelas memakai SNAPSHOT nama kelas pada transaksi
   // (Borrow.className; peminjaman kolektif memakai collectiveClassName).
   // Tidak ada keduanya → "Tanpa Kelas". `groupBy` + Map merge (bukan fetch-all),

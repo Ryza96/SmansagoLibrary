@@ -104,6 +104,14 @@ export interface BorrowingChartTopBook {
   count: number
 }
 
+// Kategori buku paling diminati (maks 10). Satu buku hanya punya SATU kategori
+// (Book.categoryId nullable), sehingga hitungan = eksemplar per kategori.
+// Buku tanpa kategori → "Tanpa Kategori". Urutan: count desc, lalu category asc.
+export interface BorrowingChartTopCategory {
+  category: string
+  count: number
+}
+
 // Distribusi per kelas (snapshot nama kelas pada transaksi). Transaksi tanpa
 // kelas → "Tanpa Kelas". Urutan: count desc, lalu className asc.
 export interface BorrowingChartClassRow {
@@ -124,5 +132,7 @@ export interface BorrowingChartData {
   summary: BorrowingChartSummary
   monthly: BorrowingChartMonthPoint[]
   topBooks: BorrowingChartTopBook[]
+  /** Isi tabel kanan bawah ("Kategori Buku Paling Diminati"). */
+  topCategories: BorrowingChartTopCategory[]
   byClass: BorrowingChartClassRow[]
 }
