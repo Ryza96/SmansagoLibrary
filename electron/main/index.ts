@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Menu } from 'electron'
+import { app, BrowserWindow, Menu, dialog } from 'electron'
 import path from 'path'
 import dotenv from 'dotenv'
 import { initDatabase, closeDatabase } from './database'
@@ -6,6 +6,10 @@ import { createContainer } from './bootstrap'
 import { registerAllHandlers } from '../ipc/index'
 import { bootstrapDataInfrastructure } from './infrastructure/bootstrap'
 import { bootstrapMigrations } from '../../src/main/infrastructure/migrations/migration-bootstrap'
+import {
+  createPreMigrationBackup,
+  findLatestPreMigrationBackup,
+} from '../../src/main/infrastructure/migrations/pre-migration-backup'
 import { databaseReconciliationService } from '../../src/main/services/database-reconciliation.service'
 import { resolveLiveDatabaseFile } from '../../src/main/infrastructure/database-path'
 import { connectPrisma, disconnectPrisma } from '../../src/main/repositories/base/prisma'
@@ -71,10 +75,71 @@ app.whenReady().then(async () => {
   // dengan menjalankan migration yang belum diterapkan (transaction-per-migration,
   // direkam ke tabel `_prisma_migrations` ala `prisma migrate deploy`). Dev tidak
   // terpengaruh — migration dev dikelola `prisma migrate deploy`.
+  //
+  // Jaring pengaman: SEBELUM menjalankan migrasi apa pun, database dibackup lebih
+  // dulu (hanya bila ada migrasi pending dan file DB sudah ada). Bila backup gagal,
+  // migrasi TIDAK dijalankan. Bila migrasi gagal, aplikasi berhenti dan tidak lanjut
+  // ke initDatabase. Mode non-packaged (dev) TIDAK terpengaruh.
   if (app.isPackaged) {
     const migrationsDir = path.join(process.resourcesPath, 'migrations')
-    const migrationResult = await bootstrapMigrations(migrationsDir)
-    console.log(`[Migrations] bootstrap: ${migrationResult.applied.length} applied, ${migrationResult.skipped.length} skipped`)
+    const preMigrationBackupDir = path.join(infra.paths.backupDir, 'pre-migration')
+    let preMigrationBackupPath: string | null = null
+
+    try {
+      const backupResult = await createPreMigrationBackup({
+        migrationsDir,
+        databaseFile: infra.paths.databaseFile,
+        backupDir: preMigrationBackupDir,
+        appVersion: app.getVersion(),
+      })
+      preMigrationBackupPath = backupResult.backupPath
+      if (backupResult.created) {
+        console.log(`[Migrations] backup pra-migrasi dibuat: ${backupResult.backupPath}`)
+      } else {
+        console.log('[Migrations] tidak ada migrasi pending — backup pra-migrasi tidak dibuat')
+      }
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      console.error(`[Migrations] backup pra-migrasi gagal: ${detail}`)
+      dialog.showErrorBox(
+        'Backup Pra-Migrasi Gagal',
+        [
+          'Aplikasi gagal membuat salinan backup database sebelum menjalankan migrasi.',
+          'Migrasi TIDAK dijalankan agar data Anda tetap aman.',
+          '',
+          `Lokasi folder backup: ${preMigrationBackupDir}`,
+          `Lokasi log: ${infra.paths.logsDir}`,
+          '',
+          `Detail: ${detail}`,
+        ].join('\n')
+      )
+      app.quit()
+      return
+    }
+
+    try {
+      const migrationResult = await bootstrapMigrations(migrationsDir)
+      console.log(`[Migrations] bootstrap: ${migrationResult.applied.length} applied, ${migrationResult.skipped.length} skipped`)
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      const latestBackup =
+        preMigrationBackupPath ?? findLatestPreMigrationBackup(preMigrationBackupDir)
+      console.error(`[Migrations] migrasi gagal: ${detail}`)
+      dialog.showErrorBox(
+        'Migrasi Database Gagal',
+        [
+          'Migrasi database gagal dijalankan.',
+          'Data lama tidak diubah dan tetap tersimpan pada database.',
+          latestBackup
+            ? `Salinan backup pra-migrasi terbaru: ${latestBackup}`
+            : 'Tidak ada berkas backup pra-migrasi.',
+          '',
+          `Detail: ${detail}`,
+        ].join('\n')
+      )
+      app.quit()
+      return
+    }
   }
 
   await initDatabase()
