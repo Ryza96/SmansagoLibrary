@@ -74,9 +74,8 @@ function normalizeMonths(months: BorrowingChartMonthPoint[] | undefined | null):
   }))
 }
 
-function headerHtml(data: BorrowingChartData, printedAt: string): string {
+function headerHtml(data: BorrowingChartData, printedAt: string, monogram: string): string {
   const institution = data.institution
-  const monogram = generateLogoMonogramSvg(institution.schoolName, institution.libraryName)
   const contact = [institution.phone, institution.email].filter((item) => item && item.trim()).join(' • ')
   return `
     <header class="doc-header">
@@ -265,7 +264,15 @@ const STYLES = `
     flex-direction: column;
   }
   .doc-header { display: flex; align-items: center; gap: 4mm; }
-  .doc-logo { flex: 0 0 auto; width: 12mm; height: 12mm; }
+  .doc-logo {
+    flex: 0 0 auto;
+    width: 12mm;
+    height: 12mm;
+    background-image: var(--report-logo-url, none);
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+  }
   .doc-logo svg { width: 100%; height: 100%; }
   .doc-identity { flex: 1 1 auto; min-width: 0; }
   .doc-library { font-size: 13pt; font-weight: 700; line-height: 1.2; }
@@ -364,20 +371,32 @@ const STYLES = `
  * Bangun HTML cetak laporan grafik peminjaman: SATU lembar A4 landscape.
  * Tidak ada <script>, tidak ada paginasi; footer selalu "Halaman 1 dari 1".
  */
-export function generateBorrowingChartHtml(data: BorrowingChartData): string {
+export function generateBorrowingChartHtml(
+  data: BorrowingChartData,
+  options?: { logoDataUri?: string | null }
+): string {
   const printedAt = formatPrintedAt(data.generatedAt)
   const months = normalizeMonths(data.monthly)
+  // Logo sekolah (data URI) & monogram saling eksklusif, persis pola
+  // generateReportPrintHtml: monogram kosong bila logo ada, dan data URI
+  // disuntikkan SEKALI lewat CSS variable.
+  const monogram = options?.logoDataUri
+    ? ''
+    : generateLogoMonogramSvg(data.institution.schoolName, data.institution.libraryName)
+  const logoVar = options?.logoDataUri
+    ? `:root { --report-logo-url: url("${options.logoDataUri}"); }`
+    : ''
 
   return `<!DOCTYPE html>
 <html lang="id">
 <head>
 <meta charset="utf-8" />
 <title>${escapeHtml(data.title)}</title>
-<style>${STYLES}</style>
+<style>${logoVar}${STYLES}</style>
 </head>
 <body>
   <section class="a4-sheet">
-    ${headerHtml(data, printedAt)}
+    ${headerHtml(data, printedAt, monogram)}
     ${summaryCardsHtml(data)}
     <div class="chart-grid">
       ${monthlyCardHtml(months)}

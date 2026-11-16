@@ -83,7 +83,10 @@ function logoElementHtml(data: BorrowCardData): string {
   if (data.header.logo) {
     return `<img class="logo-img" src="${escapeHtml(data.header.logo)}" alt="Logo Perpustakaan">`
   }
-  return `<svg viewBox="0 0 24 24" fill="none" stroke="#12235a" stroke-width="1.6"><path d="M2 6c3-1.5 6-1.5 9 0v13c-3-1.5-6-1.5-9 0V6z"/><path d="M22 6c-3-1.5-6-1.5-9 0v13c3-1.5 6-1.5 9 0V6z"/></svg>`
+  // Fallback seragam: monogram biru (bukan ikon buku). Bila schoolName &
+  // libraryName sama-sama kosong, generateLogoMonogramSvg sendiri jatuh ke
+  // ikon buku sebagai upaya terakhir.
+  return generateLogoMonogramSvg(data.header.schoolName, data.header.libraryName)
 }
 
 function headerHtml(data: BorrowCardData): string {

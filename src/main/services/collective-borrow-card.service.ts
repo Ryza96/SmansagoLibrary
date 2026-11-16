@@ -1,5 +1,6 @@
 import { BorrowRepository } from '../repositories/borrow.repository'
 import { generateQrCodeSvg } from './barcode.service'
+import { generateLogoMonogramSvg } from './borrow-card.service'
 import { COLLECTIVE_CARD_PAGE, paginateCollectiveCardRows } from '../../shared/config/collective-card'
 import type { CollectiveCardCopyData, CollectiveCardData } from '../../shared/dto/collective-card'
 import { AppError } from '../../../electron/main/errorHandler'
@@ -123,9 +124,10 @@ export async function buildCollectiveCardData(
 // grayscale (aman printer hitam-putih), font sistem.
 // ---------------------------------------------------------------------------
 
-function logoHtml(logo: string): string {
+function logoHtml(logo: string, schoolName: string, libraryName: string): string {
   if (logo) return `<img class="logo" src="${escapeHtml(logo)}" alt="Logo">`
-  return `<div class="logo-empty"></div>`
+  // Fallback seragam: monogram biru di dalam wadah 18mm.
+  return `<div class="logo-fallback">${generateLogoMonogramSvg(schoolName, libraryName)}</div>`
 }
 
 function sheetHeaderHtml(data: CollectiveCardData, page: number, totalPages: number, isFirst: boolean): string {
@@ -134,7 +136,7 @@ function sheetHeaderHtml(data: CollectiveCardData, page: number, totalPages: num
     : ''
   return `<div class="doc-head">
     <div class="school">
-      ${logoHtml(data.school.logo)}
+      ${logoHtml(data.school.logo, data.school.schoolName, data.school.libraryName)}
       <div class="school-text">
         <div class="library">${escapeHtml(data.school.libraryName)}</div>
         ${data.school.schoolName ? `<div class="school-name">${escapeHtml(data.school.schoolName)}</div>` : ''}
@@ -260,7 +262,8 @@ export function generateCollectiveCardHtml(data: CollectiveCardData, options: Co
   .doc-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8mm; border-bottom: 1mm solid #111111; padding-bottom: 4mm; }
   .school { display: flex; gap: 4mm; align-items: center; min-width: 0; }
   .logo { width: 18mm; height: 18mm; object-fit: contain; }
-  .logo-empty { width: 18mm; height: 18mm; border: 0.4mm solid #666666; }
+  .logo-fallback { width: 18mm; height: 18mm; }
+  .logo-fallback svg { width: 100%; height: 100%; display: block; }
   .library { font-size: 16pt; font-weight: 800; }
   .school-name { font-size: 10pt; font-weight: 700; color: #333333; }
   .school-addr { font-size: 8pt; color: #555555; }

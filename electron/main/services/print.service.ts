@@ -446,11 +446,16 @@ export class PrintService {
   }
 
   private async buildBorrowingChartHtml(filter?: BorrowingChartFilter): Promise<{ html: string; data: BorrowingChartData }> {
-    const data = await this.getBorrowingChartService().buildBorrowingChartData(filter)
-    // Grafik selalu SATU halaman. Kop dokumen berasal dari `data.institution`
-    // yang dibaca Service dari Settings, jadi tidak ada logo yang perlu
-    // disuntikkan di sini.
-    return { html: generateBorrowingChartHtml(data), data }
+    const [data, settings] = await Promise.all([
+      this.getBorrowingChartService().buildBorrowingChartData(filter),
+      this.settingService.get()
+    ])
+    // Grafik selalu SATU halaman. Kop dokumen berasal dari `data.institution`;
+    // logo dibaca persis pola buildReportPrintHtml: resolveAssetPath →
+    // readFileAsDataUri → fallback monogram di template.
+    const resolvedLogoPath = resolveAssetPath(settings.logoPath, this.assetRoot)
+    const logoDataUri = resolvedLogoPath ? await this.readFileAsDataUri(resolvedLogoPath) : null
+    return { html: generateBorrowingChartHtml(data, { logoDataUri }), data }
   }
 
   async previewBorrowingChart(
